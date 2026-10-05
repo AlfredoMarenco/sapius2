@@ -57,7 +57,7 @@ class Lesson extends Model
         return $this->hasMany(Quiz::class, 'leccion_id');
     }
 
-    public function homeworks()
+    public function homeworkAssignments()
     {
         return $this->hasMany(Homework::class, 'leccion_id');
     }

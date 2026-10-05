@@ -10,7 +10,7 @@ use App\Models\Quiz;
 use App\Models\Question;
 use App\Models\Answer;
 use App\Models\Media;
-use App\Models\HomeworkAssignment;
+use App\Models\Homework;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
