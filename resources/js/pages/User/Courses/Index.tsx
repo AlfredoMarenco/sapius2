@@ -69,7 +69,7 @@ export default function Index({ enrollments }: Props) {
                             {/* Course Image & Progress Overlay */}
                             <div className="relative aspect-[16/9] overflow-hidden bg-gray-100">
                                 <img 
-                                    src={enrollment.image ? (enrollment.image.startsWith('http') ? enrollment.image : `/storage/${enrollment.image}`) : 'https://images.unsplash.com/photo-1576091160550-217359f42f8c?auto=format&fit=crop&q=80&w=2070'} 
+                                    src={enrollment.image ? (enrollment.image.startsWith('http') ? enrollment.image : `/media/stream/${enrollment.image}`) : 'https://images.unsplash.com/photo-1576091160550-217359f42f8c?auto=format&fit=crop&q=80&w=2070'} 
                                     alt={enrollment.title}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                                 />
@@ -160,8 +160,8 @@ export default function Index({ enrollments }: Props) {
 Index.layout = (page: any) => (
     <AppLayout
         breadcrumbs={[
-            { title: 'Dashboard', href: '/user/dashboard' },
-            { title: 'Mis Cursos', href: '/user/my-courses' },
+            { title: 'Dashboard', href: '/alumno' },
+            { title: 'Mis Cursos', href: '/alumno/my-courses' },
         ]}
     >
         {page}

@@ -41,19 +41,19 @@ export default function Login({
                     <>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60 ml-1">Correo Electrónico</Label>
+                                <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60 ml-1">Nombre de Usuario</Label>
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
+                                    id="username"
+                                    type="text"
+                                    name="username"
                                     required
                                     autoFocus
                                     tabIndex={1}
-                                    autoComplete="email"
-                                    placeholder="admin@sapius.com"
+                                    autoComplete="username"
+                                    placeholder="Ej: lalo.ce"
                                     className="h-14 border-2 rounded-2xl px-5 font-bold focus-visible:ring-brand-navy focus-visible:border-brand-navy"
                                 />
-                                <InputError message={errors.email} />
+                                <InputError message={errors.username} />
                             </div>
 
                             <div className="grid gap-2">

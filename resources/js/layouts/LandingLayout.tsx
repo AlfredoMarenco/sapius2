@@ -122,7 +122,7 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
                                 Registrarme
                             </Link>
                             <Link 
-                                href={auth.user ? (auth.user.roles?.[0]?.name === 'admin' ? '/admin/dashboard' : '/dashboard') : '/login'} 
+                                href={auth.user ? (auth.user.roles?.[0]?.name === 'admin' ? '/admin/dashboard' : '/alumno') : '/login'} 
                                 className="group relative flex items-center justify-center rounded-lg bg-brand-coral px-6 py-3.5 text-xs font-bold tracking-widest text-white transition-all hover:scale-105 active:scale-95 shadow-lg shadow-brand-coral/20 uppercase overflow-hidden"
                             >
                                 <span className="relative z-10 mr-2">IR AL PANEL</span>

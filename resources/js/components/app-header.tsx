@@ -33,7 +33,7 @@ import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, toUrl } from '@/lib/utils';
-import { dashboard } from '@/routes';
+// removed
 import type { BreadcrumbItem, NavItem, Auth } from '@/types';
 
 type Props = {
@@ -60,7 +60,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const { auth } = usePage<Auth>().props;
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
-    const dashboardUrl = auth.user?.role === 'admin' ? '/admin/dashboard' : '/user/dashboard';
+    const dashboardUrl = auth.user?.role === 'admin' ? '/admin/dashboard' : '/alumno';
 
     const mainNavItems: NavItem[] = [
         {

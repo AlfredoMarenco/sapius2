@@ -214,7 +214,7 @@ export default function Edit({ course, categories }: Props) {
                                                 <span className="text-xs font-bold text-brand-blue truncate max-w-[150px]">{(data.image as any).name}</span>
                                             </div>
                                         ) : course.image ? (
-                                            <img src={`/storage/${course.image}`} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                                            <img src={`/media/stream/${course.image}`} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
                                         ) : (
                                             <ImageIcon className="h-10 w-10 mb-2" />
                                         )}

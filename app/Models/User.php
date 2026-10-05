@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use Spatie\Permission\Traits\HasRoles;
+use App\Concerns\HasShinobiRoles;
+
+use App\Concerns\MapsLegacyAttributes;
 
 #[Fillable([
     'first_name',
@@ -34,8 +36,21 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasShinobiRoles, MapsLegacyAttributes;
 
+    protected $legacyMapping = [
+        'first_name' => 'nombre',
+        'last_name' => 'apellido',
+        'phone' => 'telefono',
+        'photo' => 'foto',
+        'id_folio' => 'folio',
+        'university' => 'universidad_procedencia',
+        'document_id' => 'documento_identificacion',
+        'entry_pass' => 'pase_ingreso',
+        'specialty' => 'especialidad',
+        'is_active' => 'activo',
+        // username, email, password, strikes, is_blocked are same
+    ];
     protected $appends = ['name', 'role'];
 
     /**
@@ -66,7 +81,11 @@ class User extends Authenticatable
 
     public function getRoleAttribute()
     {
-        return $this->roles->first()?->name ?? 'student';
+        $role = $this->roles->first();
+        if (!$role) {
+            return 'alumno';
+        }
+        return strtolower($role->slug ?? $role->name);
     }
 
     /**

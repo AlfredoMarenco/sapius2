@@ -89,7 +89,7 @@ export default function Welcome({ slides, prides, teachers, reviews }: Props) {
                         <div className="mt-16 lg:mt-0 lg:col-span-5 relative">
                             <div className="relative rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,28,61,0.2)] skew-y-1 lg:skew-y-3 ring-8 ring-white">
                                 {slides.length > 0 ? (
-                                    <img src={`/storage/${slides[0].img}`} alt="Sapius Slide" className="w-full h-auto aspect-[4/5] object-cover" />
+                                    <img src={`/media/stream/${slides[0].img}`} alt="Sapius Slide" className="w-full h-auto aspect-[4/5] object-cover" />
                                 ) : (
                                     <div className="bg-gray-50 aspect-[4/5] flex items-center justify-center">
                                         <GraduationCap className="w-32 h-32 text-brand-navy/10" />
@@ -223,7 +223,7 @@ export default function Welcome({ slides, prides, teachers, reviews }: Props) {
                             <div key={p.id} className="bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[3rem] hover:bg-white/10 transition-all group">
                                 <div className="relative w-36 h-36 mx-auto mb-8">
                                     <div className="absolute inset-0 bg-brand-coral/20 rounded-full scale-110 group-hover:scale-125 transition-all"></div>
-                                    <img src={`/storage/${p.img}`} alt={p.name} className="relative w-full h-full object-cover rounded-full border-4 border-white/5 shadow-2xl" />
+                                    <img src={`/media/stream/${p.img}`} alt={p.name} className="relative w-full h-full object-cover rounded-full border-4 border-white/5 shadow-2xl" />
                                 </div>
                                 <div className="text-center">
                                     <h4 className="text-2xl font-black text-white uppercase tracking-tight">{p.name}</h4>
@@ -255,7 +255,7 @@ export default function Welcome({ slides, prides, teachers, reviews }: Props) {
                             <div key={t.id} className="text-center group">
                                 <div className="relative inline-block mb-10">
                                     <div className="absolute inset-0 bg-brand-coral/5 rounded-full scale-[1.3] group-hover:scale-[1.8] group-hover:opacity-0 transition-all duration-1000"></div>
-                                    <img src={`/storage/${t.img}`} alt={t.name} className="relative w-56 h-56 object-cover rounded-full border-4 border-gray-50 shadow-[0_20px_50px_rgba(0,28,61,0.15)] group-hover:scale-105 transition-all duration-500" />
+                                    <img src={`/media/stream/${t.img}`} alt={t.name} className="relative w-56 h-56 object-cover rounded-full border-4 border-gray-50 shadow-[0_20px_50px_rgba(0,28,61,0.15)] group-hover:scale-105 transition-all duration-500" />
                                 </div>
                                 <h4 className="text-3xl font-black text-brand-navy uppercase tracking-tighter">{t.name}</h4>
                                 <p className="mt-3 text-brand-coral font-black uppercase tracking-widest text-xs">{t.description}</p>

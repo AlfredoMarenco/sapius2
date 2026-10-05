@@ -174,6 +174,7 @@ export default function Builder({ course }: Props) {
     const [isEditModuleModalOpen, setIsEditModuleModalOpen] = useState(false);
     const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
     const [activeModuleId, setActiveModuleId] = useState<number | null>(null);
     const [editingModule, setEditingModule] = useState<Module | null>(null);
@@ -255,6 +256,10 @@ export default function Builder({ course }: Props) {
             { text: '', is_correct: false },
             { text: '', is_correct: false },
         ]
+    });
+
+    const importForm = useForm({
+        file: null as File | null,
     });
 
     useEffect(() => {
@@ -377,6 +382,14 @@ export default function Builder({ course }: Props) {
         if (!activeLesson || activeLesson.quizzes.length === 0) return;
         questionForm.post(`/admin/quizzes/${activeLesson.quizzes[0].id}/questions`, {
             onSuccess: () => { setIsQuestionModalOpen(false); questionForm.reset(); }
+        });
+    };
+
+    const handleImportSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeLesson || activeLesson.quizzes.length === 0) return;
+        importForm.post(`/admin/quizzes/${activeLesson.quizzes[0].id}/import-questions`, {
+            onSuccess: () => { setIsImportModalOpen(false); importForm.reset(); }
         });
     };
 
@@ -691,7 +704,10 @@ export default function Builder({ course }: Props) {
                                                         <h3 className="text-xl font-black text-brand-navy uppercase tracking-tight">Banco de Preguntas ({activeLesson.quizzes[0]?.questions.length ?? 0})</h3>
                                                         <p className="text-xs text-muted-foreground font-medium italic">Solo opción múltiple con 4 respuestas.</p>
                                                     </div>
-                                                    <Button onClick={() => setIsQuestionModalOpen(true)} disabled={activeLesson.quizzes.length === 0} size="sm" className="bg-brand-blue rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 px-8"><Plus className="h-3 w-3 mr-2" /> Nueva Pregunta</Button>
+                                                    <div className="flex gap-2">
+                                                        <Button onClick={() => setIsImportModalOpen(true)} disabled={activeLesson.quizzes.length === 0} size="sm" variant="outline" className="rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 px-6 border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white"><FileText className="h-3 w-3 mr-2" /> Importar</Button>
+                                                        <Button onClick={() => setIsQuestionModalOpen(true)} disabled={activeLesson.quizzes.length === 0} size="sm" className="bg-brand-blue rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 px-6"><Plus className="h-3 w-3 mr-2" /> Nueva Pregunta</Button>
+                                                    </div>
                                                 </div>
 
                                                 {activeLesson.quizzes[0]?.questions.length === 0 && <div className="bg-gray-50 border-2 border-dashed rounded-[3rem] p-20 text-center">
@@ -888,6 +904,41 @@ export default function Builder({ course }: Props) {
                             <Button type="submit" disabled={mediaForm.processing} className="bg-brand-blue rounded-xl font-black uppercase tracking-widest px-10 h-12 shadow-lg shadow-brand-blue/20">Agregar Recurso</Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+                <DialogContent className="sm:max-w-[425px] rounded-[2rem] border-0 shadow-2xl overflow-hidden p-0">
+                    <div className="bg-brand-navy p-6 flex flex-col gap-2 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                            <FileText className="w-24 h-24" />
+                        </div>
+                        <DialogTitle className="text-2xl font-black text-white uppercase tracking-tight relative z-10">Importar Preguntas</DialogTitle>
+                    </div>
+                    <div className="p-6">
+                        <div className="text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                            <p className="mb-2"><strong>Formato Sapius Legacy (Excel/CSV)</strong></p>
+                            <p>El archivo debe contener en la fila 1 la cabecera: <code className="text-xs bg-gray-200 px-1 py-0.5 rounded">slug | pregunta | retro | r1 | r2 | r3 | r4 | ... | correcta | score | imagen</code></p>
+                        </div>
+                        <form onSubmit={handleImportSubmit} className="space-y-6">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60">Archivo Excel (.xlsx, .csv)</Label>
+                                <Input 
+                                    type="file" 
+                                    accept=".xlsx, .xls, .csv" 
+                                    onChange={e => importForm.setData('file', e.target.files?.[0] || null)}
+                                    className="h-12 border-gray-100 rounded-xl font-bold file:h-12 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20"
+                                />
+                                {importForm.errors.file && <p className="text-xs text-red-500">{importForm.errors.file}</p>}
+                            </div>
+                            <DialogFooter className="gap-2 sm:gap-0">
+                                <Button type="button" variant="ghost" onClick={() => setIsImportModalOpen(false)} className="font-black uppercase text-[10px] tracking-widest h-12">Cancelar</Button>
+                                <Button type="submit" disabled={importForm.processing || !importForm.data.file} className="bg-brand-blue hover:bg-brand-blue/90 rounded-xl h-12 px-8 font-black uppercase text-[10px] tracking-widest text-white shadow-lg shadow-brand-blue/20">
+                                    Subir e Importar
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </div>
                 </DialogContent>
             </Dialog>
 

@@ -233,12 +233,118 @@ class CourseBuilderController extends Controller
     }
 
     /**
+     * Update an existing question and its answers.
+     */
+    public function updateQuestion(Request $request, Question $question)
+    {
+        $validated = $request->validate([
+            'text' => 'required|string',
+            'explanation' => 'nullable|string',
+            'points' => 'required|integer|min:0',
+            'answers' => 'required|array|min:2',
+            'answers.*.id' => 'nullable|exists:answers,id',
+            'answers.*.text' => 'required|string',
+            'answers.*.is_correct' => 'required|boolean',
+        ]);
+
+        $question->update([
+            'text' => $validated['text'],
+            'explanation' => $validated['explanation'],
+            'points' => $validated['points'],
+        ]);
+
+        $existingAnswerIds = [];
+        foreach ($validated['answers'] as $answerData) {
+            if (isset($answerData['id'])) {
+                $answer = $question->answers()->find($answerData['id']);
+                if ($answer) {
+                    $answer->update([
+                        'text' => $answerData['text'],
+                        'is_correct' => $answerData['is_correct'],
+                    ]);
+                    $existingAnswerIds[] = $answer->id;
+                }
+            } else {
+                $newAnswer = $question->answers()->create([
+                    'text' => $answerData['text'],
+                    'is_correct' => $answerData['is_correct'],
+                ]);
+                $existingAnswerIds[] = $newAnswer->id;
+            }
+        }
+        
+        $question->answers()->whereNotIn('id', $existingAnswerIds)->delete();
+
+        return back()->with('success', 'Pregunta actualizada correctamente');
+    }
+
+    /**
      * Delete a question.
      */
     public function destroyQuestion(Question $question)
     {
         $question->delete();
         return back()->with('success', 'Pregunta eliminada');
+    }
+
+    /**
+     * Duplicate a quiz and its questions.
+     */
+    public function duplicateQuiz(Quiz $quiz)
+    {
+        $newQuiz = $quiz->replicate();
+        $newQuiz->title = $quiz->title . ' (Copia)';
+        $newQuiz->save();
+
+        foreach ($quiz->questions as $question) {
+            $newQuestion = $question->replicate();
+            $newQuestion->quiz_id = $newQuiz->id;
+            $newQuestion->save();
+
+            foreach ($question->answers as $answer) {
+                $newAnswer = $answer->replicate();
+                $newAnswer->question_id = $newQuestion->id;
+                $newAnswer->save();
+            }
+        }
+
+        return back()->with('success', 'Examen duplicado correctamente');
+    }
+
+    /**
+     * Reorder modules.
+     */
+    public function reorderModules(Request $request, Course $course)
+    {
+        $validated = $request->validate([
+            'modules' => 'required|array',
+            'modules.*.id' => 'required|exists:modules,id',
+            'modules.*.position' => 'required|integer|min:0',
+        ]);
+
+        foreach ($validated['modules'] as $moduleData) {
+            $course->modules()->where('id', $moduleData['id'])->update(['position' => $moduleData['position']]);
+        }
+
+        return back()->with('success', 'Módulos reordenados');
+    }
+
+    /**
+     * Reorder lessons.
+     */
+    public function reorderLessons(Request $request, Module $module)
+    {
+        $validated = $request->validate([
+            'lessons' => 'required|array',
+            'lessons.*.id' => 'required|exists:lessons,id',
+            'lessons.*.position' => 'required|integer|min:0',
+        ]);
+
+        foreach ($validated['lessons'] as $lessonData) {
+            $module->lessons()->where('id', $lessonData['id'])->update(['position' => $lessonData['position']]);
+        }
+
+        return back()->with('success', 'Lecciones reordenadas');
     }
 
     /**
@@ -249,14 +355,93 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'points' => 'required|integer|min:0',
+            'points' => 'nullable|integer|min:0',
         ]);
 
-        $lesson->homeworkAssignments()->updateOrCreate(
-            ['lesson_id' => $lesson->id],
-            $validated
-        );
+        $lesson->update([
+            'resumen' => $validated['description'] ?? $validated['title'],
+        ]);
 
         return back()->with('success', 'Tarea actualizada correctamente');
+    }
+
+    /**
+     * Upload a chunk of a large media file.
+     */
+    public function uploadChunk(Request $request)
+    {
+        $chunk = $request->file('file');
+        $index = $request->input('index');
+        $totalChunks = $request->input('total_chunks');
+        $identifier = $request->input('identifier');
+        $originalName = $request->input('filename');
+
+        if (!$chunk || is_null($index) || is_null($totalChunks) || !$identifier) {
+            return response()->json(['error' => 'Datos de fragmento inválidos.'], 400);
+        }
+
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        if (strtolower($extension) !== 'mp4') {
+            return response()->json(['error' => 'Solo se permiten archivos de video con extensión MP4.'], 400);
+        }
+
+        $identifier = preg_replace('/[^a-zA-Z0-9_\-]/', '', $identifier);
+        $tempDir = storage_path('app/chunks/' . $identifier);
+
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+
+        $chunkName = 'chunk_' . $index;
+        $chunk->move($tempDir, $chunkName);
+
+        $uploadedCount = count(glob($tempDir . '/chunk_*'));
+
+        if ($uploadedCount == $totalChunks) {
+            $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+            if (empty($extension)) {
+                $extension = 'mp4';
+            }
+            $finalFilename = $identifier . '.' . $extension;
+            
+            $finalDir = storage_path('app/uploads');
+            if (!file_exists($finalDir)) {
+                mkdir($finalDir, 0777, true);
+            }
+            
+            $finalPath = $finalDir . "/" . $finalFilename;
+
+            $out = fopen($finalPath, 'wb');
+            if ($out) {
+                for ($i = 0; $i < $totalChunks; $i++) {
+                    $chunkFile = $tempDir . '/chunk_' . $i;
+                    if (file_exists($chunkFile)) {
+                        $in = fopen($chunkFile, 'rb');
+                        if ($in) {
+                            while ($buff = fread($in, 4096)) {
+                                fwrite($out, $buff);
+                            }
+                            fclose($in);
+                            unlink($chunkFile);
+                        }
+                    }
+                }
+                fclose($out);
+            }
+
+            if (file_exists($tempDir)) {
+                rmdir($tempDir);
+            }
+
+            return response()->json([
+                'completed' => true,
+                'filename' => $finalFilename
+            ]);
+        }
+
+        return response()->json([
+            'completed' => false,
+            'progress' => round(($uploadedCount / $totalChunks) * 100, 2)
+        ]);
     }
 }

@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Head, useForm, router } from '@inertiajs/react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -20,8 +20,27 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingAdminNav } from '../LandingAdminNav';
+
+// DND-Kit Imports
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Slide {
     id: number;
@@ -32,9 +51,70 @@ interface Slide {
     active: boolean;
 }
 
-export default function Index({ slides }: { slides: Slide[] }) {
+// Componente para Fila Ordenable
+const SortableRow = ({ slide, handleEdit, handleDelete }: { slide: Slide, handleEdit: (s: Slide) => void, handleDelete: (id: number) => void }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: slide.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+        backgroundColor: isDragging ? '#f9fafb' : 'white',
+        opacity: isDragging ? 0.8 : 1,
+    };
+
+    return (
+        <TableRow ref={setNodeRef} style={style} className={isDragging ? 'shadow-md' : ''}>
+            <TableCell>
+                <div 
+                    {...attributes} 
+                    {...listeners} 
+                    className="cursor-grab hover:text-brand-orange text-gray-400 p-2 -ml-2"
+                >
+                    <GripVertical className="h-5 w-5" />
+                </div>
+            </TableCell>
+            <TableCell>
+                <div className="h-12 w-20 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+                    {slide.img ? (
+                        <img src={slide.img.startsWith('http') ? slide.img : `/media/stream/${slide.img}`} alt={slide.title} className="h-full w-full object-cover" />
+                    ) : (
+                        <ImageIcon className="h-6 w-6 text-gray-400" />
+                    )}
+                </div>
+            </TableCell>
+            <TableCell className="font-medium">{slide.title}</TableCell>
+            <TableCell>{slide.section}</TableCell>
+            <TableCell>{slide.position}</TableCell>
+            <TableCell className="text-right">
+                <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(slide)}>
+                        <Pencil className="h-4 w-4 text-brand-blue" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(slide.id)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+};
+
+export default function Index({ slides: initialSlides }: { slides: Slide[] }) {
+    const [slides, setSlides] = useState<Slide[]>(initialSlides);
     const [isEditing, setIsEditing] = useState<Slide | null>(null);
     const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        setSlides(initialSlides);
+    }, [initialSlides]);
 
     const { data, setData, post, put, delete: destroy, processing, reset, errors } = useForm({
         title: '',
@@ -43,6 +123,42 @@ export default function Index({ slides }: { slides: Slide[] }) {
         position: 1,
         active: true,
     });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 5 }, // Previene drags accidentales al hacer clic
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = slides.findIndex(s => s.id === active.id);
+            const newIndex = slides.findIndex(s => s.id === over.id);
+
+            const newOrder = arrayMove(slides, oldIndex, newIndex);
+            
+            // Actualizar estado visualmente de inmediato
+            setSlides(newOrder.map((s, index) => ({ ...s, position: index + 1 })));
+
+            // Enviar orden al backend
+            try {
+                await fetch('/api/sort/slides', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ slides: newOrder.map(s => s.id) })
+                });
+                router.reload({ only: ['slides'] }); // Refrescar los datos limpios si es necesario
+            } catch (error) {
+                console.error("Error guardando el nuevo orden", error);
+                setSlides(initialSlides); // Revertir en caso de error
+            }
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -141,6 +257,7 @@ export default function Index({ slides }: { slides: Slide[] }) {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12"></TableHead>
                                 <TableHead className="w-24">Imagen</TableHead>
                                 <TableHead>Título</TableHead>
                                 <TableHead>Sección</TableHead>
@@ -149,32 +266,25 @@ export default function Index({ slides }: { slides: Slide[] }) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {slides.map((slide) => (
-                                <TableRow key={slide.id}>
-                                    <TableCell>
-                                        <div className="h-12 w-20 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
-                                            {slide.img ? (
-                                                <img src={slide.img.startsWith('http') ? slide.img : `/storage/${slide.img}`} alt={slide.title} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <ImageIcon className="h-6 w-6 text-gray-400" />
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="font-medium">{slide.title}</TableCell>
-                                    <TableCell>{slide.section}</TableCell>
-                                    <TableCell>{slide.position}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(slide)}>
-                                                <Pencil className="h-4 w-4 text-brand-blue" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(slide.id)}>
-                                                <Trash2 className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <SortableContext
+                                    items={slides.map(s => s.id)}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    {slides.map((slide) => (
+                                        <SortableRow 
+                                            key={slide.id} 
+                                            slide={slide} 
+                                            handleEdit={handleEdit} 
+                                            handleDelete={handleDelete} 
+                                        />
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
                         </TableBody>
                     </Table>
                 </div>

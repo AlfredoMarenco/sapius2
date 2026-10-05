@@ -15,7 +15,16 @@ import {
     XCircle,
     ArrowRight,
     Clock,
-    Tag
+    Tag,
+    BookOpen,
+    Users,
+    Percent,
+    Activity,
+    Video,
+    FileText,
+    ListChecks,
+    Ticket,
+    CalendarDays
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -39,10 +48,10 @@ interface Instructor {
 interface ScheduledCourse {
     id: number;
     instructor_id: number;
-    instructor: {
+    instructor?: {
         first_name: string;
         last_name: string;
-    };
+    } | null;
     start_date: string;
     end_date: string;
     price: number;
@@ -56,7 +65,7 @@ interface Course {
     image: string | null;
     category: {
         name: string;
-    };
+    } | null;
     modules_count: number;
     scheduled_courses: ScheduledCourse[];
 }
@@ -106,7 +115,7 @@ export default function Show({ course, instructors }: Props) {
                         <h1 className="text-3xl font-black text-brand-navy tracking-tighter uppercase leading-none">{course.title}</h1>
                         <div className="flex items-center gap-3">
                             <Badge variant="outline" className="rounded-full bg-brand-blue/5 text-brand-blue border-brand-blue/20 text-[10px] uppercase font-black px-3">
-                                {course.category.name}
+                                {course.category?.name || 'General'}
                             </Badge>
                             <span className="text-gray-400 text-xs font-bold uppercase tracking-widest flex items-center gap-1">
                                 <Layers className="w-3.5 h-3.5" />
@@ -127,6 +136,12 @@ export default function Show({ course, instructors }: Props) {
                         <Button variant="outline" className="rounded-2xl border-2 font-black uppercase tracking-widest text-[10px] h-12 gap-2 hover:bg-brand-navy hover:text-white transition-all shadow-lg shadow-gray-200">
                             <Edit3 className="w-4 h-4" />
                             Editar Información
+                        </Button>
+                    </Link>
+                    <Link href={`/admin/courses/${course.id}/calendars`}>
+                        <Button variant="outline" className="rounded-2xl border-2 border-brand-cyan text-brand-cyan font-black uppercase tracking-widest text-[10px] h-12 gap-2 hover:bg-brand-cyan hover:text-white transition-all shadow-lg shadow-brand-cyan/20">
+                            <CalendarDays className="w-4 h-4" />
+                            Calendarios
                         </Button>
                     </Link>
                     <Button 
@@ -185,7 +200,7 @@ export default function Show({ course, instructors }: Props) {
                                                         </span>
                                                         <span className="flex items-center gap-1.5 pt-1">
                                                             <UserIcon className="w-3.5 h-3.5" />
-                                                            {schedule.instructor.first_name} {schedule.instructor.last_name}
+                                                            {schedule.instructor ? `${schedule.instructor.first_name} ${schedule.instructor.last_name}` : 'Docente Asignado'}
                                                         </span>
                                                         <span className="flex items-center gap-1.5 pt-1 text-brand-navy font-black">
                                                             <DollarSign className="w-3.5 h-3.5" />
@@ -195,10 +210,43 @@ export default function Show({ course, instructors }: Props) {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                                                <Link href={`/admin/registro/contenido?cp_id=${schedule.id}`}>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm"
+                                                        className="rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border-blue-200 text-blue-700 hover:bg-blue-50 transition-all"
+                                                        title="Programar calendario y apertura de clases"
+                                                    >
+                                                        <BookOpen className="w-3.5 h-3.5 text-blue-600" /> Contenido
+                                                    </Button>
+                                                </Link>
+
+                                                <Link href={`/admin/curso/${schedule.id}`}>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm"
+                                                        className="rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border-gray-200 text-gray-700 hover:bg-gray-100 transition-all"
+                                                        title="Ver alumnos inscritos en esta cohorte"
+                                                    >
+                                                        <Users className="w-3.5 h-3.5 text-gray-600" /> Alumnos
+                                                    </Button>
+                                                </Link>
+
+                                                <Link href={`/admin/scheduled-courses/${schedule.id}/discounts`}>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm"
+                                                        className="rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border-orange-200 text-orange-700 hover:bg-orange-50 transition-all"
+                                                        title="Gestionar cupones de descuento"
+                                                    >
+                                                        <Ticket className="w-3.5 h-3.5 text-orange-600" /> Descuentos
+                                                    </Button>
+                                                </Link>
+
                                                 <Button 
                                                     variant="ghost" 
-                                                    className={`rounded-xl px-4 font-black uppercase text-[10px] tracking-widest gap-2 h-10 border transition-all ${schedule.is_active ? 'border-brand-cyan/20 text-brand-cyan hover:bg-brand-cyan/5' : 'border-gray-200 text-gray-400 hover:bg-gray-100'}`}
+                                                    className={`rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border transition-all ${schedule.is_active ? 'border-brand-cyan/20 text-brand-cyan hover:bg-brand-cyan/5' : 'border-gray-200 text-gray-400 hover:bg-gray-100'}`}
                                                     onClick={() => handleToggle(schedule.id)}
                                                 >
                                                     {schedule.is_active ? (
@@ -214,7 +262,22 @@ export default function Show({ course, instructors }: Props) {
                                                             <MoreVertical className="w-4 h-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="rounded-2xl border-2 p-2">
+                                                    <DropdownMenuContent align="end" className="rounded-2xl border-2 p-2 w-52">
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/admin/registro/contenido?cp_id=${schedule.id}`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
+                                                                <BookOpen className="w-3.5 h-3.5 text-blue-600" /> Programar Contenido
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/admin/curso/${schedule.id}`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
+                                                                <Users className="w-3.5 h-3.5 text-gray-600" /> Lista de Alumnos
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/admin/registro/descuentos?cp_id=${schedule.id}`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
+                                                                <Percent className="w-3.5 h-3.5 text-emerald-600" /> Códigos Descuento
+                                                            </Link>
+                                                        </DropdownMenuItem>
                                                         <DropdownMenuItem 
                                                             onClick={() => {
                                                                 setEditingSchedule(schedule);
@@ -263,7 +326,7 @@ export default function Show({ course, instructors }: Props) {
                     <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-2xl shadow-gray-200/50 overflow-hidden">
                         <div className="aspect-video bg-gray-100 overflow-hidden relative">
                             <img 
-                                src={course.image ? (course.image.startsWith('http') ? course.image : `/storage/${course.image}`) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=2070'} 
+                                src={course.image ? (course.image.startsWith('http') ? course.image : `/media/stream/${course.image}`) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=2070'} 
                                 alt={course.title}
                                 className="w-full h-full object-cover"
                             />

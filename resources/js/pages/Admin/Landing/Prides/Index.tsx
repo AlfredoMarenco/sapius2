@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Head, useForm, router } from '@inertiajs/react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -21,8 +21,27 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingAdminNav } from '../LandingAdminNav';
+
+// DND-Kit Imports
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Pride {
     id: number;
@@ -34,9 +53,70 @@ interface Pride {
     active: boolean;
 }
 
-export default function Index({ prides }: { prides: Pride[] }) {
+// Componente para Fila Ordenable
+const SortableRow = ({ pride, handleEdit, handleDelete }: { pride: Pride, handleEdit: (p: Pride) => void, handleDelete: (id: number) => void }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: pride.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+        backgroundColor: isDragging ? '#f9fafb' : 'white',
+        opacity: isDragging ? 0.8 : 1,
+    };
+
+    return (
+        <TableRow ref={setNodeRef} style={style} className={isDragging ? 'shadow-md' : ''}>
+            <TableCell>
+                <div 
+                    {...attributes} 
+                    {...listeners} 
+                    className="cursor-grab hover:text-brand-orange text-gray-400 p-2 -ml-2"
+                >
+                    <GripVertical className="h-5 w-5" />
+                </div>
+            </TableCell>
+            <TableCell>
+                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                    {pride.img ? (
+                        <img src={pride.img.startsWith('http') ? pride.img : `/media/stream/${pride.img}`} alt={pride.name} className="h-full w-full object-cover" />
+                    ) : (
+                        <ImageIcon className="h-6 w-6 text-gray-400" />
+                    )}
+                </div>
+            </TableCell>
+            <TableCell className="font-medium">{pride.name}</TableCell>
+            <TableCell>{pride.text}</TableCell>
+            <TableCell>{pride.position}</TableCell>
+            <TableCell className="text-right">
+                <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(pride)}>
+                        <Pencil className="h-4 w-4 text-brand-blue" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(pride.id)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+};
+
+export default function Index({ prides: initialPrides }: { prides: Pride[] }) {
+    const [prides, setPrides] = useState<Pride[]>(initialPrides);
     const [isEditing, setIsEditing] = useState<Pride | null>(null);
     const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        setPrides(initialPrides);
+    }, [initialPrides]);
 
     const { data, setData, post, delete: destroy, processing, reset, errors } = useForm({
         _method: 'POST',
@@ -47,6 +127,42 @@ export default function Index({ prides }: { prides: Pride[] }) {
         position: 1,
         active: true,
     });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 5 },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = prides.findIndex(p => p.id === active.id);
+            const newIndex = prides.findIndex(p => p.id === over.id);
+
+            const newOrder = arrayMove(prides, oldIndex, newIndex);
+            
+            // Actualizar estado visualmente de inmediato
+            setPrides(newOrder.map((p, index) => ({ ...p, position: index + 1 })));
+
+            // Enviar orden al backend
+            try {
+                await fetch('/api/sort/prides', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ prides: newOrder.map(p => p.id) })
+                });
+                router.reload({ only: ['prides'] });
+            } catch (error) {
+                console.error("Error guardando el nuevo orden", error);
+                setPrides(initialPrides);
+            }
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -145,6 +261,7 @@ export default function Index({ prides }: { prides: Pride[] }) {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12"></TableHead>
                                 <TableHead className="w-24">Foto</TableHead>
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Subtítulo</TableHead>
@@ -153,32 +270,25 @@ export default function Index({ prides }: { prides: Pride[] }) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {prides.map((pride) => (
-                                <TableRow key={pride.id}>
-                                    <TableCell>
-                                        <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                                            {pride.img ? (
-                                                <img src={pride.img.startsWith('http') ? pride.img : `/storage/${pride.img}`} alt={pride.name} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <ImageIcon className="h-6 w-6 text-gray-400" />
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="font-medium">{pride.name}</TableCell>
-                                    <TableCell>{pride.text}</TableCell>
-                                    <TableCell>{pride.position}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(pride)}>
-                                                <Pencil className="h-4 w-4 text-brand-blue" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(pride.id)}>
-                                                <Trash2 className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <SortableContext
+                                    items={prides.map(p => p.id)}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    {prides.map((pride) => (
+                                        <SortableRow 
+                                            key={pride.id} 
+                                            pride={pride} 
+                                            handleEdit={handleEdit} 
+                                            handleDelete={handleDelete} 
+                                        />
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
                         </TableBody>
                     </Table>
                 </div>

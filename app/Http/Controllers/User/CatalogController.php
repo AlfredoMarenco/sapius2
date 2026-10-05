@@ -9,103 +9,125 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class CatalogController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Get available courses filtered by category or all.
+     */
+    protected function getAvailableItems($categoryName = null)
     {
-        $user = $request->user();
+        $user = Auth::user();
 
         // Get IDs of courses the user is already enrolled in
-        $enrolledCourseIds = $user->enrollments()
-            ->with('scheduledCourse')
-            ->get()
-            ->pluck('scheduledCourse.course_id')
-            ->unique()
+        $enrolledScheduledIds = Enrollment::where('user_id', $user->id)
+            ->where('aceptado', 'si')
+            ->pluck('curso_programado_id')
             ->toArray();
 
-        // Fetch courses (ScheduledCourse) that are active and NOT enrolled
-        // Eager load lessons to get accurate counts
-        $availableCourses = ScheduledCourse::with(['course.category', 'course.modules.lessons', 'instructor'])
-            ->where('is_active', true)
-            ->whereHas('course', function($query) use ($enrolledCourseIds) {
-                $query->whereNotIn('id', $enrolledCourseIds)
-                      ->where('is_active', true);
-            })
-            ->get()
-            ->map(function($scheduled) {
-                return [
-                    'id' => $scheduled->id,
-                    'course_id' => $scheduled->course_id,
-                    'title' => $scheduled->course->title,
-                    'category' => $scheduled->course->category->name,
-                    'instructor' => $scheduled->instructor->name,
-                    'price' => $scheduled->price,
-                    'image' => $scheduled->course->image,
-                    'description' => $scheduled->course->description,
-                    'modules_count' => $scheduled->course->modules->count(),
-                    'lessons_count' => $scheduled->course->modules->sum(function($m) { return $m->lessons->count(); }),
-                    'start_date' => $scheduled->start_date ? $scheduled->start_date->format('d M, Y') : null,
-                ];
+        $query = ScheduledCourse::with(['category', 'course.modules.lessons', 'instructor'])
+            ->where('activo', 'si')
+            ->whereNotIn('id', $enrolledScheduledIds)
+            ->whereHas('course', function ($q) {
+                $q->where('activo', 'si');
             });
 
-        return Inertia::render('User/Catalog/Index', [
-            'courses' => $availableCourses,
-            'categories' => Category::all(),
-        ]);
-    }
-
-    public function show(ScheduledCourse $scheduled)
-    {
-        $scheduled->load(['course.category', 'course.modules.lessons', 'instructor']);
-        
-        return Inertia::render('User/Catalog/Show', [
-            'course' => [
-                'id' => $scheduled->id,
-                'title' => $scheduled->course->title,
-                'category' => $scheduled->course->category->name,
-                'instructor' => $scheduled->instructor->name,
-                'price' => $scheduled->price,
-                'image' => $scheduled->course->image,
-                'description' => $scheduled->course->description,
-                'modules' => $scheduled->course->modules->map(function($m) {
-                    return [
-                        'id' => $m->id,
-                        'title' => $m->title,
-                        'description' => $m->description,
-                        'lessons' => $m->lessons->map(function($l) {
-                            return [
-                                'id' => $l->id,
-                                'title' => $l->title,
-                            ];
-                        }),
-                    ];
-                }),
-            ],
-        ]);
-    }
-
-    public function enroll(Request $request, ScheduledCourse $scheduled)
-    {
-        $user = $request->user();
-
-        // Check if already enrolled (double-check prevention)
-        $existing = Enrollment::where('user_id', $user->id)
-            ->where('scheduled_course_id', $scheduled->id)
-            ->first();
-
-        if ($existing) {
-            return redirect()->route('user.courses.index')->with('error', 'Ya estás inscrito en este curso.');
+        if ($categoryName) {
+            $query->whereHas('category', function ($catQ) use ($categoryName) {
+                $catQ->where('name', 'LIKE', '%' . $categoryName . '%');
+            });
         }
 
-        // Create enrollment
-        Enrollment::create([
-            'user_id' => $user->id,
-            'scheduled_course_id' => $scheduled->id,
-            'status' => 'active',
-            'enrolled_at' => Carbon::now(),
-        ]);
+        return $query->get()->map(function ($scheduled) {
+            return [
+                'id' => $scheduled->id,
+                'course_id' => $scheduled->course_id,
+                'identifier' => $scheduled->identificador,
+                'title' => $scheduled->course->title,
+                'category' => $scheduled->category ? $scheduled->category->name : 'General',
+                'instructor' => $scheduled->instructor ? $scheduled->instructor->name : 'Sapius Team',
+                'price' => (float)$scheduled->precio,
+                'image' => $scheduled->course->image,
+                'description' => $scheduled->course->description,
+                'modules_count' => $scheduled->course->modules ? $scheduled->course->modules->count() : 0,
+                'lessons_count' => $scheduled->course->modules ? $scheduled->course->modules->sum(function ($m) { return $m->lessons ? $m->lessons->count() : 0; }) : 0,
+                'start_date' => $scheduled->fecha_inicio ? Carbon::parse($scheduled->fecha_inicio)->format('d/m/Y') : null,
+            ];
+        });
+    }
 
-        return redirect()->route('user.courses.index')->with('success', '¡Enhorabuena! Te has inscrito correctamente.');
+    public function index(Request $request)
+    {
+        return $this->cursos($request);
+    }
+
+    /**
+     * Available Courses: /alumno/cursos
+     */
+    public function cursos(Request $request)
+    {
+        $courses = $this->getAvailableItems('Cursos');
+
+        return Inertia::render('User/Catalog/Index', [
+            'courses' => $courses,
+            'categories' => Category::all(),
+            'activeTab' => 'cursos',
+            'title' => 'Cursos Disponibles',
+        ]);
+    }
+
+    /**
+     * Available Guides: /alumno/guias
+     */
+    public function guias(Request $request)
+    {
+        $guias = $this->getAvailableItems('Guias');
+
+        return Inertia::render('User/Catalog/Index', [
+            'courses' => $guias,
+            'categories' => Category::all(),
+            'activeTab' => 'guias',
+            'title' => 'Guías de Estudio Disponibles',
+        ]);
+    }
+
+    /**
+     * Available Simulators: /alumno/simuladores
+     */
+    public function simuladores(Request $request)
+    {
+        $simuladores = $this->getAvailableItems('Simuladores');
+
+        return Inertia::render('User/Catalog/Index', [
+            'courses' => $simuladores,
+            'categories' => Category::all(),
+            'activeTab' => 'simuladores',
+            'title' => 'Simuladores Disponibles',
+        ]);
+    }
+
+    /**
+     * Step 1 of enrollment / registration: /alumno/inscripcion/{curso_id}
+     */
+    public function inscripcion($curso_id)
+    {
+        $scheduled = ScheduledCourse::with(['category', 'course.modules.lessons', 'instructor'])->findOrFail($curso_id);
+
+        return Inertia::render('User/Catalog/Inscripcion', [
+            'course' => [
+                'id' => $scheduled->id,
+                'identifier' => $scheduled->identificador,
+                'title' => $scheduled->course->title,
+                'category' => $scheduled->category ? $scheduled->category->name : 'General',
+                'instructor' => $scheduled->instructor ? $scheduled->instructor->name : 'Sapius Team',
+                'price' => (float)$scheduled->precio,
+                'image' => $scheduled->course->image,
+                'description' => $scheduled->course->description,
+                'modules_count' => $scheduled->course->modules ? $scheduled->course->modules->count() : 0,
+                'lessons_count' => $scheduled->course->modules ? $scheduled->course->modules->sum(function ($m) { return $m->lessons ? $m->lessons->count() : 0; }) : 0,
+                'start_date' => $scheduled->fecha_inicio ? Carbon::parse($scheduled->fecha_inicio)->format('d/m/Y') : null,
+            ]
+        ]);
     }
 }

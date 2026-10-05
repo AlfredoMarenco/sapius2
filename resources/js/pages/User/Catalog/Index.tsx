@@ -35,7 +35,7 @@ interface Props {
     categories: any[];
 }
 
-export default function Catalog({ courses, categories }: Props) {
+export default function Catalog({ courses, categories = [] }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -133,7 +133,7 @@ export default function Catalog({ courses, categories }: Props) {
                                 <div className="absolute inset-0 bg-brand-navy/20 group-hover:bg-brand-navy/0 transition-colors duration-500 z-10" />
                                 <img 
                                     src={course.image 
-                                        ? (course.image.startsWith('http') ? course.image : `/storage/${course.image}`) 
+                                        ? (course.image.startsWith('http') ? course.image : `/media/stream/${course.image}`) 
                                         : 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=2073'} 
                                     alt={course.title}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
@@ -176,9 +176,9 @@ export default function Catalog({ courses, categories }: Props) {
                                     </div>
                                 </div>
 
-                                <Link href={`/user/catalog/${course.id}`} className="w-full">
+                                <Link href={`/alumno/checkout/${course.id}`} className="w-full">
                                     <Button className="w-full h-14 rounded-2xl bg-brand-navy hover:bg-brand-navy/90 font-black uppercase tracking-widest text-xs shadow-xl shadow-brand-navy/10 group/btn">
-                                        Explorar y Adquirir
+                                        Inscribirme Ahora
                                         <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
                                     </Button>
                                 </Link>
@@ -235,8 +235,8 @@ export default function Catalog({ courses, categories }: Props) {
 Catalog.layout = (page: any) => (
     <AppLayout
         breadcrumbs={[
-            { title: 'Panel de Alumno', href: '/user/dashboard' },
-            { title: 'Cursos disponibles', href: '/user/catalog' },
+            { title: 'Panel de Alumno', href: '/alumno' },
+            { title: 'Cursos disponibles', href: '/alumno/cursos' },
         ]}
     >
         {page}

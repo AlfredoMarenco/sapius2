@@ -14,7 +14,7 @@ class LandingReviewController extends Controller
     {
         return Inertia::render('Admin/Landing/Reviews/Index', [
             'reviews' => LandingReview::with('course')->get(),
-            'courses' => Course::select('id', 'title')->get()
+            'courses' => Course::select('id', 'titulo')->get()
         ]);
     }
 

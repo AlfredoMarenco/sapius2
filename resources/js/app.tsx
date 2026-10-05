@@ -1,3 +1,9 @@
+if (typeof window === 'undefined') {
+    (global as any).window = {};
+    (global as any).document = {};
+    (global as any).requestAnimationFrame = (callback: any) => setTimeout(callback, 0);
+}
+
 import { createInertiaApp } from '@inertiajs/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';

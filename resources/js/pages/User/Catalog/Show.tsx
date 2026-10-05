@@ -145,7 +145,7 @@ export default function Show({ course }: Props) {
                         >
                             <div className="aspect-video rounded-[3rem] overflow-hidden border-4 border-white/10 shadow-2xl relative">
                                 <img 
-                                    src={course.image ? (course.image.startsWith('http') ? course.image : `/storage/${course.image}`) : 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=2073'} 
+                                    src={course.image ? (course.image.startsWith('http') ? course.image : `/media/stream/${course.image}`) : 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=2073'} 
                                     alt={course.title}
                                     className="w-full h-full object-cover"
                                 />

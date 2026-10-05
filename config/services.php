@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'openpay' => [
+        'merchant_id' => env('OPENPAY_MERCHANT_ID', ''),
+        'public_key' => env('OPENPAY_PUBLIC_KEY', ''),
+        'private_key' => env('OPENPAY_PRIVATE_KEY', ''),
+        'sandbox' => env('OPENPAY_SANDBOX', true),
+    ],
+
 ];

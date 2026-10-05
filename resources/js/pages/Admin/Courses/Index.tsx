@@ -25,15 +25,11 @@ import {
     CheckCircle2,
     XCircle,
     ChevronRight,
-    Tag
+    Tag,
+    Copy
 } from 'lucide-react';
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
-    DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useState } from 'react';
 
 interface Course {
     id: number;
@@ -50,6 +46,8 @@ interface Props {
 }
 
 export default function Index({ courses }: Props) {
+    const [searchTerm, setSearchTerm] = useState('');
+
     const handleToggleCourse = (id: number) => {
         router.patch(`/admin/courses/${id}/toggle`, {}, {
             onSuccess: () => {
@@ -69,8 +67,13 @@ export default function Index({ courses }: Props) {
         }
     };
 
+    const filteredCourses = courses.filter((c) =>
+        c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.category?.name && c.category.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
     return (
-        <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-10">
+        <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
             <Head title="Admin: Gestión de Cursos" />
 
             {/* Header Section */}
@@ -80,13 +83,34 @@ export default function Index({ courses }: Props) {
                     <p className="text-muted-foreground font-medium italic">Control central de contenidos y activaciones en marketplace.</p>
                 </div>
 
-                <Link href="/admin/courses/create">
-                    <Button className="rounded-2xl bg-brand-navy hover:bg-brand-blue font-black uppercase tracking-widest text-[10px] h-14 px-8 gap-2 shadow-xl shadow-brand-navy/20 group">
-                        <Plus className="w-4 h-4" />
-                        Nuevo Curso Maestro
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-3">
+                    <Link href="/admin/cursos/copy">
+                        <Button variant="outline" className="rounded-2xl border-2 font-black uppercase tracking-widest text-[10px] h-12 px-6 gap-2 shadow-sm group">
+                            <Copy className="w-4 h-4 text-brand-blue" />
+                            Copiar Curso
+                        </Button>
+                    </Link>
+
+                    <Link href="/admin/cursos/create">
+                        <Button className="rounded-2xl bg-brand-navy hover:bg-brand-blue font-black uppercase tracking-widest text-[10px] h-12 px-6 gap-2 shadow-xl shadow-brand-navy/20 group">
+                            <Plus className="w-4 h-4" />
+                            Nuevo Curso Maestro
+                            <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+
+            {/* Buscador */}
+            <div className="relative max-w-md">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                    type="text"
+                    placeholder="Buscar curso por título o categoría..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue shadow-sm"
+                />
             </div>
 
             {/* Courses Table Card */}
@@ -102,7 +126,7 @@ export default function Index({ courses }: Props) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {courses.length === 0 ? (
+                        {filteredCourses.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="py-32 text-center">
                                     <div className="space-y-4">
@@ -114,7 +138,7 @@ export default function Index({ courses }: Props) {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            courses.map((course) => (
+                            filteredCourses.map((course) => (
                                 <TableRow key={course.id} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50 group">
                                     <TableCell className="py-6 px-8">
                                         <div className="flex items-center gap-6">
@@ -157,39 +181,34 @@ export default function Index({ courses }: Props) {
                                     </TableCell>
                                     <TableCell className="py-6 px-8 text-right">
                                         <div className="flex justify-end gap-2">
-                                            <Link href={`/admin/courses/${course.id}`}>
-                                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-brand-navy hover:text-white border border-gray-100" title="Ver Detalles y Programación">
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border border-gray-100">
-                                                        <MoreVertical className="w-4 h-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="rounded-[1.5rem] border-2 p-2 w-56">
-                                                    <DropdownMenuItem className="rounded-xl font-bold text-[10px] uppercase tracking-widest p-3 gap-3" asChild>
-                                                        <Link href={`/admin/courses/${course.id}/builder`}>
-                                                            <Layout className="w-4 h-4 text-brand-blue" />
-                                                            Constructor de Contenido
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem className="rounded-xl font-bold text-[10px] uppercase tracking-widest p-3 gap-3" asChild>
-                                                        <Link href={`/admin/courses/${course.id}/edit`}>
-                                                            <Edit3 className="w-4 h-4 text-brand-orange" />
-                                                            Editar Información
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem 
-                                                        onClick={() => handleDelete(course.id)}
-                                                        className="rounded-xl font-bold text-[10px] uppercase tracking-widest p-3 gap-3 text-destructive"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                        Eliminar Curso
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <Button asChild variant="outline" size="sm" className="h-9 px-3 gap-2 text-brand-blue border-brand-blue/20 hover:bg-brand-blue/10">
+                                                <Link href={`/admin/courses/${course.id}/builder`} title="Constructor de Contenido">
+                                                    <Layout className="w-4 h-4" />
+                                                    <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Contenido</span>
+                                                </Link>
+                                            </Button>
+                                            <Button asChild variant="outline" size="sm" className="h-9 px-3 gap-2 text-brand-orange border-brand-orange/20 hover:bg-brand-orange/10">
+                                                <Link href={`/admin/courses/${course.id}/edit`} title="Editar Información">
+                                                    <Edit3 className="w-4 h-4" />
+                                                    <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Editar</span>
+                                                </Link>
+                                            </Button>
+                                            <Button asChild variant="outline" size="sm" className="h-9 px-3 gap-2 text-brand-navy border-brand-navy/20 hover:bg-brand-navy/10">
+                                                <Link href={`/admin/courses/${course.id}`} title="Ver y Programar Cohortes">
+                                                    <Calendar className="w-4 h-4" />
+                                                    <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Programar</span>
+                                                </Link>
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleDelete(course.id)}
+                                                className="h-9 px-3 gap-2 text-destructive border-destructive/20 hover:bg-destructive/10"
+                                                title="Eliminar Curso"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Eliminar</span>
+                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
