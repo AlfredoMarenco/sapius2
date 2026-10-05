@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('certificates', function (Blueprint $table) {
+        if (!Schema::hasTable('certificates')) {
+            Schema::create('certificates', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('curso_programado_id')->constrained('cursos_programados')->onDelete('cascade');
@@ -22,6 +23,7 @@ return new class extends Migration
             // Un usuario solo puede tener un certificado por curso_programado
             $table->unique(['user_id', 'curso_programado_id']);
         });
+        }
     }
 
     /**

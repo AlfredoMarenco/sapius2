@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('scheduled_courses', function (Blueprint $table) {
+        if (!Schema::hasTable('scheduled_courses')) {
+            Schema::create('scheduled_courses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('course_id')->constrained()->onDelete('cascade');
             $table->foreignId('instructor_id')->constrained('users')->onDelete('cascade');
@@ -22,6 +23,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+        }
     }
 
     /**

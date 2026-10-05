@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('slides', function (Blueprint $table) {
+        if (!Schema::hasTable('slides')) {
+            Schema::create('slides', function (Blueprint $table) {
             $table->id();
             $table->string('title')->nullable();
             $table->string('image');
@@ -20,8 +21,10 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+        }
 
-        Schema::create('prides', function (Blueprint $table) {
+        if (!Schema::hasTable('prides')) {
+            Schema::create('prides', function (Blueprint $table) {
             $table->id();
             $table->string('title');
             $table->text('content');
@@ -29,8 +32,10 @@ return new class extends Migration
             $table->integer('position')->default(1);
             $table->timestamps();
         });
+        }
 
-        Schema::create('teachers', function (Blueprint $table) {
+        if (!Schema::hasTable('teachers')) {
+            Schema::create('teachers', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('specialty')->nullable();
@@ -39,8 +44,10 @@ return new class extends Migration
             $table->integer('position')->default(1);
             $table->timestamps();
         });
+        }
 
-        Schema::create('reviews', function (Blueprint $table) {
+        if (!Schema::hasTable('reviews')) {
+            Schema::create('reviews', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->string('author_name')->nullable(); // For guest reviews
@@ -49,6 +56,7 @@ return new class extends Migration
             $table->boolean('is_visible')->default(false);
             $table->timestamps();
         });
+        }
     }
 
     /**

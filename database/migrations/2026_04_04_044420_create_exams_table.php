@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('exams', function (Blueprint $table) {
+        if (!Schema::hasTable('exams')) {
+            Schema::create('exams', function (Blueprint $table) {
             $table->id();
             $table->foreignId('enrollment_id')->constrained()->onDelete('cascade');
             $table->foreignId('quiz_id')->constrained()->onDelete('cascade');
@@ -22,6 +23,7 @@ return new class extends Migration
             $table->json('answers_snapshot')->nullable(); // Optional: store answers given
             $table->timestamps();
         });
+        }
     }
 
     /**

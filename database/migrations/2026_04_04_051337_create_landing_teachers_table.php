@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('landing_teachers', function (Blueprint $table) {
+        if (!Schema::hasTable('landing_teachers')) {
+            Schema::create('landing_teachers', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('description')->nullable();
@@ -19,6 +20,7 @@ return new class extends Migration
             $table->integer('position')->default(0);
             $table->timestamps();
         });
+        }
     }
 
     /**

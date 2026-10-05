@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('landing_reviews', function (Blueprint $table) {
+        if (!Schema::hasTable('landing_reviews')) {
+            Schema::create('landing_reviews', function (Blueprint $table) {
             $table->id();
             $table->string('user_name');
             $table->text('content');
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->foreignId('course_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
         });
+        }
     }
 
     /**

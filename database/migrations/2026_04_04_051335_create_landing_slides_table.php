@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('landing_slides', function (Blueprint $table) {
+        if (!Schema::hasTable('landing_slides')) {
+            Schema::create('landing_slides', function (Blueprint $table) {
             $table->id();
             $table->string('title')->nullable();
             $table->string('img');
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->boolean('active')->default(true);
             $table->timestamps();
         });
+        }
     }
 
     /**

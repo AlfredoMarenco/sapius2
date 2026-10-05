@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('enrollments', function (Blueprint $table) {
+        if (!Schema::hasTable('enrollments')) {
+            Schema::create('enrollments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('scheduled_course_id')->constrained()->onDelete('cascade');
@@ -19,6 +20,7 @@ return new class extends Migration
             $table->dateTime('enrolled_at')->nullable();
             $table->timestamps();
         });
+        }
     }
 
     /**

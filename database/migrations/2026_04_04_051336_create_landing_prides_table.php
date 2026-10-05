@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('landing_prides', function (Blueprint $table) {
+        if (!Schema::hasTable('landing_prides')) {
+            Schema::create('landing_prides', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->text('text')->nullable();
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->integer('position')->default(0);
             $table->timestamps();
         });
+        }
     }
 
     /**
