@@ -9,8 +9,11 @@ use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+use App\Traits\OptimizesImages;
+
 class LandingConfigController extends Controller
 {
+    use OptimizesImages;
     public function index()
     {
         $slides = Slide::where('section', 'LIKE', 'slider-index')->orWhereNull('section')->orderBy('position', 'asc')->get();
@@ -27,7 +30,7 @@ class LandingConfigController extends Controller
     public function uploadSlide(Request $request)
     {
         $request->validate(['image' => 'required|image|max:4096']);
-        $url = $request->file('image')->store('slider-index', 'public');
+        $url = $this->optimizeAndStoreImage($request->file('image'), 'slider-index');
 
         Slide::create([
             'img' => $url,
@@ -53,7 +56,7 @@ class LandingConfigController extends Controller
             'image' => 'required|image|max:4096',
         ]);
 
-        $url = $request->file('image')->store('prides', 'public');
+        $url = $this->optimizeAndStoreImage($request->file('image'), 'prides');
 
         Pride::create([
             'img' => $url,
@@ -82,7 +85,7 @@ class LandingConfigController extends Controller
         ];
 
         if ($request->hasFile('image')) {
-            $data['img'] = $request->file('image')->store('prides', 'public');
+            $data['img'] = $this->optimizeAndStoreImage($request->file('image'), 'prides');
         }
 
         $pride->update($data);
@@ -104,7 +107,7 @@ class LandingConfigController extends Controller
             'image' => 'required|image|max:4096',
         ]);
 
-        $url = $request->file('image')->store('teachers', 'public');
+        $url = $this->optimizeAndStoreImage($request->file('image'), 'teachers');
 
         Teacher::create([
             'img' => $url,
@@ -130,7 +133,7 @@ class LandingConfigController extends Controller
         ];
 
         if ($request->hasFile('image')) {
-            $data['img'] = $request->file('image')->store('teachers', 'public');
+            $data['img'] = $this->optimizeAndStoreImage($request->file('image'), 'teachers');
         }
 
         $teacher->update($data);

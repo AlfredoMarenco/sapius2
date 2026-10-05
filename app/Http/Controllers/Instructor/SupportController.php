@@ -22,7 +22,7 @@ class SupportController extends Controller
         ]);
 
         // Logic para mandar el correo (igual que en el sistema legacy)
-        // Mail::to('soporte@sapius.com.mx')->send(new \App\Mail\SoporteInstructor($validated, auth()->user()));
+        Mail::to('soporte@sapius.com.mx')->send(new \App\Mail\SoporteInstructor($validated, auth()->user()));
 
         return back()->with('success', 'Mensaje enviado correctamente al equipo de soporte.');
     }

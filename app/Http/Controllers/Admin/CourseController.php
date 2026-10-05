@@ -12,8 +12,11 @@ use Inertia\Inertia;
 use Illuminate\Support\Str;
 use App\Models\User;
 
+use App\Traits\OptimizesImages;
+
 class CourseController extends Controller
 {
+    use OptimizesImages;
     public function index()
     {
         $courses = Course::with('category')
@@ -61,7 +64,7 @@ class CourseController extends Controller
         $course->activo = 'si';
         
         if ($request->hasFile('image')) {
-            $course->image = $request->file('image')->store('courses', 'public');
+            $course->image = $this->optimizeAndStoreImage($request->file('image'), 'courses');
         }
 
         $course->save();
@@ -112,7 +115,7 @@ class CourseController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            $course->image = $request->file('image')->store('courses', 'public');
+            $course->image = $this->optimizeAndStoreImage($request->file('image'), 'courses');
         }
 
         $course->save();

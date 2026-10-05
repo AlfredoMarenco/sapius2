@@ -23,8 +23,31 @@ class CourseController extends Controller
     public function show($id)
     {
         $course = Course::with(['category', 'modules.lessons.media', 'modules.lessons.quizzes'])->findOrFail($id);
+        
+        $scheduledCourses = \App\Models\ScheduledCourse::where('curso_id', $id)
+            ->with(['students' => function($q) {
+                $q->select('users.id', 'users.name', 'users.last_name', 'users.email', 'users.username', 'users.avatar');
+            }])->get();
+
+        $enrolledStudents = collect();
+        foreach ($scheduledCourses as $cohort) {
+            foreach ($cohort->students as $student) {
+                $enrolledStudents->push([
+                    'id' => $student->id,
+                    'name' => trim($student->name . ' ' . $student->last_name),
+                    'email' => $student->email,
+                    'avatar' => $student->avatar,
+                    'cohort' => $cohort->internal_id ?? ('Grupo ' . $cohort->id),
+                    'enrolled_at' => $student->pivot->created_at,
+                    'status' => $student->pivot->aceptado,
+                ]);
+            }
+        }
+
         return Inertia::render('Instructor/Courses/Show', [
-            'course' => $course
+            'course' => $course,
+            'students' => $enrolledStudents->values(),
+            'total_cohorts' => $scheduledCourses->count(),
         ]);
     }
 }
