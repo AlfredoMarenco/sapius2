@@ -50,14 +50,13 @@ class CourseController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'category_id' => 'required',
+            'category_id' => 'nullable',
             'description' => 'nullable|string',
             'image' => 'nullable|image|max:2048',
         ]);
 
         $course = new Course();
         $course->user_id = auth()->id();
-        $course->category_id = $validated['category_id'];
         $course->title = $validated['title'];
         $course->slug = Str::slug($validated['title']) . '-' . time();
         $course->description = $validated['description'];
@@ -69,7 +68,7 @@ class CourseController extends Controller
 
         $course->save();
 
-        return redirect()->route('admin.cursos.index')->with('success', 'Curso creado con éxito');
+        return redirect()->route('admin.courses.index')->with('success', 'Curso creado con éxito');
     }
 
     public function show($id)
@@ -88,10 +87,12 @@ class CourseController extends Controller
 
     public function edit($id)
     {
-        $course = Course::findOrFail($id);
+        $course = Course::with('category')->findOrFail($id);
 
         return Inertia::render('Admin/Courses/Edit', [
-            'course' => $course,
+            'course' => array_merge($course->toArray(), [
+                'category_id' => $course->category?->id ?? '',
+            ]),
             'categories' => Category::all(),
         ]);
     }
@@ -102,12 +103,11 @@ class CourseController extends Controller
 
         $request->validate([
             'title' => 'required|string|max:255',
-            'category_id' => 'required',
+            'category_id' => 'nullable',
             'description' => 'nullable|string',
         ]);
 
         $course->title = $request->title;
-        $course->category_id = $request->category_id;
         $course->description = $request->description;
 
         if ($request->has('activo')) {
@@ -120,7 +120,11 @@ class CourseController extends Controller
 
         $course->save();
 
-        return redirect()->route('admin.cursos.index')->with('success', 'Curso actualizado con éxito');
+        if ($request->filled('category_id')) {
+            $course->scheduledCourses()->update(['category_id' => $request->category_id]);
+        }
+
+        return redirect()->route('admin.courses.index')->with('success', 'Curso actualizado con éxito');
     }
 
     public function toggle($id)
@@ -137,7 +141,7 @@ class CourseController extends Controller
         $course = Course::findOrFail($id);
         $course->delete();
 
-        return redirect()->route('admin.cursos.index')->with('success', 'Curso eliminado');
+        return redirect()->route('admin.courses.index')->with('success', 'Curso eliminado');
     }
 
     public function copyIndex()

@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Encoders\WebpEncoder;
 use Illuminate\Support\Str;
 
 trait OptimizesImages
@@ -23,15 +24,26 @@ trait OptimizesImages
         // Usamos el driver GD
         $manager = new ImageManager(new Driver());
 
-        // Leemos la imagen temporal subida
-        $image = $manager->read($file->getRealPath());
+        // Leemos la imagen temporal subida (soporta v4 con decode y v3 con read)
+        if (method_exists($manager, 'decode')) {
+            $image = $manager->decode($file->getRealPath());
+        } elseif (method_exists($manager, 'read')) {
+            $image = $manager->read($file->getRealPath());
+        } else {
+            $image = $manager->make($file->getRealPath());
+        }
 
         // Si la imagen es extremadamente grande, la redimensionamos para no exceder Full HD
-        // Esto mantiene la relación de aspecto automáticamente en v3
-        $image->scaleDown(width: 1920, height: 1920);
+        if (method_exists($image, 'scaleDown')) {
+            $image->scaleDown(width: 1920, height: 1920);
+        }
 
-        // Convertimos a WebP
-        $encoded = $image->toWebp($quality);
+        // Convertimos a WebP (soporta v4 con WebpEncoder y v3 con toWebp)
+        if (method_exists($image, 'toWebp')) {
+            $encoded = $image->toWebp($quality);
+        } else {
+            $encoded = $image->encode(new WebpEncoder(quality: $quality));
+        }
 
         // Generamos un nombre único seguro
         $filename = Str::random(40) . '.webp';

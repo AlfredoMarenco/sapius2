@@ -54,7 +54,7 @@ export default function Edit({ course, categories }: Props) {
 
     const { data, setData, post, processing, errors } = useForm({
         title: course.title,
-        category_id: course.category_id.toString(),
+        category_id: course.category_id ? course.category_id.toString() : '',
         description: course.description || '',
         image: null as File | null,
         _method: 'PUT', // Method spoofing for Laravel

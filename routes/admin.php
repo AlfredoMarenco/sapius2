@@ -49,8 +49,10 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/courses', [CourseController::class, 'index'])->name('courses.index');
     Route::get('/cursos/create', [CourseController::class, 'create'])->name('cursos.create');
     Route::get('/courses/create', [CourseController::class, 'create'])->name('courses.create');
-    Route::post('/cursos/store', [CourseController::class, 'store'])->name('cursos.store');
-    Route::post('/courses/store', [CourseController::class, 'store'])->name('courses.store');
+    Route::post('/cursos', [CourseController::class, 'store'])->name('cursos.store');
+    Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
+    Route::post('/cursos/store', [CourseController::class, 'store']);
+    Route::post('/courses/store', [CourseController::class, 'store']);
 
     Route::get('/cursos/{id}', [CourseController::class, 'show']);
     Route::get('/courses/{id}', [CourseController::class, 'show'])->name('courses.show');
@@ -60,6 +62,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/courses/{id}/edit', [CourseController::class, 'edit'])->name('courses.edit');
     Route::post('/cursos/edit', [CourseController::class, 'edit']);
 
+    Route::match(['put', 'patch', 'post'], '/cursos/{id}', [CourseController::class, 'update']);
+    Route::match(['put', 'patch', 'post'], '/courses/{id}', [CourseController::class, 'update']);
     Route::match(['put', 'post'], '/cursos/{id}/update', [CourseController::class, 'update'])->name('cursos.update');
     Route::match(['put', 'post'], '/courses/{id}/update', [CourseController::class, 'update'])->name('courses.update');
     Route::post('/cursos/update', function (\Illuminate\Http\Request $r) {

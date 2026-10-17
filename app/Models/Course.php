@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 
 use App\Concerns\MapsLegacyAttributes;
 
-#[Fillable(['user_id', 'category_id', 'title', 'slug', 'description', 'image', 'is_active'])]
+#[Fillable(['user_id', 'title', 'slug', 'description', 'image', 'is_active'])]
 class Course extends Model
 {
     use MapsLegacyAttributes;
@@ -28,7 +28,14 @@ class Course extends Model
 
     public function category()
     {
-        return $this->belongsTo(Category::class, 'category_id');
+        return $this->hasOneThrough(
+            Category::class,
+            ScheduledCourse::class,
+            'curso_id',
+            'id',
+            'id',
+            'category_id'
+        );
     }
 
     public function modules()
