@@ -54,34 +54,37 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/cursos/store', [CourseController::class, 'store']);
     Route::post('/courses/store', [CourseController::class, 'store']);
 
-    Route::get('/cursos/{id}', [CourseController::class, 'show']);
-    Route::get('/courses/{id}', [CourseController::class, 'show'])->name('courses.show');
-    Route::get('/cursos/{id}/view', [CourseController::class, 'show'])->name('cursos.show');
+    // Copiar Cursos (Legacy: /admin/cursos/copy y /admin/curso/copy-details/{curso})
+    // MUST be declared before /cursos/{id} to avoid capturing 'copy' as an ID
+    Route::get('/cursos/copy', [CourseController::class, 'copyIndex'])->name('cursos.copy');
+    Route::get('/courses/copy', [CourseController::class, 'copyIndex']);
+    Route::post('/cursos/copy/create', [CourseController::class, 'copyCreate'])->name('cursos.copy.create');
+    Route::post('/courses/copy/create', [CourseController::class, 'copyCreate']);
+    Route::get('/curso/copy-details/{curso}', [CourseController::class, 'getAllContentOfCurso'])->name('cursos.details.copy');
+    Route::post('/curso/copy-details/coping', [CourseController::class, 'copySelectContentOfCourse'])->name('cursos.content.copy');
 
-    Route::get('/cursos/{id}/edit', [CourseController::class, 'edit'])->name('cursos.edit');
-    Route::get('/courses/{id}/edit', [CourseController::class, 'edit'])->name('courses.edit');
+    Route::get('/cursos/{id}', [CourseController::class, 'show'])->whereNumber('id');
+    Route::get('/courses/{id}', [CourseController::class, 'show'])->name('courses.show')->whereNumber('id');
+    Route::get('/cursos/{id}/view', [CourseController::class, 'show'])->name('cursos.show')->whereNumber('id');
+
+    Route::get('/cursos/{id}/edit', [CourseController::class, 'edit'])->name('cursos.edit')->whereNumber('id');
+    Route::get('/courses/{id}/edit', [CourseController::class, 'edit'])->name('courses.edit')->whereNumber('id');
     Route::post('/cursos/edit', [CourseController::class, 'edit']);
 
-    Route::match(['put', 'patch', 'post'], '/cursos/{id}', [CourseController::class, 'update']);
-    Route::match(['put', 'patch', 'post'], '/courses/{id}', [CourseController::class, 'update']);
-    Route::match(['put', 'post'], '/cursos/{id}/update', [CourseController::class, 'update'])->name('cursos.update');
-    Route::match(['put', 'post'], '/courses/{id}/update', [CourseController::class, 'update'])->name('courses.update');
+    Route::match(['put', 'patch', 'post'], '/cursos/{id}', [CourseController::class, 'update'])->whereNumber('id');
+    Route::match(['put', 'patch', 'post'], '/courses/{id}', [CourseController::class, 'update'])->whereNumber('id');
+    Route::match(['put', 'post'], '/cursos/{id}/update', [CourseController::class, 'update'])->name('cursos.update')->whereNumber('id');
+    Route::match(['put', 'post'], '/courses/{id}/update', [CourseController::class, 'update'])->name('courses.update')->whereNumber('id');
     Route::post('/cursos/update', function (\Illuminate\Http\Request $r) {
         return app(CourseController::class)->update($r, $r->id);
     });
 
-    Route::match(['patch', 'post'], '/cursos/{id}/toggle', [CourseController::class, 'toggle'])->name('cursos.toggle');
-    Route::match(['patch', 'post'], '/courses/{id}/toggle', [CourseController::class, 'toggle'])->name('courses.toggle');
+    Route::match(['patch', 'post'], '/cursos/{id}/toggle', [CourseController::class, 'toggle'])->name('cursos.toggle')->whereNumber('id');
+    Route::match(['patch', 'post'], '/courses/{id}/toggle', [CourseController::class, 'toggle'])->name('courses.toggle')->whereNumber('id');
 
-    Route::match(['delete', 'post'], '/cursos/{id}/destroy', [CourseController::class, 'destroy'])->name('cursos.destroy');
-    Route::match(['delete', 'post'], '/courses/{id}/destroy', [CourseController::class, 'destroy']);
-    Route::delete('/courses/{id}', [CourseController::class, 'destroy'])->name('courses.destroy');
-    
-    // Copiar Cursos (Legacy: /admin/cursos/copy y /admin/curso/copy-details/{curso})
-    Route::get('/cursos/copy', [CourseController::class, 'copyIndex'])->name('cursos.copy');
-    Route::post('/cursos/copy/create', [CourseController::class, 'copyCreate'])->name('cursos.copy.create');
-    Route::get('/curso/copy-details/{curso}', [CourseController::class, 'getAllContentOfCurso'])->name('cursos.details.copy');
-    Route::post('/curso/copy-details/coping', [CourseController::class, 'copySelectContentOfCourse'])->name('cursos.content.copy');
+    Route::match(['delete', 'post'], '/cursos/{id}/destroy', [CourseController::class, 'destroy'])->name('cursos.destroy')->whereNumber('id');
+    Route::match(['delete', 'post'], '/courses/{id}/destroy', [CourseController::class, 'destroy'])->whereNumber('id');
+    Route::delete('/courses/{id}', [CourseController::class, 'destroy'])->name('courses.destroy')->whereNumber('id');
     
     // Calendarios
     Route::get('/courses/{course}/calendars', [CourseCalendarController::class, 'index'])->name('courses.calendars');

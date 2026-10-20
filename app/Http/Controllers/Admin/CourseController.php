@@ -178,7 +178,6 @@ class CourseController extends Controller
 
             $nuevoCurso = new Course();
             $nuevoCurso->user_id = auth()->id() ?? $cursoOriginal->user_id;
-            $nuevoCurso->category_id = $cursoOriginal->category_id;
             $nuevoCurso->title = $cursoOriginal->title . ' (Copia)';
             $nuevoCurso->slug = Str::slug($cursoOriginal->title) . '-copia-' . time();
             $nuevoCurso->description = $cursoOriginal->description;
@@ -252,7 +251,6 @@ class CourseController extends Controller
 
         $nuevoCurso = new Course();
         $nuevoCurso->user_id = auth()->id() ?? $cursoOriginal->user_id;
-        $nuevoCurso->category_id = $cursoOriginal->category_id;
         $nuevoCurso->title = $cursoOriginal->title . ' (Copia Parcial)';
         $nuevoCurso->slug = Str::slug($cursoOriginal->title) . '-copia-' . time();
         $nuevoCurso->description = $cursoOriginal->description;

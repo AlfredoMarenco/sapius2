@@ -8,14 +8,17 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use App\Concerns\MapsLegacyAttributes;
 use Illuminate\Database\Eloquent\Builder;
 
-#[Fillable(['module_id', 'title', 'slug', 'image', 'content', 'summary', 'position', 'is_active', 'is_scheduled', 'available_at', 'expires_at'])]
+#[Fillable(['course_id', 'module_id', 'title', 'slug', 'image', 'content', 'summary', 'position', 'is_active'])]
 class Lesson extends Model
 {
     use MapsLegacyAttributes;
 
     protected $table = 'lecciones'; // In legacy DB, lessons are stored here with leccion_id > 0
 
+    protected $appends = ['is_scheduled', 'available_at', 'expires_at'];
+
     protected $legacyMapping = [
+        'course_id' => 'curso_id',
         'module_id' => 'leccion_id',
         'title' => 'titulo',
         'image' => 'imagen',
@@ -30,16 +33,45 @@ class Lesson extends Model
         static::addGlobalScope('lesson', function (Builder $builder) {
             $builder->where('leccion_id', '>', 0);
         });
+
+        static::creating(function ($lesson) {
+            if (empty($lesson->curso_id) && !empty($lesson->leccion_id)) {
+                $module = Module::withoutGlobalScopes()->find($lesson->leccion_id);
+                if ($module) {
+                    $lesson->curso_id = $module->curso_id;
+                }
+            }
+            if (empty($lesson->activo)) {
+                $lesson->activo = 'si';
+            }
+        });
     }
 
     protected function casts(): array
     {
         return [
-            'available_at' => 'datetime',
-            'expires_at' => 'datetime',
-            'is_scheduled' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function getIsScheduledAttribute(): bool
+    {
+        return false;
+    }
+
+    public function getAvailableAtAttribute(): ?string
+    {
+        return null;
+    }
+
+    public function getExpiresAtAttribute(): ?string
+    {
+        return null;
+    }
+
+    public function course()
+    {
+        return $this->belongsTo(Course::class, 'curso_id');
     }
 
     public function module()

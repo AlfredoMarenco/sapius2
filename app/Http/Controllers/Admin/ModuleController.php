@@ -8,6 +8,7 @@ use App\Models\Module;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ModuleController extends Controller
 {
@@ -53,7 +54,7 @@ class ModuleController extends Controller
     {
         $validated = $request->validate([
             'modules' => 'required|array',
-            'modules.*.id' => 'required|exists:modules,id',
+            'modules.*.id' => ['required', Rule::exists(Module::class, 'id')],
             'modules.*.position' => 'required|integer',
         ]);
 

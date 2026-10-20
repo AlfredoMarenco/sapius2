@@ -13,13 +13,27 @@ class InteractivePdf extends Model
         'titulo',
         'file_path',
         'fields_config',
-        'allow_download'
     ];
 
     protected $casts = [
         'fields_config' => 'array',
-        'allow_download' => 'boolean'
     ];
+
+    protected $appends = [
+        'allow_download',
+    ];
+
+    public function getAllowDownloadAttribute(): bool
+    {
+        return !empty($this->fields_config['allow_download']);
+    }
+
+    public function setAllowDownloadAttribute($value): void
+    {
+        $config = $this->fields_config ?? [];
+        $config['allow_download'] = (bool) $value;
+        $this->fields_config = $config;
+    }
 
     public function lesson()
     {

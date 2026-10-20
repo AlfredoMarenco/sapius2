@@ -19,8 +19,21 @@ class Question extends Model
         'text' => 'pregunta',
         'image' => 'imagen',
         'points' => 'score',
+        'explanation' => 'opciones',
         'is_active' => 'activo',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($question) {
+            if (empty($question->activo)) {
+                $question->activo = 'si';
+            }
+            if (empty($question->slug)) {
+                $question->slug = \Illuminate\Support\Str::slug(\Illuminate\Support\Str::limit($question->pregunta ?? 'pregunta', 50)) . '-' . rand(1000, 9999);
+            }
+        });
+    }
 
     public function quiz()
     {

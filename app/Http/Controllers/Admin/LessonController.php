@@ -20,6 +20,7 @@ class LessonController extends Controller
         ]);
 
         $lesson = new Lesson();
+        $lesson->course_id = $module->curso_id;
         $lesson->module_id = $module->id;
         $lesson->title = $validated['title'];
         $lesson->slug = Str::slug($validated['title']) . '-' . time();

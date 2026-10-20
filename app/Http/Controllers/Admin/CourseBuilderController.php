@@ -14,6 +14,7 @@ use App\Models\Homework;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CourseBuilderController extends Controller
 {
@@ -48,12 +49,9 @@ class CourseBuilderController extends Controller
 
         $course->modules()->create([
             'title' => $validated['title'],
-            'image' => $validated['image'],
+            'image' => $validated['image'] ?? null,
             'slug' => Str::slug($validated['title']) . '-' . time(),
             'position' => $validated['position'] ?? ($course->modules()->count() + 1),
-            'is_scheduled' => $validated['is_scheduled'] ?? false,
-            'available_at' => $validated['available_at'] ?? null,
-            'expires_at' => $validated['expires_at'] ?? null,
         ]);
 
         return back()->with('success', 'Módulo añadido correctamente');
@@ -73,11 +71,15 @@ class CourseBuilderController extends Controller
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
-        if (isset($validated['title']) && $validated['title'] !== $module->title) {
-            $validated['slug'] = Str::slug($validated['title']) . '-' . time();
+        $data = array_intersect_key($validated, array_flip(['title', 'image', 'position']));
+
+        if (isset($data['title']) && $data['title'] !== $module->title) {
+            $data['slug'] = Str::slug($data['title']) . '-' . time();
         }
 
-        $module->update($validated);
+        if (!empty($data)) {
+            $module->update($data);
+        }
 
         return back()->with('success', 'Módulo actualizado');
     }
@@ -109,12 +111,10 @@ class CourseBuilderController extends Controller
         ]);
 
         $module->lessons()->create([
+            'course_id' => $module->curso_id,
             'title' => $validated['title'],
             'slug' => Str::slug($validated['title']) . '-' . time(),
             'position' => $validated['position'] ?? ($module->lessons()->count() + 1),
-            'is_scheduled' => $validated['is_scheduled'] ?? false,
-            'available_at' => $validated['available_at'] ?? null,
-            'expires_at' => $validated['expires_at'] ?? null,
         ]);
 
         return back()->with('success', 'Lección añadida correctamente');
@@ -146,11 +146,15 @@ class CourseBuilderController extends Controller
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
-        if (isset($validated['title']) && $validated['title'] !== $lesson->title) {
-            $validated['slug'] = Str::slug($validated['title']) . '-' . time();
+        $data = array_intersect_key($validated, array_flip(['title', 'content']));
+
+        if (isset($data['title']) && $data['title'] !== $lesson->title) {
+            $data['slug'] = Str::slug($data['title']) . '-' . time();
         }
 
-        $lesson->update($validated);
+        if (!empty($data)) {
+            $lesson->update($data);
+        }
 
         return back()->with('success', 'Contenido de la lección actualizado');
     }
@@ -161,13 +165,29 @@ class CourseBuilderController extends Controller
     public function storeMedia(Request $request, Lesson $lesson)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title' => 'nullable|string|max:255',
             'file_type' => 'required|string', // video, image, document, link
             'file_path' => 'required|string',
             'is_downloadable' => 'boolean',
         ]);
 
-        $lesson->media()->create($validated);
+        $tipoMap = [
+            'image' => 'imagen',
+            'document' => 'archivo',
+            'link' => 'liga',
+            'video' => 'video',
+            'videoext' => 'videoext',
+        ];
+
+        $tipo = $tipoMap[$validated['file_type']] ?? $validated['file_type'];
+
+        $lesson->media()->create([
+            'tipo' => $tipo,
+            'ruta' => $validated['file_path'],
+            'downloadable' => $validated['is_downloadable'] ?? false,
+            'activo' => 'si',
+            'programable' => 'si',
+        ]);
 
         return back()->with('success', 'Recurso añadido');
     }
@@ -197,10 +217,40 @@ class CourseBuilderController extends Controller
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
-        $lesson->quizzes()->updateOrCreate(
-            ['lesson_id' => $lesson->id],
-            $validated
-        );
+        $tipo = $validated['type'];
+        if (str_starts_with($tipo, 'EXANI')) {
+            $tipo = 'EXANI';
+        } elseif (str_starts_with($tipo, 'ENARM')) {
+            $tipo = 'ENARM';
+        } elseif (!in_array($tipo, ['EXANI', 'EGEL', 'ENARM'])) {
+            $tipo = 'EGEL';
+        }
+
+        $timeLimit = $validated['time_limit'] ?? null;
+        if (is_numeric($timeLimit)) {
+            $hours = floor($timeLimit / 60);
+            $mins = $timeLimit % 60;
+            $timeString = sprintf('%02d:%02d:00', $hours, $mins);
+        } elseif (is_string($timeLimit) && str_contains($timeLimit, ':')) {
+            $timeString = $timeLimit;
+        } else {
+            $timeString = '01:00:00';
+        }
+
+        $quizData = [
+            'course_id' => $lesson->curso_id,
+            'title' => $validated['title'],
+            'type' => $tipo,
+            'time_limit' => $timeString,
+            'attempts_allowed' => $validated['attempts_allowed'],
+        ];
+
+        $quiz = $lesson->quizzes()->first();
+        if ($quiz) {
+            $quiz->update($quizData);
+        } else {
+            $lesson->quizzes()->create($quizData);
+        }
 
         return back()->with('success', 'Examen actualizado correctamente');
     }
@@ -225,8 +275,13 @@ class CourseBuilderController extends Controller
             'points' => $validated['points'],
         ]);
 
-        foreach ($validated['answers'] as $answerData) {
-            $question->answers()->create($answerData);
+        foreach ($validated['answers'] as $index => $answerData) {
+            $question->answers()->create([
+                'text' => $answerData['text'],
+                'is_correct' => $answerData['is_correct'],
+                'position' => $index + 1,
+                'activo' => 'si',
+            ]);
         }
 
         return back()->with('success', 'Pregunta añadida correctamente');
@@ -242,7 +297,7 @@ class CourseBuilderController extends Controller
             'explanation' => 'nullable|string',
             'points' => 'required|integer|min:0',
             'answers' => 'required|array|min:2',
-            'answers.*.id' => 'nullable|exists:answers,id',
+            'answers.*.id' => ['nullable', Rule::exists(Answer::class, 'id')],
             'answers.*.text' => 'required|string',
             'answers.*.is_correct' => 'required|boolean',
         ]);
@@ -254,13 +309,14 @@ class CourseBuilderController extends Controller
         ]);
 
         $existingAnswerIds = [];
-        foreach ($validated['answers'] as $answerData) {
+        foreach ($validated['answers'] as $index => $answerData) {
             if (isset($answerData['id'])) {
                 $answer = $question->answers()->find($answerData['id']);
                 if ($answer) {
                     $answer->update([
                         'text' => $answerData['text'],
                         'is_correct' => $answerData['is_correct'],
+                        'position' => $index + 1,
                     ]);
                     $existingAnswerIds[] = $answer->id;
                 }
@@ -268,6 +324,8 @@ class CourseBuilderController extends Controller
                 $newAnswer = $question->answers()->create([
                     'text' => $answerData['text'],
                     'is_correct' => $answerData['is_correct'],
+                    'position' => $index + 1,
+                    'activo' => 'si',
                 ]);
                 $existingAnswerIds[] = $newAnswer->id;
             }
@@ -299,6 +357,7 @@ class CourseBuilderController extends Controller
         foreach ($quiz->questions as $question) {
             $newQuestion = $question->replicate();
             $newQuestion->quiz_id = $newQuiz->id;
+            $newQuestion->slug = Str::slug($newQuestion->pregunta ?? 'pregunta') . '-' . rand(1000, 9999);
             $newQuestion->save();
 
             foreach ($question->answers as $answer) {
@@ -318,7 +377,7 @@ class CourseBuilderController extends Controller
     {
         $validated = $request->validate([
             'modules' => 'required|array',
-            'modules.*.id' => 'required|exists:modules,id',
+            'modules.*.id' => ['required', Rule::exists(Module::class, 'id')],
             'modules.*.position' => 'required|integer|min:0',
         ]);
 
@@ -336,7 +395,7 @@ class CourseBuilderController extends Controller
     {
         $validated = $request->validate([
             'lessons' => 'required|array',
-            'lessons.*.id' => 'required|exists:lessons,id',
+            'lessons.*.id' => ['required', Rule::exists(Lesson::class, 'id')],
             'lessons.*.position' => 'required|integer|min:0',
         ]);
 

@@ -44,12 +44,13 @@ class InteractivePdfController extends Controller
         // We will store it in public disk so it's easily accessible by the frontend
         $path = $file->store('files/interactive_pdfs', 'public');
 
+        $allowDownload = $request->has('allow_download') && $request->allow_download ? 1 : 0;
+
         $material = InteractivePdf::create([
             'leccion_id' => $request->leccion_id,
             'titulo' => $request->titulo,
             'file_path' => basename($path),
-            'fields_config' => [],
-            'allow_download' => $request->has('allow_download') && $request->allow_download ? 1 : 0
+            'fields_config' => ['allow_download' => $allowDownload],
         ]);
 
         return redirect()->back()->with('success', 'PDF interactivo subido exitosamente.');

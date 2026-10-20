@@ -8,12 +8,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use App\Concerns\MapsLegacyAttributes;
 use Illuminate\Database\Eloquent\Builder;
 
-#[Fillable(['course_id', 'title', 'slug', 'image', 'description', 'position', 'is_active', 'is_scheduled', 'available_at', 'expires_at'])]
+#[Fillable(['course_id', 'title', 'slug', 'image', 'description', 'position', 'is_active'])]
 class Module extends Model
 {
     use MapsLegacyAttributes;
 
     protected $table = 'lecciones'; // In the legacy DB, modules are stored as parent lecciones (leccion_id = 0)
+
+    protected $appends = ['is_scheduled', 'available_at', 'expires_at'];
 
     protected $legacyMapping = [
         'course_id' => 'curso_id',
@@ -32,16 +34,37 @@ class Module extends Model
                   ->orWhereNull('leccion_id');
             });
         });
+
+        static::creating(function ($module) {
+            if (is_null($module->leccion_id)) {
+                $module->leccion_id = 0;
+            }
+            if (empty($module->activo)) {
+                $module->activo = 'si';
+            }
+        });
     }
 
     protected function casts(): array
     {
         return [
-            'available_at' => 'datetime',
-            'expires_at' => 'datetime',
-            'is_scheduled' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function getIsScheduledAttribute(): bool
+    {
+        return false;
+    }
+
+    public function getAvailableAtAttribute(): ?string
+    {
+        return null;
+    }
+
+    public function getExpiresAtAttribute(): ?string
+    {
+        return null;
     }
 
     public function course()
@@ -57,5 +80,10 @@ class Module extends Model
     public function quizzes()
     {
         return $this->hasMany(Quiz::class, 'leccion_id');
+    }
+
+    public function media()
+    {
+        return $this->hasMany(Media::class, 'leccion_id');
     }
 }
