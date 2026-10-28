@@ -19,8 +19,15 @@ class OverdueLessonsReminderEmail extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct($student, $overdueLessons)
+    public function __construct($student, $overdueLessons = [])
     {
+        // Support both ($student, $overdueLessons) and legacy ($overdueLessons, $student)
+        if (is_array($student) && !is_array($overdueLessons)) {
+            $temp = $student;
+            $student = $overdueLessons;
+            $overdueLessons = $temp;
+        }
+
         $this->student = $student;
         $this->overdueLessons = $overdueLessons;
     }

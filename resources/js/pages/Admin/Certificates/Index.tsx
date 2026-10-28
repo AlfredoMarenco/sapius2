@@ -59,12 +59,12 @@ export default function CertificatesIndex({ certificates, filters, cohorts }: Pr
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get(route('admin.certificates.index'), { search: searchTerm }, { preserveState: true });
+        router.get('/admin/certificates', { search: searchTerm }, { preserveState: true });
     };
 
     const handleEmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('admin.certificates.emit'), {
+        post('/admin/certificates/emit', {
             onSuccess: () => {
                 setIsEmitModalOpen(false);
                 reset();
@@ -74,7 +74,7 @@ export default function CertificatesIndex({ certificates, filters, cohorts }: Pr
 
     const revokeCertificate = (id: number) => {
         if (confirm('¿Estás seguro de que deseas revocar y eliminar este certificado? Esta acción no se puede deshacer.')) {
-            router.delete(route('admin.certificates.destroy', id));
+            router.delete(`/admin/certificates/${id}`);
         }
     };
 
@@ -122,7 +122,7 @@ export default function CertificatesIndex({ certificates, filters, cohorts }: Pr
                             variant="ghost"
                             onClick={() => {
                                 setSearchTerm('');
-                                router.get(route('admin.certificates.index'));
+                                router.get('/admin/certificates');
                             }}
                         >
                             Limpiar
@@ -170,7 +170,7 @@ export default function CertificatesIndex({ certificates, filters, cohorts }: Pr
                                                     variant="outline"
                                                     className="h-8 px-2.5 gap-1.5 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
                                                 >
-                                                    <a href={route('admin.certificates.download', cert.id)} target="_blank">
+                                                    <a href={`/admin/certificates/${cert.id}/download`} target="_blank">
                                                         <Eye className="w-4 h-4" />
                                                         <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Ver PDF</span>
                                                     </a>

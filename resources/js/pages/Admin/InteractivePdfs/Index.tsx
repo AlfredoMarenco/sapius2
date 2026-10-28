@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FileText, Plus, Trash2, Edit, Layout, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -39,9 +39,7 @@ export default function Index({ lesson, materials }: any) {
 
     const handleDelete = (id: number) => {
         if (confirm('¿Estás seguro de eliminar este PDF interactivo? Todos los datos de los alumnos se perderán.')) {
-            // using inertia to delete
-            post(`/admin/material-pdfs/${id}`, {
-                data: { _method: 'delete' },
+            router.delete(`/admin/material-pdfs/${id}`, {
                 preserveScroll: true
             });
         }

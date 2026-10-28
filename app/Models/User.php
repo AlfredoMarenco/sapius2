@@ -108,4 +108,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(HomeworkSubmission::class);
     }
+
+    public function completedLessons()
+    {
+        return $this->belongsToMany(\App\Models\Cursos\Leccion::class, 'leccion_user', 'user_id', 'leccion_id')
+            ->withPivot('curso_programado_id', 'completed_at');
+    }
 }

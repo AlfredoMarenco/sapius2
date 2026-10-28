@@ -206,7 +206,7 @@ class CheckoutController extends Controller
                 'amount' => (float) $finalPrice,
                 'currency' => 'MXN',
                 'description' => $description,
-                'order_id' => 'checkout-' . $user->id . '-' . time(),
+                'order_id' => 'checkout-' . $user->id . '-' . $scheduled->id . '-' . time(),
                 'redirect_url' => url('/alumno/checkout/callback'),
                 'customer' => $customer,
                 'send_email' => false,

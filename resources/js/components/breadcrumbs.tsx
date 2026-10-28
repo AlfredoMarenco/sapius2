@@ -30,12 +30,14 @@ export function Breadcrumbs({
                                             <BreadcrumbPage>
                                                 {item.title}
                                             </BreadcrumbPage>
-                                        ) : (
+                                        ) : item.href ? (
                                             <BreadcrumbLink asChild>
                                                 <Link href={item.href}>
                                                     {item.title}
                                                 </Link>
                                             </BreadcrumbLink>
+                                        ) : (
+                                            <span className="text-muted-foreground">{item.title}</span>
                                         )}
                                     </BreadcrumbItem>
                                     {!isLast && <BreadcrumbSeparator />}

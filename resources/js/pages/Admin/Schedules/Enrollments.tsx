@@ -8,6 +8,8 @@ import {
     ShieldAlert, 
     Search, 
     Download, 
+    FileSpreadsheet,
+    FileArchive,
     UserPlus, 
     ChevronLeft, 
     Award, 
@@ -254,11 +256,20 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
                             Venta Presencial
                         </button>
                         <a
-                            href={`/admin/exportAllResults/${cohort.id}`}
-                            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted transition-all"
+                            href={`/admin/exportAllResults/${cohort.id}?format=excel`}
+                            title="Descargar sábana de calificaciones en formato Excel"
+                            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400 transition-all"
                         >
-                            <Download className="size-4 text-green-600" />
-                            Exportar Calificaciones
+                            <FileSpreadsheet className="size-4 text-emerald-600" />
+                            Exportar Excel (.xlsx)
+                        </a>
+                        <a
+                            href={`/admin/exportAllResults/${cohort.id}?format=zip`}
+                            title="Descargar paquete ZIP con los reportes individuales en PDF"
+                            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-all"
+                        >
+                            <FileArchive className="size-4 text-rose-600" />
+                            Exportar PDFs (.zip)
                         </a>
                     </div>
                 </div>

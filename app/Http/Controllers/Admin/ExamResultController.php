@@ -3,13 +3,23 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
+use App\Models\Cursos\Leccion;
 use App\Models\Enrollment;
 use App\Models\Exam;
+use App\Models\Quiz;
 use App\Models\ScheduledCourse;
-use App\Models\Course;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Response;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use ZipArchive;
 
 class ExamResultController extends Controller
 {
@@ -122,95 +132,283 @@ class ExamResultController extends Controller
     }
 
     /**
-     * Export individual student exam results report
+     * Export individual student exam results report (Official PDF format)
      * Legacy URL: GET /admin/exportCalificaciones/{inscripcion_id}
      */
     public function exportReport($inscripcion_id)
     {
-        $inscripcion = Enrollment::with(['user', 'scheduledCourse.course'])->findOrFail($inscripcion_id);
+        $inscripcion = Enrollment::with(['user', 'scheduledCourse.course', 'exams.quiz'])->findOrFail($inscripcion_id);
         $user = $inscripcion->user;
-        $exams = Exam::with('quiz')->where('inscripcion_id', $inscripcion_id)->get();
+        $cohort = $inscripcion->scheduledCourse;
 
-        $filename = "Calificaciones_{$user->name}_{$inscripcion_id}.csv";
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+        $lecciones = Leccion::with(['pruebas' => function ($q) {
+            $q->where('activo', 'si');
+        }])->where('curso_id', $cohort ? $cohort->course_id : 0)->get();
 
-        $callback = function () use ($exams, $user, $inscripcion) {
-            $file = fopen('php://output', 'w');
-            // BOM UTF-8 for Excel
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+        $exams = $inscripcion->exams ?? collect();
 
-            fputcsv($file, ['Reporte Individual de Calificaciones']);
-            fputcsv($file, ['Alumno', $user ? $user->name : 'N/A']);
-            fputcsv($file, ['Correo', $user ? $user->email : 'N/A']);
-            fputcsv($file, ['Fecha de Emisión', date('d/m/Y H:i')]);
-            fputcsv($file, []);
-            fputcsv($file, ['ID', 'Examen / Prueba', 'Aciertos', 'Total Preguntas', 'Calificación', 'Finalizado', 'Fecha']);
+        $studentName = $user ? trim(($user->first_name ?? $user->name ?? '').' '.($user->last_name ?? $user->apellido ?? '')) : 'Alumno';
+        if (empty($studentName)) {
+            $studentName = $user->name ?? $user->email ?? 'Alumno';
+        }
+        $cleanName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $studentName);
 
-            foreach ($exams as $ex) {
-                fputcsv($file, [
-                    $ex->id,
-                    $ex->quiz ? $ex->quiz->title : 'Evaluación #' . $ex->prueba_id,
-                    $ex->aciertos ?? 0,
-                    $ex->total_preguntas ?? 0,
-                    $ex->score ?? $ex->calificacion ?? 0,
-                    $ex->finalizado === 'si' ? 'Sí' : 'No',
-                    $ex->created_at ? $ex->created_at->format('d/m/Y H:i') : 'N/A',
-                ]);
-            }
+        $pdf = Pdf::loadView('alumno.exportresultados', [
+            'examenes' => $exams,
+            'lecciones' => $lecciones,
+            'inscripcion' => $inscripcion,
+        ]);
 
-            fclose($file);
-        };
+        $fileName = "Calificaciones_{$cleanName}_{$inscripcion_id}.pdf";
 
-        return response()->stream($callback, 200, $headers);
+        return $pdf->download($fileName);
     }
 
     /**
-     * Export all student results for a cohort
+     * Export all student results for a cohort (Excel matrix or ZIP of PDFs)
      * Legacy URL: GET /admin/exportAllResults/{curso_id}
+     * Query param: ?format=excel (default) or ?format=zip
      */
-    public function exportAllStudentResults($curso_id)
+    public function exportAllStudentResults(Request $request, $curso_id)
     {
-        $cohort = ScheduledCourse::with(['course', 'enrollments.user'])->findOrFail($curso_id);
-        $enrollments = $cohort->enrollments;
+        $cohort = ScheduledCourse::with(['course'])->findOrFail($curso_id);
+        $format = strtolower($request->query('format', 'excel'));
 
-        $filename = "Acta_Calificaciones_Grupo_{$cohort->id}.csv";
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+        if ($format === 'zip' || $format === 'pdf') {
+            return $this->exportCohortZip($cohort);
+        }
 
-        $callback = function () use ($cohort, $enrollments) {
-            $file = fopen('php://output', 'w');
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+        return $this->exportCohortExcel($cohort);
+    }
 
-            fputcsv($file, ['Acta de Calificaciones del Grupo']);
-            fputcsv($file, ['Curso', $cohort->course ? $cohort->course->title : 'N/A']);
-            fputcsv($file, ['Cohorte / Generación', $cohort->identificador]);
-            fputcsv($file, ['Fecha de Emisión', date('d/m/Y H:i')]);
-            fputcsv($file, ['Total Inscritos', $enrollments->count()]);
-            fputcsv($file, []);
-            fputcsv($file, ['ID Inscripción', 'Alumno', 'Correo', 'Aceptado', 'Exámenes Presentados', 'Promedio']);
+    /**
+     * Generate full grade matrix in Excel (.xlsx) format
+     */
+    protected function exportCohortExcel(ScheduledCourse $cohort)
+    {
+        $course = $cohort->course;
 
-            foreach ($enrollments as $ins) {
-                $studentExams = Exam::where('inscripcion_id', $ins->id)->get();
-                $avgScore = $studentExams->count() > 0 ? round($studentExams->avg('calificacion'), 2) : 0;
+        // Quizzes of the course
+        $quizzes = Quiz::where('curso_id', $cohort->course_id)
+            ->where('activo', 'si')
+            ->orderBy('id', 'asc')
+            ->get();
 
-                fputcsv($file, [
-                    $ins->id,
-                    $ins->user ? $ins->user->name : 'N/A',
-                    $ins->user ? $ins->user->email : 'N/A',
-                    $ins->aceptado === 'si' ? 'Aceptado' : 'Pendiente',
-                    $studentExams->count(),
-                    $avgScore,
-                ]);
+        // Accepted enrolled students
+        $enrollments = Enrollment::with(['user', 'exams.quiz'])
+            ->where('curso_programado_id', $cohort->id)
+            ->where('aceptado', 'si')
+            ->get();
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Calificaciones');
+
+        // Title & Info Header
+        $sheet->mergeCells('A1:F1');
+        $sheet->setCellValue('A1', 'SAPIUS - ACTA DE CALIFICACIONES');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF002146');
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+        $courseTitle = $course ? $course->title : 'Curso';
+        $cohortIdentifier = $cohort->identificador ?? ('Cohorte #'.$cohort->id);
+        $infoText = "Curso: {$courseTitle} | Cohorte: {$cohortIdentifier} | Fecha: ".date('d/m/Y H:i');
+        $sheet->mergeCells('A2:F2');
+        $sheet->setCellValue('A2', $infoText);
+        $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(10)->getColor()->setARGB('FF333333');
+
+        // Table Column Headers (Row 4)
+        $headers = ['#', 'ID Inscripción', 'Folio', 'Alumno', 'Correo', 'Universidad'];
+        $colIndex = 1;
+        foreach ($headers as $h) {
+            $coord = Coordinate::stringFromColumnIndex($colIndex).'4';
+            $sheet->setCellValue($coord, $h);
+            $colIndex++;
+        }
+
+        // Dynamic quiz headers
+        $quizColMap = [];
+        foreach ($quizzes as $quiz) {
+            $coord = Coordinate::stringFromColumnIndex($colIndex).'4';
+            $quizTitle = $quiz->title ?? ('Evaluación #'.$quiz->id);
+            $sheet->setCellValue($coord, $quizTitle);
+            $quizColMap[$quiz->id] = $colIndex;
+            $colIndex++;
+        }
+
+        // Metric headers
+        $presentedCol = $colIndex;
+        $sheet->setCellValue(Coordinate::stringFromColumnIndex($presentedCol).'4', 'Exámenes Presentados');
+        $colIndex++;
+
+        $avgCol = $colIndex;
+        $sheet->setCellValue(Coordinate::stringFromColumnIndex($avgCol).'4', 'Promedio General');
+
+        // Style Header Row 4
+        $lastColLetter = Coordinate::stringFromColumnIndex($colIndex);
+        $sheet->getStyle("A4:{$lastColLetter}4")->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle("A4:{$lastColLetter}4")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF002146');
+        $sheet->getStyle("A4:{$lastColLetter}4")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Data rows
+        $rowIndex = 5;
+        $studentCount = 0;
+
+        foreach ($enrollments as $ins) {
+            $studentCount++;
+            $user = $ins->user;
+            $studentName = $user ? trim(($user->first_name ?? $user->name ?? '').' '.($user->last_name ?? $user->apellido ?? '')) : 'Alumno';
+            if (empty($studentName)) {
+                $studentName = $user->name ?? $user->email ?? 'Alumno';
+            }
+            $folio = $user ? ($user->id_folio ?? $user->folio ?? $user->id) : 'N/A';
+            $university = $user ? ($user->university ?? $user->universidad_procedencia ?? 'N/A') : 'N/A';
+
+            $sheet->setCellValue("A{$rowIndex}", $studentCount);
+            $sheet->setCellValue("B{$rowIndex}", $ins->id);
+            $sheet->setCellValue("C{$rowIndex}", $folio);
+            $sheet->setCellValue("D{$rowIndex}", $studentName);
+            $sheet->setCellValue("E{$rowIndex}", $user ? $user->email : 'N/A');
+            $sheet->setCellValue("F{$rowIndex}", $university);
+
+            $studentExams = $ins->exams ?? collect();
+            $presentedCount = 0;
+            $sumScores = 0;
+
+            foreach ($quizColMap as $quizId => $cIdx) {
+                $colLetter = Coordinate::stringFromColumnIndex($cIdx);
+                $exam = $studentExams->firstWhere('prueba_id', $quizId);
+                if ($exam) {
+                    $score = (float) ($exam->score_total ?? $exam->score ?? $exam->calificacion ?? 0);
+                    $sheet->setCellValue("{$colLetter}{$rowIndex}", $score);
+                    $sheet->getStyle("{$colLetter}{$rowIndex}")->getNumberFormat()->setFormatCode('0.0');
+                    $sheet->getStyle("{$colLetter}{$rowIndex}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $presentedCount++;
+                    $sumScores += $score;
+                } else {
+                    $sheet->setCellValue("{$colLetter}{$rowIndex}", 'NP');
+                    $sheet->getStyle("{$colLetter}{$rowIndex}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle("{$colLetter}{$rowIndex}")->getFont()->setColor(new Color('FF856404'));
+                }
             }
 
-            fclose($file);
-        };
+            // Metrics for student
+            $presLetter = Coordinate::stringFromColumnIndex($presentedCol);
+            $sheet->setCellValue("{$presLetter}{$rowIndex}", $presentedCount);
+            $sheet->getStyle("{$presLetter}{$rowIndex}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        return response()->stream($callback, 200, $headers);
+            $avgLetter = Coordinate::stringFromColumnIndex($avgCol);
+            $avgScore = $presentedCount > 0 ? round($sumScores / $presentedCount, 1) : 0;
+            $sheet->setCellValue("{$avgLetter}{$rowIndex}", $avgScore);
+            $sheet->getStyle("{$avgLetter}{$rowIndex}")->getNumberFormat()->setFormatCode('0.0');
+            $sheet->getStyle("{$avgLetter}{$rowIndex}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $rowIndex++;
+        }
+
+        // Border styling for entire table
+        $lastRowIndex = $rowIndex - 1;
+        if ($lastRowIndex >= 5) {
+            $sheet->getStyle("A4:{$lastColLetter}{$lastRowIndex}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('FFCCCCCC');
+        }
+
+        // Auto-size columns
+        for ($i = 1; $i <= $colIndex; $i++) {
+            $colLetter = Coordinate::stringFromColumnIndex($i);
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
+        }
+
+        $cleanCohortIdent = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $cohort->identificador ?? ('Cohorte_'.$cohort->id));
+        $filename = "Acta_Calificaciones_{$cleanCohortIdent}.xlsx";
+
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+
+    /**
+     * Generate ZIP package containing individual student PDF reports
+     */
+    protected function exportCohortZip(ScheduledCourse $cohort)
+    {
+        ini_set('max_execution_time', 300);
+        ini_set('memory_limit', '512M');
+
+        $enrollments = Enrollment::with(['user', 'exams.quiz'])
+            ->where('curso_programado_id', $cohort->id)
+            ->where('aceptado', 'si')
+            ->get();
+
+        if ($enrollments->isEmpty()) {
+            return back()->with('error', 'La cohorte no tiene alumnos aceptados para exportar.');
+        }
+
+        $lecciones = Leccion::with(['pruebas' => function ($q) {
+            $q->where('activo', 'si');
+        }])->where('curso_id', $cohort->course_id)->get();
+
+        $tempFolder = storage_path('app/temp_reports/'.uniqid('cohort_'.$cohort->id.'_', true));
+        if (! file_exists($tempFolder)) {
+            mkdir($tempFolder, 0777, true);
+        }
+
+        $pdfFiles = [];
+
+        try {
+            foreach ($enrollments as $ins) {
+                $user = $ins->user;
+                $studentName = $user ? trim(($user->first_name ?? $user->name ?? '').' '.($user->last_name ?? $user->apellido ?? '')) : 'Alumno';
+                if (empty($studentName)) {
+                    $studentName = $user->name ?? $user->email ?? 'Alumno';
+                }
+                $cleanName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $studentName);
+
+                $examenes = $ins->exams ?? collect();
+
+                $pdf = Pdf::loadView('alumno.exportresultados', [
+                    'examenes' => $examenes,
+                    'lecciones' => $lecciones,
+                    'inscripcion' => $ins,
+                ]);
+
+                $fileName = "{$cleanName} - {$ins->id}.pdf";
+                $filePath = "{$tempFolder}/{$fileName}";
+
+                $pdf->save($filePath);
+                $pdfFiles[] = $filePath;
+            }
+
+            $cleanCohortIdent = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $cohort->identificador ?? ('Cohorte_'.$cohort->id));
+            $zipFileName = "Resultados_{$cleanCohortIdent}_".date('Ymd_His').'.zip';
+            $zipPath = storage_path("app/{$zipFileName}");
+
+            $zip = new ZipArchive;
+            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+                foreach ($pdfFiles as $file) {
+                    if (file_exists($file)) {
+                        $zip->addFile($file, basename($file));
+                    }
+                }
+                $zip->close();
+            }
+
+            return response()->download($zipPath)->deleteFileAfterSend(true);
+        } finally {
+            // Cleanup temporary PDF files
+            foreach ($pdfFiles as $file) {
+                if (file_exists($file)) {
+                    @unlink($file);
+                }
+            }
+            if (file_exists($tempFolder)) {
+                @rmdir($tempFolder);
+            }
+        }
     }
 }

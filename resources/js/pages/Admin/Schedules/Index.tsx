@@ -246,7 +246,7 @@ export default function SchedulesIndex({
                                         required
                                         className="w-full text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent p-2"
                                         value={createForm.course_id}
-                                        onChange={(e) => setCreateForm({ ...createForm, course_id: e.target.value })}
+                                        onChange={(e) => setCreateForm({ ...createForm, course_id: Number(e.target.value) })}
                                     >
                                         {courses.map((c) => (
                                             <option key={c.id} value={c.id}>
@@ -271,7 +271,7 @@ export default function SchedulesIndex({
                                             required
                                             className="w-full text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent p-2"
                                             value={createForm.instructor_id}
-                                            onChange={(e) => setCreateForm({ ...createForm, instructor_id: e.target.value })}
+                                            onChange={(e) => setCreateForm({ ...createForm, instructor_id: Number(e.target.value) })}
                                         >
                                             {instructors.map((i) => (
                                                 <option key={i.id} value={i.id}>

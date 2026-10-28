@@ -17,7 +17,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (!class_exists('App\User')) {
+            class_alias(\App\Models\User::class, 'App\User');
+        }
     }
 
     /**

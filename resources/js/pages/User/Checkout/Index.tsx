@@ -137,11 +137,11 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                 </CardDescription>
                             </CardHeader>
 
-                            {usePage().props.flash?.error && (
+                            {(usePage().props as any).flash?.error && (
                                 <div className="px-6 pb-2">
                                     <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4 shrink-0" />
-                                        <span>{usePage().props.flash.error}</span>
+                                        <span>{(usePage().props as any).flash.error}</span>
                                     </div>
                                 </div>
                             )}

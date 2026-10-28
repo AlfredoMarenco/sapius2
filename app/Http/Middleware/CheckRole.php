@@ -20,6 +20,11 @@ class CheckRole
             return redirect('login');
         }
 
+        // Permitir acceso total si el usuario tiene rol de administrador
+        if ((method_exists($user, 'hasRole') && $user->hasRole('admin')) || (isset($user->role) && $user->role === 'admin')) {
+            return $next($request);
+        }
+
         // Si el usuario tiene el trait HasShinobiRoles o similar, usamos hasRole.
         // Si no, verificamos manualmente si hay un campo "role" o equivalente.
         if (method_exists($user, 'hasRole')) {

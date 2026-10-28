@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, Save, MousePointer2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -17,6 +17,7 @@ interface FieldConfig {
     width: number;
     height: number;
     type: string;
+    [key: string]: any;
 }
 
 export default function Editor({ material }: any) {
@@ -92,8 +93,9 @@ export default function Editor({ material }: any) {
     };
 
     const saveLayout = () => {
-        post(`/admin/material-pdfs/${material.id}/save-layout`, {
-            data: { fields_config: fields },
+        router.post(`/admin/material-pdfs/${material.id}/save-layout`, {
+            fields_config: fields,
+        }, {
             preserveScroll: true
         });
     };

@@ -16,6 +16,9 @@ Route::namespace('App\Http\Controllers\Api')->group(function () {
 
     Route::get('/test-n8n', 'N8nTestController@send')->name('test.n8n');
 
+    // OpenPay Webhook (Pagos asíncronos: OXXO Pay, SPEI, Tarjeta y verificación)
+    Route::post('/webhooks/openpay', 'OpenPayWebhookController@handleWebhook')->name('api.webhooks.openpay');
+
     // Electron MAC Detector Routes
     Route::post('/login', 'AuthController@login');
     

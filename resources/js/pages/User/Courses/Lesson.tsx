@@ -82,7 +82,7 @@ export default function Lesson({
             if (data.success) {
                 setCompleted(data.completed);
                 // Si deseamos actualizar la vista para que el check lateral se refleje:
-                router.reload({ only: ['modules', 'lesson'], preserveScroll: true });
+                router.reload({ only: ['modules', 'lesson'] });
             }
         } catch (error) {
             console.error('Error toggling completion', error);

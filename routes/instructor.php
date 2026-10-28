@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Instructor\DashboardController;
 use App\Http\Controllers\Instructor\CourseController;
 use App\Http\Controllers\Instructor\SupportController;
-use App\Http\Controllers\Admin\CourseBuilderController;
+use App\Http\Controllers\Instructor\CourseBuilderController;
 
 Route::middleware(['auth', 'verified', 'role:instructor'])->prefix('instructor')->name('instructor.')->group(function () {
     // Dashboard
