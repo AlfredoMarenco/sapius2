@@ -6,19 +6,43 @@ test('registration screen can be rendered', function () {
     $response->assertOk();
 });
 
-test('new users can register', function () {
+test('new users can register with explicit username, first_name and last_name', function () {
     $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
 
     $response = $this->post(route('register.store'), [
-        'name' => 'Test User',
-        'email' => 'test_feature_reg@example.com',
+        'first_name' => 'Carlos',
+        'last_name' => 'Santana Gomez',
+        'username' => 'csantana_test',
+        'email' => 'csantana_test@example.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
     ]);
 
     $this->assertAuthenticated();
 
-    $user = User::where('email', 'test_feature_reg@example.com')->first();
+    $user = User::where('email', 'csantana_test@example.com')->first();
     expect($user)->not->toBeNull();
+    expect($user->username)->toBe('csantana_test');
+    expect($user->nombre)->toBe('Carlos');
+    expect($user->apellido)->toBe('Santana Gomez');
+    $user?->delete();
+});
+
+test('new users can also register with name field fallback', function () {
+    $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
+
+    $response = $this->post(route('register.store'), [
+        'name' => 'Laura Martinez',
+        'email' => 'lmartinez_test@example.com',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+    ]);
+
+    $this->assertAuthenticated();
+
+    $user = User::where('email', 'lmartinez_test@example.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->username)->not->toBeEmpty();
+    expect($user->nombre)->toBe('Laura');
     $user?->delete();
 });

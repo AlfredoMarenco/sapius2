@@ -24,23 +24,37 @@ class CreateNewUser implements CreatesNewUsers
     {
         Validator::make($input, [
             ...$this->profileRules(),
+            'first_name' => ['required_without:name', 'nullable', 'string', 'max:255'],
+            'last_name' => ['required_without:name', 'nullable', 'string', 'max:255'],
             'password' => $this->passwordRules(),
         ])->validate();
 
         return DB::transaction(function () use ($input) {
+            $firstName = trim($input['first_name'] ?? '');
+            $lastName = trim($input['last_name'] ?? '');
             $fullName = trim($input['name'] ?? '');
-            $nameParts = preg_split('/\s+/', $fullName, 2);
-            $firstName = $nameParts[0] ?? $fullName;
-            $lastName = $nameParts[1] ?? '';
 
-            // Generar un username único a partir del email o nombre
-            $baseUsername = strtolower(explode('@', $input['email'])[0]);
-            $baseUsername = preg_replace('/[^a-z0-9_]/', '', $baseUsername) ?: 'user';
-            $username = $baseUsername;
-            $counter = 1;
-            while (User::where('username', $username)->exists()) {
-                $username = $baseUsername . $counter;
-                $counter++;
+            if (!$firstName && $fullName) {
+                $nameParts = preg_split('/\s+/', $fullName, 2);
+                $firstName = $nameParts[0] ?? $fullName;
+                $lastName = $nameParts[1] ?? '';
+            } elseif (!$fullName && ($firstName || $lastName)) {
+                $fullName = trim("{$firstName} {$lastName}");
+            }
+
+            // Obtener username ingresado o generar uno único seguro
+            $rawUsername = trim($input['username'] ?? '');
+            if (!empty($rawUsername)) {
+                $username = $rawUsername;
+            } else {
+                $baseUsername = strtolower(explode('@', $input['email'])[0]);
+                $baseUsername = preg_replace('/[^a-z0-9_]/', '', $baseUsername) ?: 'user';
+                $username = $baseUsername;
+                $counter = 1;
+                while (User::where('username', $username)->exists()) {
+                    $username = $baseUsername . $counter;
+                    $counter++;
+                }
             }
 
             $user = User::create([

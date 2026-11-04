@@ -15,7 +15,17 @@ trait ProfileValidationRules
     protected function profileRules(?int $userId = null): array
     {
         return [
-            'name' => $this->nameRules(),
+            'name' => ['nullable', 'string', 'max:255'],
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
+            'username' => [
+                'nullable',
+                'string',
+                'max:255',
+                $userId === null
+                    ? Rule::unique(User::class, 'username')
+                    : Rule::unique(User::class, 'username')->ignore($userId),
+            ],
             'email' => $this->emailRules($userId),
         ];
     }
