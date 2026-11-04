@@ -160,7 +160,7 @@ export default function Catalog({ courses, categories = [] }: Props) {
                                     <h3 className="text-2xl font-black text-brand-navy tracking-tight leading-tight uppercase group-hover:text-brand-coral transition-colors">
                                         {course.title}
                                     </h3>
-                                    <p className="text-sm text-gray-500 font-medium line-clamp-3 italic">
+                                    <p className="text-sm text-gray-500 font-medium italic">
                                         {stripHtml(course.description) || 'Sin descripción disponible por el momento.'}
                                     </p>
                                 </div>
