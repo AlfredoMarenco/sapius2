@@ -16,6 +16,7 @@ use App\Concerns\HasShinobiRoles;
 use App\Concerns\MapsLegacyAttributes;
 
 #[Fillable([
+    'name',
     'first_name',
     'last_name',
     'username',
@@ -39,6 +40,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable, TwoFactorAuthenticatable, HasShinobiRoles, MapsLegacyAttributes;
 
     protected $legacyMapping = [
+        'name' => 'nombre',
         'first_name' => 'nombre',
         'last_name' => 'apellido',
         'phone' => 'telefono',

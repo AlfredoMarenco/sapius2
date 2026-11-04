@@ -2,22 +2,18 @@
 
 namespace App\Actions\Fortify;
 
-use App\Actions\Teams\CreateTeam;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules, ProfileValidationRules;
-
-    public function __construct(private CreateTeam $createTeam)
-    {
-        //
-    }
 
     /**
      * Validate and create a newly registered user.
@@ -32,13 +28,41 @@ class CreateNewUser implements CreatesNewUsers
         ])->validate();
 
         return DB::transaction(function () use ($input) {
+            $fullName = trim($input['name'] ?? '');
+            $nameParts = preg_split('/\s+/', $fullName, 2);
+            $firstName = $nameParts[0] ?? $fullName;
+            $lastName = $nameParts[1] ?? '';
+
+            // Generar un username único a partir del email o nombre
+            $baseUsername = strtolower(explode('@', $input['email'])[0]);
+            $baseUsername = preg_replace('/[^a-z0-9_]/', '', $baseUsername) ?: 'user';
+            $username = $baseUsername;
+            $counter = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $baseUsername . $counter;
+                $counter++;
+            }
+
             $user = User::create([
-                'name' => $input['name'],
+                'name' => $fullName,
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'username' => $username,
                 'email' => $input['email'],
                 'password' => $input['password'],
+                'activo' => 'si',
+                'validado' => 'no',
             ]);
 
-            $this->createTeam->handle($user, $user->name."'s Team", isPersonal: true);
+            // Asignar rol de Alumno (ID 3 en Sapius)
+            if (Schema::hasTable('role_user')) {
+                DB::table('role_user')->insertOrIgnore([
+                    'user_id' => $user->id,
+                    'role_id' => 3,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             return $user;
         });
