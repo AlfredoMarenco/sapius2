@@ -33,7 +33,19 @@ class ValidRecaptcha implements ValidationRule
                 'remoteip' => request()->ip(),
             ]);
 
+            \Illuminate\Support\Facades\Log::info('reCAPTCHA verification response:', [
+                'success' => $response->json('success'),
+                'errors' => $response->json('error-codes'),
+                'hostname' => $response->json('hostname'),
+            ]);
+
             if (!$response->successful() || !$response->json('success')) {
+                $errorCodes = $response->json('error-codes') ?? [];
+                // Si el error es únicamente porque el dominio test.sapius.com.mx no está añadido a la lista blanca de Google reCAPTCHA del dominio sapius.com.mx
+                if (in_array('bad-request', $errorCodes) || in_array('hostname-mismatch', $errorCodes) || in_array('invalid-input-response', $errorCodes)) {
+                    \Illuminate\Support\Facades\Log::warning('reCAPTCHA falló por código: ' . json_encode($errorCodes));
+                }
+
                 $fail('La verificación de reCAPTCHA ha fallado. Por favor, intenta de nuevo.');
             }
         } catch (\Throwable $e) {
