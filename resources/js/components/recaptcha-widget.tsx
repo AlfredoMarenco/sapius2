@@ -35,8 +35,32 @@ export default function RecaptchaWidget({
                 try {
                     widgetIdRef.current = window.grecaptcha.render(containerRef.current, {
                         sitekey: siteKey,
-                        callback: (token: string) => onVerify(token),
-                        'expired-callback': () => onExpired && onExpired(),
+                        callback: (token: string) => {
+                            // 1. Actualizar el input hidden en el DOM para que el formulario de Inertia lo capture
+                            const form = containerRef.current?.closest('form');
+                            if (form) {
+                                const hiddenInput = form.querySelector('input[name="g-recaptcha-response"]') as HTMLInputElement;
+                                if (hiddenInput) {
+                                    hiddenInput.value = token;
+                                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }
+                            // 2. Notificar al estado de React
+                            onVerify(token);
+                        },
+                        'expired-callback': () => {
+                            const form = containerRef.current?.closest('form');
+                            if (form) {
+                                const hiddenInput = form.querySelector('input[name="g-recaptcha-response"]') as HTMLInputElement;
+                                if (hiddenInput) {
+                                    hiddenInput.value = '';
+                                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }
+                            if (onExpired) onExpired();
+                        },
                         'error-callback': () => onError && onError(),
                     });
                 } catch (e) {
