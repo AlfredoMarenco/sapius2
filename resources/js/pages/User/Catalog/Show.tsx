@@ -15,6 +15,7 @@ import {
     Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { stripHtml } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { 
     Accordion, 
@@ -97,7 +98,7 @@ export default function Show({ course }: Props) {
                                     {course.title}
                                 </h1>
                                 <p className="text-white/60 text-lg font-medium max-w-xl italic">
-                                    {course.description || 'Domina los conocimientos más avanzados con nuestra metodología de alta especialidad médica.'}
+                                    {stripHtml(course.description) || 'Domina los conocimientos más avanzados con nuestra metodología de alta especialidad médica.'}
                                 </p>
                             </motion.div>
 
@@ -207,7 +208,7 @@ export default function Show({ course }: Props) {
                         <div className="bg-white rounded-[3rem] p-8 md:p-12 border-2 border-gray-100 shadow-xl shadow-gray-200/50 space-y-6">
                             <h3 className="text-2xl font-black text-brand-navy uppercase tracking-tighter">Sobre este curso</h3>
                             <div className="prose max-w-none text-gray-500 font-medium leading-relaxed italic">
-                                {course.description || 'En este curso aprenderás las bases fundamentales y avanzadas necesarias para tu desarrollo profesional de la mano de expertos en la industria.'}
+                                {stripHtml(course.description) || 'En este curso aprenderás las bases fundamentales y avanzadas necesarias para tu desarrollo profesional de la mano de expertos en la industria.'}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
                                 {[
@@ -307,3 +308,4 @@ Show.layout = (page: any) => (
         {page}
     </AppLayout>
 );
+

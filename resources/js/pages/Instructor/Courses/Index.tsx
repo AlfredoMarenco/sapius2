@@ -1,6 +1,7 @@
 import React from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
+import { stripHtml } from '@/lib/utils';
 import { BookOpen, Settings, Edit, Eye } from 'lucide-react';
 
 interface Course {
@@ -51,7 +52,7 @@ export default function Index({ courses }: { courses: Course[] }) {
                                 {course.title}
                             </h3>
                             <p className="text-sm text-muted-foreground line-clamp-2 flex-grow mb-4">
-                                {course.description}
+                                {stripHtml(course.description)}
                             </p>
                             
                             <div className="flex gap-2 mt-auto">
@@ -96,3 +97,4 @@ Index.layout = (page: React.ReactNode) => (
         {page}
     </AppLayout>
 );
+

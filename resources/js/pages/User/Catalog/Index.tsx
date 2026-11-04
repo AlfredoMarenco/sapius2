@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { stripHtml } from '@/lib/utils';
 
 interface Course {
     id: number;
@@ -160,7 +161,7 @@ export default function Catalog({ courses, categories = [] }: Props) {
                                         {course.title}
                                     </h3>
                                     <p className="text-sm text-gray-500 font-medium line-clamp-3 italic">
-                                        {course.description || 'Sin descripción disponible por el momento.'}
+                                        {stripHtml(course.description) || 'Sin descripción disponible por el momento.'}
                                     </p>
                                 </div>
 
@@ -242,3 +243,5 @@ Catalog.layout = (page: any) => (
         {page}
     </AppLayout>
 );
+
+
