@@ -159,7 +159,7 @@ class CohortEnrollmentController extends Controller
                 ->send(new \App\Mail\AutoAceptacionEmail($enrollment));
         }
 
-        return redirect()->route('admin.cursos.inscritos', ['id' => $id])
+        return redirect()->route('admin.cursos.get-inscritos', ['curso_id' => $id])
             ->with('success', 'Alumno inscrito manualmente con éxito.');
     }
 
