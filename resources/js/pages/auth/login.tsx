@@ -1,7 +1,9 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
+import RecaptchaWidget from '@/components/recaptcha-widget';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -23,6 +25,9 @@ export default function Login({
     canResetPassword,
     canRegister,
 }: Props) {
+    const { recaptcha_site_key } = usePage<any>().props;
+    const [captchaToken, setCaptchaToken] = useState<string>('');
+
     return (
         <>
             <Head title="Acceso de Usuario" />
@@ -39,9 +44,11 @@ export default function Login({
             >
                 {({ processing, errors }) => (
                     <>
+                        <input type="hidden" name="g-recaptcha-response" value={captchaToken} />
+
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60 ml-1">Nombre de Usuario</Label>
+                                <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60 ml-1">Nombre de Usuario o Correo</Label>
                                 <Input
                                     id="username"
                                     type="text"
@@ -50,7 +57,7 @@ export default function Login({
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="username"
-                                    placeholder="Ej: lalo.ce"
+                                    placeholder="Ej: marencocode o usuario@correo.com"
                                     className="h-14 border-2 rounded-2xl px-5 font-bold focus-visible:ring-brand-navy focus-visible:border-brand-navy"
                                 />
                                 <InputError message={errors.username} />
@@ -80,6 +87,15 @@ export default function Login({
                                 />
                                 <InputError message={errors.password} />
                             </div>
+
+                            {recaptcha_site_key && (
+                                <RecaptchaWidget
+                                    siteKey={recaptcha_site_key}
+                                    onVerify={(token) => setCaptchaToken(token)}
+                                    onExpired={() => setCaptchaToken('')}
+                                    errorMessage={(errors as any)['g-recaptcha-response']}
+                                />
+                            )}
 
                             <div className="flex items-center space-x-3 ml-1">
                                 <Checkbox

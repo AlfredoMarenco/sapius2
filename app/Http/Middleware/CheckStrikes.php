@@ -17,7 +17,8 @@ class CheckStrikes
     {
         $user = \Illuminate\Support\Facades\Auth::user();
         if ($user) {
-            if ($user->is_blocked === 'si' || $user->is_blocked === 1 || $user->is_blocked === true || $user->strikes >= 3) {
+            // Un usuario se considera bloqueado si is_blocked está activo o acumula 100 o más puntos de severidad (strikes)
+            if ($user->is_blocked === 'si' || $user->is_blocked === 1 || $user->is_blocked === true || $user->strikes >= 100) {
                 if ($request->expectsJson()) {
                     return response()->json([
                         'error' => 'Tu cuenta ha sido bloqueada por exceder el límite de advertencias (strikes).',

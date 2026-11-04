@@ -22,11 +22,20 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
-        Validator::make($input, [
+        $rules = [
             ...$this->profileRules(),
             'first_name' => ['required_without:name', 'nullable', 'string', 'max:255'],
             'last_name' => ['required_without:name', 'nullable', 'string', 'max:255'],
             'password' => $this->passwordRules(),
+        ];
+
+        // Validar reCAPTCHA si está configurado
+        if (config('elearning.captcha_secret_key')) {
+            $rules['g-recaptcha-response'] = [new \App\Rules\ValidRecaptcha()];
+        }
+
+        Validator::make($input, $rules, [
+            'g-recaptcha-response.required' => 'Por favor, marca la casilla "No soy un robot".',
         ])->validate();
 
         return DB::transaction(function () use ($input) {

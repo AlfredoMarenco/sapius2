@@ -1,7 +1,9 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
+import RecaptchaWidget from '@/components/recaptcha-widget';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +13,9 @@ import { store } from '@/routes/register';
 import AuthLayout from '@/layouts/auth-layout';
 
 export default function Register() {
+    const { recaptcha_site_key } = usePage<any>().props;
+    const [captchaToken, setCaptchaToken] = useState<string>('');
+
     return (
         <>
             <Head title="Registro de Alumno" />
@@ -28,6 +33,8 @@ export default function Register() {
             >
                 {({ processing, errors }) => (
                     <>
+                        <input type="hidden" name="g-recaptcha-response" value={captchaToken} />
+
                         <div className="grid gap-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="grid gap-1.5">
@@ -121,6 +128,15 @@ export default function Register() {
                                     <InputError message={errors.password_confirmation} />
                                 </div>
                             </div>
+
+                            {recaptcha_site_key && (
+                                <RecaptchaWidget
+                                    siteKey={recaptcha_site_key}
+                                    onVerify={(token) => setCaptchaToken(token)}
+                                    onExpired={() => setCaptchaToken('')}
+                                    errorMessage={(errors as any)['g-recaptcha-response']}
+                                />
+                            )}
 
                             <Button
                                 type="submit"

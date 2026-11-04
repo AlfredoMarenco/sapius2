@@ -39,6 +39,44 @@ class FortifyServiceProvider extends ServiceProvider
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
+        $this->configureAuthentication();
+    }
+
+    /**
+     * Configure custom Fortify authentication to validate reCAPTCHA and allow login via username or email.
+     */
+    private function configureAuthentication(): void
+    {
+        Fortify::authenticateUsing(function (Request $request) {
+            // Validar reCAPTCHA si está configurado
+            $recaptchaSecret = config('elearning.captcha_secret_key');
+            if ($recaptchaSecret && $request->filled('g-recaptcha-response')) {
+                $recaptchaRule = new \App\Rules\ValidRecaptcha();
+                $request->validate([
+                    'g-recaptcha-response' => [$recaptchaRule],
+                ], [
+                    'g-recaptcha-response.required' => 'Por favor, marca la casilla "No soy un robot".',
+                ]);
+            }
+
+            $loginInput = $request->input('username') ?? $request->input('email');
+            $password = $request->input('password');
+
+            if (!$loginInput || !$password) {
+                return null;
+            }
+
+            // Buscar por username o por email
+            $user = \App\Models\User::where('username', $loginInput)
+                ->orWhere('email', $loginInput)
+                ->first();
+
+            if ($user && \Illuminate\Support\Facades\Hash::check($password, $user->password)) {
+                return $user;
+            }
+
+            return null;
+        });
     }
 
     /**
