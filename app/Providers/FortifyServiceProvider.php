@@ -47,18 +47,32 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureAuthentication(): void
     {
-        Fortify::authenticateUsing(function (Request $request) {
-            // Validar reCAPTCHA si está configurado
-            $recaptchaSecret = config('elearning.captcha_secret_key');
-            if ($recaptchaSecret && $request->filled('g-recaptcha-response')) {
-                $recaptchaRule = new \App\Rules\ValidRecaptcha();
-                $request->validate([
-                    'g-recaptcha-response' => [$recaptchaRule],
-                ], [
-                    'g-recaptcha-response.required' => 'Por favor, marca la casilla "No soy un robot".',
-                ]);
-            }
+        // 1. Validar reCAPTCHA antes de la autenticación
+        Fortify::authenticateThrough(function (Request $request) {
+            return array_filter([
+                config('fortify.limiters.login') ? null : \Laravel\Fortify\Actions\EnsureLoginIsNotThrottled::class,
+                \Laravel\Fortify\Actions\CanonicalizeUsername::class,
+                new class {
+                    public function handle($request, $next) {
+                        $recaptchaSecret = config('elearning.captcha_secret_key');
+                        if ($recaptchaSecret) {
+                            $request->validate([
+                                'g-recaptcha-response' => ['required', new \App\Rules\ValidRecaptcha()],
+                            ], [
+                                'g-recaptcha-response.required' => 'Por favor, marca la casilla "No soy un robot".',
+                            ]);
+                        }
+                        return $next($request);
+                    }
+                },
+                \Laravel\Fortify\Features::enabled(\Laravel\Fortify\Features::twoFactorAuthentication()) ? \Laravel\Fortify\Actions\RedirectsIfTwoFactorAuthenticatable::class : null,
+                \Laravel\Fortify\Actions\AttemptToAuthenticate::class,
+                \Laravel\Fortify\Actions\PrepareAuthenticatedSession::class,
+            ]);
+        });
 
+        // 2. Resolver usuario por username o email (sin revalidar reCAPTCHA para no duplicar el token de un solo uso)
+        Fortify::authenticateUsing(function (Request $request) {
             $loginInput = $request->input('username') ?? $request->input('email');
             $password = $request->input('password');
 
