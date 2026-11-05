@@ -65,7 +65,7 @@ class FortifyServiceProvider extends ServiceProvider
                         return $next($request);
                     }
                 },
-                \Laravel\Fortify\Features::enabled(\Laravel\Fortify\Features::twoFactorAuthentication()) ? \Laravel\Fortify\Actions\RedirectsIfTwoFactorAuthenticatable::class : null,
+                \Laravel\Fortify\Features::enabled(\Laravel\Fortify\Features::twoFactorAuthentication()) ? \Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable::class : null,
                 \Laravel\Fortify\Actions\AttemptToAuthenticate::class,
                 \Laravel\Fortify\Actions\PrepareAuthenticatedSession::class,
             ]);
