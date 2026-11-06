@@ -26,6 +26,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
+import { getEmbedVideoUrl } from '@/lib/utils';
 
 interface LessonProps {
     lesson: {
@@ -122,7 +123,7 @@ export default function Lesson({
                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-black shadow-md border border-neutral-800/50">
                                 {(videoMedia.url || videoMedia.ruta || videoMedia.file_path) && (videoMedia.url || videoMedia.ruta || videoMedia.file_path).includes('http') ? (
                                     <iframe
-                                        src={videoMedia.url || videoMedia.ruta || videoMedia.file_path}
+                                        src={getEmbedVideoUrl(videoMedia.url || videoMedia.ruta || videoMedia.file_path)}
                                         title={lesson.title}
                                         className="w-full h-full border-0"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

@@ -29,7 +29,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState, useMemo, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, getEmbedVideoUrl } from '@/lib/utils';
 import { 
     Accordion, 
     AccordionContent, 
@@ -176,6 +176,8 @@ export default function Builder({ course }: Props) {
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+    const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
     const [activeModuleId, setActiveModuleId] = useState<number | null>(null);
     const [editingModule, setEditingModule] = useState<Module | null>(null);
     const [isEditingLessonTitle, setIsEditingLessonTitle] = useState(false);
@@ -580,7 +582,13 @@ export default function Builder({ course }: Props) {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <Button variant="outline" className="rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50"><Eye className="h-4 w-4 mr-2" /> Vista Previa</Button>
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={() => setIsPreviewModalOpen(true)}
+                                            className="rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50"
+                                        >
+                                            <Eye className="h-4 w-4 mr-2" /> Vista Previa
+                                        </Button>
                                         <Button variant="ghost" className="h-12 w-12 rounded-2xl text-destructive hover:bg-destructive/5" 
                                             onClick={() => {
                                                 const mCount = activeLesson.media?.length || 0;
@@ -627,9 +635,38 @@ export default function Builder({ course }: Props) {
                                                 {activeLesson.media?.map((media) => (
                                                     <Card key={media.id} className="rounded-[2rem] border-2 group hover:border-brand-blue/20 transition-all shadow-lg shadow-brand-navy/5 overflow-hidden">
                                                         <CardContent className="p-0">
-                                                            <div className="aspect-video bg-gray-100 flex items-center justify-center relative group-hover:bg-brand-blue/5 transition-colors">
-                                                                {media.file_type === 'video' ? <Play className="h-10 w-10 text-brand-blue" /> : <ImageIcon className="h-10 w-10 text-gray-300" />}
-                                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteMedia(media.id)} className="absolute top-3 right-3 h-10 w-10 rounded-xl bg-white/80 backdrop-blur-sm text-destructive hover:bg-destructive hover:text-white opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="h-4 w-4" /></Button>
+                                                            <div 
+                                                                className={cn(
+                                                                    "aspect-video bg-gray-100 flex items-center justify-center relative transition-colors",
+                                                                    media.file_type === 'video' && "cursor-pointer hover:bg-brand-blue/10"
+                                                                )}
+                                                                onClick={() => {
+                                                                    if (media.file_type === 'video') {
+                                                                        setPreviewVideoUrl(media.file_path);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {media.file_type === 'video' ? (
+                                                                    <div className="flex flex-col items-center gap-2">
+                                                                        <div className="h-12 w-12 rounded-full bg-brand-blue text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                                                            <Play className="h-6 w-6 ml-0.5 fill-current" />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-brand-navy/60">Clic para reproducir</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <ImageIcon className="h-10 w-10 text-gray-300" />
+                                                                )}
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="sm" 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteMedia(media.id);
+                                                                    }} 
+                                                                    className="absolute top-3 right-3 h-10 w-10 rounded-xl bg-white/80 backdrop-blur-sm text-destructive hover:bg-destructive hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
                                                             </div>
                                                             <div className="p-4 border-t-2">
                                                                 <span className="text-[9px] font-black uppercase tracking-widest text-brand-blue mb-1 block">{media.file_type}</span>
@@ -1002,6 +1039,142 @@ export default function Builder({ course }: Props) {
                 }}
                 onSave={handleSaveScheduling}
             />
+
+            {/* Modal de Vista Previa de Lección */}
+            <Dialog open={isPreviewModalOpen} onOpenChange={setIsPreviewModalOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] border-2 shadow-2xl p-0">
+                    <div className="bg-brand-navy p-6 text-white flex items-center justify-between sticky top-0 z-20">
+                        <DialogHeader>
+                            <DialogTitle className="font-black uppercase tracking-tight flex items-center gap-3 text-lg">
+                                <Eye className="h-5 w-5 text-brand-blue" />
+                                Vista Previa de Alumno: {activeLesson?.title}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <Badge className="bg-brand-blue/20 text-brand-blue border border-brand-blue/40 uppercase font-black text-[9px] tracking-widest px-3 py-1">
+                            Simulación Alumno
+                        </Badge>
+                    </div>
+
+                    <div className="p-8 space-y-6">
+                        {/* Video o Multimedia en Vista Previa */}
+                        {activeLesson?.media && activeLesson.media.find(m => m.file_type === 'video' || m.tipo === 'video' || m.tipo === 'videoext') ? (() => {
+                            const vMedia = activeLesson.media.find(m => m.file_type === 'video' || m.tipo === 'video' || m.tipo === 'videoext');
+                            const videoPath = vMedia?.file_path || vMedia?.ruta || vMedia?.url || '';
+                            const isHttp = videoPath.includes('http');
+
+                            return (
+                                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-lg border border-neutral-800">
+                                    {isHttp ? (
+                                        <iframe
+                                            src={getEmbedVideoUrl(videoPath)}
+                                            title={vMedia?.title || activeLesson.title}
+                                            className="w-full h-full border-0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <video
+                                            controls
+                                            className="w-full h-full object-cover"
+                                            src={videoPath ? `/alumno/medias/stream/${videoPath}` : ''}
+                                        >
+                                            Tu navegador no soporta el formato de video.
+                                        </video>
+                                    )}
+                                </div>
+                            );
+                        })() : (
+                            <div className="aspect-video w-full rounded-2xl bg-gradient-to-br from-brand-navy to-brand-navy/80 flex flex-col items-center justify-center text-white p-6 text-center">
+                                <BookOpen className="w-12 h-12 text-brand-blue/60 mb-3" />
+                                <h3 className="text-xl font-bold">{activeLesson?.title}</h3>
+                                <p className="text-xs text-white/60 mt-1">Esta lección no contiene video principal.</p>
+                            </div>
+                        )}
+
+                        {/* Recursos Adicionales */}
+                        {activeLesson?.media && activeLesson.media.length > 0 && (
+                            <div className="space-y-3 pt-2">
+                                <h4 className="text-xs font-black uppercase tracking-widest text-brand-navy/60">Recursos de la Lección</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {activeLesson.media.map((m) => (
+                                        <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border bg-gray-50/50">
+                                            <div className="h-9 w-9 rounded-lg bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold text-xs shrink-0">
+                                                {m.file_type === 'video' ? <Play className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-bold text-brand-navy truncate">{m.title}</p>
+                                                <p className="text-[10px] text-muted-foreground truncate">{m.file_path || m.ruta}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Contenido Teórico */}
+                        <div className="space-y-3 pt-4 border-t">
+                            <h4 className="text-xs font-black uppercase tracking-widest text-brand-navy/60">Contenido Teórico</h4>
+                            <div className="prose prose-sm max-w-none p-6 rounded-2xl bg-gray-50 border border-gray-100 min-h-[120px]">
+                                {activeLesson?.content ? (
+                                    <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
+                                ) : (
+                                    <p className="text-muted-foreground italic text-xs">Sin contenido teórico registrado.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Evaluación si existe */}
+                        {activeLesson?.quizzes && activeLesson.quizzes.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <HelpCircle className="h-6 w-6 text-amber-600" />
+                                    <div>
+                                        <p className="text-sm font-bold text-amber-900">{activeLesson.quizzes[0].title || 'Evaluación'}</p>
+                                        <p className="text-xs text-amber-700">{activeLesson.quizzes[0].questions?.length ?? 0} preguntas configuradas</p>
+                                    </div>
+                                </div>
+                                <Badge className="bg-amber-600 text-white uppercase text-[9px] font-black">
+                                    {activeLesson.quizzes[0].type || 'Examen'}
+                                </Badge>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="p-6 border-t bg-gray-50">
+                        <Button onClick={() => setIsPreviewModalOpen(false)} className="rounded-xl font-black uppercase text-[10px] tracking-widest bg-brand-navy px-8">
+                            Cerrar Vista Previa
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal para Reproducir Video Directo desde Tarjeta de Recurso */}
+            <Dialog open={previewVideoUrl !== null} onOpenChange={(open) => !open && setPreviewVideoUrl(null)}>
+                <DialogContent className="max-w-3xl rounded-[2.5rem] border-2 shadow-2xl p-0 overflow-hidden bg-black">
+                    <div className="p-4 bg-neutral-900 text-white flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-widest text-neutral-400">Reproductor Multimedia</span>
+                        <Button size="sm" variant="ghost" onClick={() => setPreviewVideoUrl(null)} className="text-white hover:bg-white/10 h-8 px-3 rounded-lg text-xs">
+                            Cerrar
+                        </Button>
+                    </div>
+                    <div className="aspect-video w-full bg-black">
+                        {previewVideoUrl && previewVideoUrl.includes('http') ? (
+                            <iframe
+                                src={getEmbedVideoUrl(previewVideoUrl)}
+                                title="Reproductor de Video"
+                                className="w-full h-full border-0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        ) : previewVideoUrl ? (
+                            <video controls autoPlay className="w-full h-full object-cover">
+                                <source src={previewVideoUrl.startsWith('/') ? previewVideoUrl : `/alumno/medias/stream/${previewVideoUrl}`} />
+                                Tu navegador no soporta el video.
+                            </video>
+                        ) : null}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

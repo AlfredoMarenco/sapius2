@@ -94,6 +94,11 @@ class Lesson extends Model
         return $this->hasMany(Homework::class, 'leccion_id');
     }
 
+    public function homeworks()
+    {
+        return $this->hasMany(Homework::class, 'leccion_id');
+    }
+
     public function interactivePdfs()
     {
         return $this->hasMany(InteractivePdf::class, 'leccion_id');

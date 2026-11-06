@@ -200,7 +200,7 @@ class UserController extends Controller
             'user_id' => $user->id,
         ]);
 
-        return redirect()->route('users.index')->with('success', 'Usuario actualizado correctamente.');
+        return redirect()->route('admin.users.index')->with('success', 'Usuario actualizado correctamente.');
     }
 
     public function unlock($id)
