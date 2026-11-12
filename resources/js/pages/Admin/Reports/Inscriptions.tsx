@@ -64,7 +64,7 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                         <TableBody>
                             {inscriptions.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8 text-neutral-400">
+                                    <TableCell colSpan={8} className="text-center py-8 text-neutral-400">
                                         No se encontraron registros de inscripciones.
                                     </TableCell>
                                 </TableRow>
@@ -109,6 +109,33 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                             )}
                         </TableBody>
                     </Table>
+                    {inscriptions.links && inscriptions.links.length > 3 && (
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-neutral-200 dark:border-neutral-800 px-4 py-3 bg-neutral-50/30 dark:bg-neutral-900/30">
+                            {inscriptions.links.map((link: any, index: number) => (
+                                link.url ? (
+                                    <Button
+                                        key={index}
+                                        asChild
+                                        size="sm"
+                                        variant={link.active ? 'default' : 'outline'}
+                                        className={link.active ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-xs'}
+                                    >
+                                        <Link
+                                            href={link.url}
+                                            preserveScroll
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                        />
+                                    </Button>
+                                ) : (
+                                    <span
+                                        key={index}
+                                        className="px-3 py-1.5 text-xs text-neutral-400 select-none"
+                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                    />
+                                )
+                            ))}
+                        </div>
+                    )}
                 </Card>
             </div>
         </>

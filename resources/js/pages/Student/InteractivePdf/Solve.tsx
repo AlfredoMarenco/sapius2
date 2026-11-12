@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, BookOpen, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
@@ -20,6 +21,14 @@ interface FieldConfig {
 }
 
 export default function Solve({ material, existingAnswers }: any) {
+    const { auth } = usePage<any>().props;
+    const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+        enabled: true,
+        watermarkText: userEmail,
+        allowTextInputs: true,
+    });
+
     const [numPages, setNumPages] = useState<number>(0);
     const [currentPage, setCurrentPage] = useState<number>(1);
     
@@ -55,8 +64,10 @@ export default function Solve({ material, existingAnswers }: any) {
             { title: material.titulo, href: '#' },
         ]}>
             <Head title={`${material.titulo}`} />
+            <StrikeAlert />
+            <Watermark />
 
-            <div className="p-6 mx-auto h-[calc(100vh-100px)] flex flex-col max-w-5xl">
+            <div className={`p-6 mx-auto h-[calc(100vh-100px)] flex flex-col max-w-5xl select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}>
                 <div className="flex items-center justify-between mb-4 flex-shrink-0">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-neutral-900 flex items-center gap-2">

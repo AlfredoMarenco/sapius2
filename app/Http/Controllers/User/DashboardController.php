@@ -137,6 +137,19 @@ class DashboardController extends Controller
         \Illuminate\Support\Facades\Log::warning("Strike registrado para usuario {$user->id} ({$user->email}). Total: {$newStrikes}. Motivo: {$reason}");
 
         if ($user->is_blocked === 1 || $user->is_blocked === true || $user->is_blocked === 'si') {
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('inscripciones') && \Illuminate\Support\Facades\Schema::hasTable('examenes')) {
+                    $enrollmentIds = Enrollment::where('user_id', $user->id)->pluck('id');
+                    if ($enrollmentIds->isNotEmpty()) {
+                        \App\Models\Exam::whereIn('inscripcion_id', $enrollmentIds)
+                            ->where('finalizado', 'no')
+                            ->update(['finalizado' => 'si']);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Error finalizando exámenes activos al bloquear usuario {$user->id}: " . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true, 
                 'blocked' => true,

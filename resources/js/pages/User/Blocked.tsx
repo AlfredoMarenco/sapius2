@@ -22,11 +22,11 @@ const getStrikeIcon = (details: string | null) => {
     const d = details || '';
     if (d.includes('pestaña') || d.includes('foco')) return <Layout className="w-5 h-5 text-neutral-500" />;
     if (d.includes('clic derecho')) return <MousePointerClick className="w-5 h-5 text-neutral-500" />;
-    if (d.includes('F12') || d.includes('desarrollador')) return <Keyboard className="w-5 h-5 text-neutral-500" />;
+    if (d.includes('ImprPant') || d.includes('captura') || d.includes('PrintScreen') || d.includes('recorte')) return <MonitorX className="w-5 h-5 text-neutral-500" />;
+    if (d.includes('F12') || d.includes('desarrollador') || d.includes('Ctrl') || d.includes('Alt') || d.includes('Windows')) return <Keyboard className="w-5 h-5 text-neutral-500" />;
     if (d.includes('copiar') || d.includes('Ctrl+C')) return <Copy className="w-5 h-5 text-neutral-500" />;
     if (d.includes('pegar') || d.includes('Ctrl+V')) return <Copy className="w-5 h-5 text-neutral-500" />;
-    if (d.includes('impresión') || d.includes('Ctrl+P')) return <Printer className="w-5 h-5 text-neutral-500" />;
-    if (d.includes('captura') || d.includes('PrintScreen')) return <MonitorX className="w-5 h-5 text-neutral-500" />;
+    if (d.includes('impresión') || d.includes('imprimir') || d.includes('Ctrl+P')) return <Printer className="w-5 h-5 text-neutral-500" />;
     return <AlertTriangle className="w-5 h-5 text-neutral-500" />;
 };
 
@@ -34,10 +34,18 @@ const getStrikeKeyCombination = (details: string | null) => {
     const d = details || '';
     if (d.includes('clic derecho')) return <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Clic Derecho</kbd>;
     if (d.includes('F12')) return <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">F12</kbd>;
+    if (d.includes('Ctrl+Alt+ImprPant')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Alt</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">ImprPant</kbd></>;
+    if (d.includes('Alt+ImprPant')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Alt</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">ImprPant</kbd></>;
+    if (d.includes('Ctrl+ImprPant')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">ImprPant</kbd></>;
+    if (d.includes('ImprPant') || d.includes('PrintScreen')) return <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">ImprPant</kbd>;
+    if (d.includes('Ctrl+Alt')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Alt</kbd></>;
     if (d.includes('Ctrl+C') || d.includes('copiar')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">C</kbd></>;
     if (d.includes('Ctrl+V') || d.includes('pegar')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">V</kbd></>;
-    if (d.includes('Ctrl+P') || d.includes('impresión')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">P</kbd></>;
-    if (d.includes('captura')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Windows</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Shift</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">S</kbd></>;
+    if (d.includes('Ctrl+P') || d.includes('impresión') || d.includes('imprimir')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">P</kbd></>;
+    if (d.includes('captura') || d.includes('recorte')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Windows</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Shift</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">S</kbd></>;
+    if (d.includes('(Ctrl)')) return <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Ctrl</kbd>;
+    if (d.includes('(Alt)')) return <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Alt</kbd>;
+    if (d.includes('Windows/Cmd')) return <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Windows / Cmd</kbd>;
     if (d.includes('pestaña')) return <><kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Alt</kbd> + <kbd className="px-2 py-1 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-mono font-bold">Tab</kbd></>;
     return null;
 };

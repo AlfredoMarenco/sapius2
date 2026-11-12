@@ -21,8 +21,8 @@ export default function Take({ quiz, exam, questions, savedAnswers, timeLeft: in
     const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
         enabled: true,
         watermarkText: userEmail,
-        onBlocked: () => {
-            submitExam();
+        onBlocked: (redirectUrl) => {
+            router.visit(redirectUrl || '/alumno/cuenta-bloqueada');
         }
     });
     const [currentIndex, setCurrentIndex] = useState(0);

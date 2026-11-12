@@ -47,7 +47,7 @@ class ReportController extends Controller
                 ];
             });
 
-        return Inertia::render('Admin/Reports/Enrollments', [
+        return Inertia::render('Admin/Reports/Inscriptions', [
             'inscriptions' => $inscriptions,
         ]);
     }
@@ -87,15 +87,21 @@ class ReportController extends Controller
                     $openpayCharge = $openpay->charges->get($enrollment->referencia);
                     
                     $charge = [
-                        'id' => $openpayCharge->id,
-                        'status' => $openpayCharge->status,
-                        'description' => $openpayCharge->description,
-                        'method' => $openpayCharge->method,
-                        'amount' => $openpayCharge->amount,
-                        'currency' => $openpayCharge->currency,
-                        'created_at' => clone $openpayCharge->creation_date,
-                        'card' => clone $openpayCharge->card,
-                        'customer' => clone $openpayCharge->customer,
+                        'id' => $openpayCharge->id ?? null,
+                        'status' => $openpayCharge->status ?? null,
+                        'description' => $openpayCharge->description ?? null,
+                        'method' => $openpayCharge->method ?? null,
+                        'amount' => $openpayCharge->amount ?? null,
+                        'currency' => $openpayCharge->currency ?? 'MXN',
+                        'created_at' => $openpayCharge->creation_date ?? null,
+                        'card' => isset($openpayCharge->card) && $openpayCharge->card ? [
+                            'card_number' => $openpayCharge->card->card_number ?? null,
+                            'brand' => $openpayCharge->card->brand ?? null,
+                        ] : null,
+                        'customer' => isset($openpayCharge->customer) && $openpayCharge->customer ? [
+                            'name' => $openpayCharge->customer->name ?? null,
+                            'email' => $openpayCharge->customer->email ?? null,
+                        ] : null,
                         'error_message' => $openpayCharge->error_message ?? null,
                     ];
                 } else {

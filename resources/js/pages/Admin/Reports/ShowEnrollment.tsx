@@ -59,7 +59,11 @@ export default function ShowEnrollment({ enrollment, discount, charge, openpayEr
                         <CardContent className="pt-6 space-y-4">
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Nombre</p>
-                                <p className="text-neutral-900 font-medium">{enrollment.user?.name} {enrollment.user?.paternal_surname} {enrollment.user?.maternal_surname}</p>
+                                <p className="text-neutral-900 font-medium">
+                                    {[enrollment.user?.name, enrollment.user?.last_name || enrollment.user?.paternal_surname, enrollment.user?.maternal_surname]
+                                        .filter(Boolean)
+                                        .join(' ') || 'Usuario Desconocido'}
+                                </p>
                             </div>
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Correo Electrónico</p>
@@ -87,7 +91,7 @@ export default function ShowEnrollment({ enrollment, discount, charge, openpayEr
                             </div>
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Cohorte (Programado)</p>
-                                <p className="text-neutral-900">{enrollment.scheduled_course?.identificador || `ID: ${enrollment.scheduled_course_id}`}</p>
+                                <p className="text-neutral-900">{enrollment.scheduled_course?.identificador || `ID: ${enrollment.curso_programado_id || enrollment.scheduled_course_id || 'N/A'}`}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Estatus de Inscripción</p>
