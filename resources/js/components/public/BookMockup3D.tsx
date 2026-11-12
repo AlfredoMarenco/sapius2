@@ -1,5 +1,4 @@
 import React from 'react';
-import { SapiusIsotype } from './SapiusLogo';
 
 export interface BookMockup3DProps {
     area: 'nutricion' | 'medicina' | 'general';
@@ -15,7 +14,7 @@ const AREA_COPY: Record<
     nutricion: {
         line1: 'EGEL',
         line2: 'Nutrición',
-        spineLabel: 'Curso virtual EGEL Nutrición - sapius',
+        spineLabel: 'Curso virtual EGEL nutrición - sapius',
     },
     medicina: {
         line1: 'EGEL',
@@ -29,10 +28,13 @@ const AREA_COPY: Record<
     },
 };
 
+const SPINE_POSITIONS = ['83.8%', '90.3%', '96.7%'] as const;
+
 /**
  * BookMockup3D
- * Combina `/img/brand2026/book-3d-egel.png` con la sobreimpresión nítida en la portada inclinada
- * y en los 3 lomos verticales exactamente como en Canva Page 2 (EGEL Nutrición / EGEL Medicina).
+ * Combina `/img/brand2026/book-3d-egel.png` (recortado al borde exacto 911x826)
+ * con unidades `@container` (`cqw`), sombras elípticas realistas de piso,
+ * sobreimpresión inclinada 30° en portada y texto vertical en los 3 lomos derechos.
  */
 export function BookMockup3D({
     area,
@@ -44,67 +46,69 @@ export function BookMockup3D({
 
     return (
         <div
-            className={`relative mx-auto w-full max-w-[520px] select-none ${className}`.trim()}
+            className={`@container relative mx-auto w-full max-w-[560px] select-none ${className}`.trim()}
         >
-            {/* Sombra suave de apoyo */}
+            {/* Sombra elíptica realista bajo la punta inferior del libro inclinado */}
             <div
                 aria-hidden="true"
-                className="pointer-events-none absolute right-6 bottom-2 left-10 h-8 rounded-full bg-[#101E33]/20 blur-xl"
+                className="pointer-events-none absolute bottom-[-2%] left-[25%] h-6 w-[36%] rounded-full bg-[#101E33]/35 blur-md"
             />
 
-            {/* Imagen base 3D de alta resolución */}
+            {/* Sombra elíptica realista bajo los 3 tomos verticales */}
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute right-[-2%] bottom-[0%] h-6 w-[26%] rounded-full bg-[#101E33]/35 blur-md"
+            />
+
+            {/* Imagen base 3D recortada al borde exacto de tinta (911x826) */}
             <img
                 src="/img/brand2026/book-3d-egel.png"
                 alt={`${copy.line1} ${copy.line2} - ${edition}`}
-                className="relative z-10 h-auto w-full object-contain drop-shadow-[0_24px_34px_rgba(16,30,51,0.22)]"
+                className="relative z-10 block h-auto w-full object-contain"
             />
 
-            {/* Sobreimpresión en la portada inclinada (~30deg) */}
+            {/* Sobreimpresión matemática en la portada inclinada (30deg) */}
             <div
                 aria-hidden="true"
-                className="pointer-events-none absolute top-[18%] left-[19%] z-20 flex h-[61%] w-[36%] rotate-[30.5deg] flex-col justify-between p-3 text-white sm:p-4"
+                className="pointer-events-none absolute top-[50.5%] left-[42.2%] z-20 flex h-[73%] w-[44.5%] -translate-x-1/2 -translate-y-1/2 rotate-[30deg] flex-col justify-between p-[3.2cqw]"
             >
                 {/* Arriba derecha: MODALIDAD VIRTUAL */}
-                <div className="text-right text-[7px] font-medium tracking-[0.22em] text-white/60 uppercase sm:text-[8.5px]">
+                <div className="text-right text-[1.85cqw] font-medium tracking-[0.22em] text-[#FF6B52] uppercase">
                     {subtitle}
                 </div>
 
                 {/* Centro izquierda: EGEL Nutrición / Medicina + CURSO 2027 */}
-                <div className="my-auto pl-1 sm:pl-2">
-                    <div className="font-display text-sm leading-[1.06] font-extrabold tracking-tight text-white sm:text-lg md:text-xl">
+                <div className="my-auto">
+                    <div className="font-display text-[4.6cqw] leading-[1.03] font-extrabold tracking-tight text-white">
                         <span className="block">{copy.line1}</span>
                         <span className="block">{copy.line2}</span>
                     </div>
-                    <div className="mt-1.5 text-[7px] font-semibold tracking-[0.25em] text-white/70 uppercase sm:text-[8.5px]">
+                    <div className="mt-[0.8cqw] text-[1.9cqw] font-medium tracking-[0.24em] text-[#FF6B52] uppercase">
                         {edition}
                     </div>
                 </div>
 
                 {/* Abajo derecha: isotipo s. blanco + punto coral */}
-                <div className="flex justify-end pr-1 pb-0.5">
-                    <SapiusIsotype variant="light" size="sm" className="h-5 sm:h-6 md:h-7" />
+                <div className="flex justify-end">
+                    <img
+                        src="/img/brand2026/isotype-s-light.png"
+                        alt=""
+                        className="h-[6.5cqw] w-auto object-contain"
+                    />
                 </div>
             </div>
 
-            {/* Sobreimpresión en los 3 lomos verticales a la derecha */}
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute top-[26%] right-[15.3%] z-20 flex h-[64%] w-[15.6%] justify-between"
-            >
-                {[0, 1, 2].map((spineIdx) => (
-                    <div
-                        key={spineIdx}
-                        className="flex h-full w-1/3 items-start justify-center pt-3"
-                    >
-                        <span
-                            style={{ writingMode: 'vertical-rl' }}
-                            className="text-[6.5px] font-medium tracking-wider whitespace-nowrap text-white/65 sm:text-[7.5px]"
-                        >
-                            {copy.spineLabel}
-                        </span>
-                    </div>
-                ))}
-            </div>
+            {/* Sobreimpresión vertical en los 3 lomos derechos */}
+            {SPINE_POSITIONS.map((leftPos, spineIdx) => (
+                <div
+                    key={spineIdx}
+                    aria-hidden="true"
+                    style={{ left: leftPos, writingMode: 'vertical-rl' }}
+                    className="pointer-events-none absolute top-[24%] bottom-[5%] z-20 flex -translate-x-1/2 items-center justify-start text-[1.65cqw] font-normal tracking-wide whitespace-nowrap text-white/90"
+                >
+                    {copy.spineLabel}
+                </div>
+            ))}
         </div>
     );
 }

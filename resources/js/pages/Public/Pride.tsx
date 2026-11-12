@@ -102,7 +102,7 @@ export default function Pride({
             {/* =========================================================
                 HERO ORGULLO SAPIUS
                ========================================================= */}
-            <section className="relative overflow-hidden bg-white py-16 sm:py-20 lg:py-24">
+            <section className="relative overflow-hidden bg-white pt-28 pb-16 sm:pt-34 sm:pb-20 lg:pb-24">
                 <div
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0"
@@ -112,28 +112,27 @@ export default function Pride({
                     }}
                 />
 
-                <div className="pointer-events-none absolute top-8 right-6 hidden opacity-65 md:block">
+                <div className="pointer-events-none absolute top-24 right-6 hidden opacity-65 md:block">
                     <PlusGridPattern rows={5} cols={5} color="coral" gap={28} size={7} />
                 </div>
                 <div className="pointer-events-none absolute bottom-6 left-6 hidden opacity-45 md:block">
                     <PlusGridPattern rows={4} cols={5} color="navy" gap={28} size={7} />
                 </div>
 
-                <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
                     <div className="flex flex-col items-center text-center">
                         <span className="inline-flex items-center gap-2 rounded-full border border-[#FF6B52]/35 bg-white/85 px-4 py-1.5 text-xs font-extrabold tracking-wider text-[#FF6B52] uppercase shadow-xs">
                             <Award className="h-3.5 w-3.5" />
                             Resultados que hablan por sí mismos
                         </span>
 
-                        <div className="mt-5 flex flex-wrap items-baseline justify-center gap-3">
+                        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                             <h1 className="font-display text-4xl font-extrabold tracking-tight text-[#101E33] sm:text-5xl lg:text-6xl">
                                 Orgullo
                             </h1>
                             <SapiusWordmark
                                 variant="dark"
-                                size="lg"
-                                className="h-10 sm:h-12 lg:h-14"
+                                className="h-9 sm:h-12 lg:h-14"
                             />
                         </div>
 

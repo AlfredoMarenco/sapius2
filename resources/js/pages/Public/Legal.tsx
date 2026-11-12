@@ -114,7 +114,7 @@ export default function Legal({ type }: LegalProps) {
         <LandingLayout>
             <Head title={`${doc.title} — Sapius`} />
 
-            <section className="relative overflow-hidden bg-white py-14 sm:py-20">
+            <section className="relative overflow-hidden bg-white pt-28 pb-16 sm:pt-34 sm:pb-20">
                 <div
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0"
@@ -124,13 +124,13 @@ export default function Legal({ type }: LegalProps) {
                     }}
                 />
 
-                <div className="pointer-events-none absolute top-10 right-6 hidden opacity-60 md:block">
+                <div className="pointer-events-none absolute top-24 right-6 hidden opacity-60 md:block">
                     <PlusGridPattern rows={5} cols={4} color="coral" gap={28} size={7} />
                 </div>
 
-                <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+                <div className="relative z-10 mx-auto max-w-4xl px-5 sm:px-8">
                     {/* Encabezado */}
-                    <div className="rounded-3xl border border-[#FF6B52]/45 bg-white/95 p-8 shadow-[0_14px_34px_-16px_rgba(16,30,51,0.14)] sm:p-10">
+                    <div className="rounded-3xl border border-[#FF6B52]/45 bg-white/95 p-6 shadow-[0_14px_34px_-16px_rgba(16,30,51,0.14)] sm:p-10">
                         <div className="flex items-center gap-3">
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFD9CE]/50">
                                 {doc.icon}
