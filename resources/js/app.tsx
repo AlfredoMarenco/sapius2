@@ -21,7 +21,7 @@ createInertiaApp({
         const page = (pages[`./pages/${name}.tsx`] as any).default;
 
         if (page.layout === undefined) {
-            if (name === 'Welcome') {
+            if (name === 'Welcome' || name.startsWith('Public/')) {
                 page.layout = null;
             } else if (name.startsWith('auth/')) {
                 page.layout = (page: any) => <AuthLayout>{page}</AuthLayout>;

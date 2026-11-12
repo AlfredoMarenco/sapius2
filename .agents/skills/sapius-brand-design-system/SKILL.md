@@ -77,11 +77,13 @@ Este skill define la identidad visual oficial para todas las páginas públicas 
 
 ## 5. Arquitectura de Navegación y Footer (`LandingLayout.tsx`)
 
+- **Aislamiento 100% Público (Cero UI de Panel)**:
+  - Las páginas públicas (`Welcome` y `Public/**`) **NUNCA** deben envolverse en `AppLayout` (`page.layout = null` en `resources/js/app.tsx`), ni mostrar sidebars, barras superiores de panel, campanas de notificación, perfiles de usuario ni botones de retorno al panel (`Ir a mi panel`), incluso cuando exista una sesión autenticada activa en el navegador. Deben comportarse siempre 100% como landing comercial pura.
 - **Navbar Superior**:
   - Fondo claro/translúcido (`bg-white/85 backdrop-blur-md border-b border-[#101E33]/5 sticky top-0 z-50`).
   - Izquierda: Logo `sapius.`.
   - Centro: `Inicio` (`/`), `Cursos` (`/cursos`), `Nosotros` (`/nosotros`), `Orgullo Sapius` (`/orgullo-sapius`), `Contacto` (`/contacto`). El ítem activo se resalta en `font-extrabold text-[#101E33]`.
-  - Derecha: Botón coral `Iniciar sesión` (`/login`) + Botón navy `Regístrate` (`/register`) — o `Ir a mi panel` si `auth.user` existe. En móvil, menú desplegable accesible.
+  - Derecha: Siempre Botón coral `Iniciar sesión` (`/login`) + Botón navy `Regístrate` (`/register`) tanto en escritorio como en el menú desplegable móvil.
 - **Footer Oscuro (`bg-[#101E33] text-white`)**:
   - Cabecera izquierda: `¿Tienes dudas sobre qué ` + `<span className="text-[#FF6B52]">curso necesitas?</span>`, subtítulo *"Escríbenos y nuestro equipo te orientará según tu objetivo académico"* y botón coral `Contactar ahora`.
   - Centro inferior: Logo `sapius.` en blanco/coral + lema *"Tu formación, nuestra pasión"* + íconos circulares blancos de redes sociales (Facebook, Instagram, TikTok, WhatsApp).

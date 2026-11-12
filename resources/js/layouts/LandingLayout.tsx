@@ -13,13 +13,6 @@ export interface LandingLayoutProps {
 }
 
 interface SharedPageProps {
-    auth?: {
-        user?: {
-            id: number;
-            name?: string;
-            roles?: Array<{ name: string }>;
-        } | null;
-    };
     scheduledCourses?: ScheduledCourseCandidate[];
     [key: string]: unknown;
 }
@@ -47,7 +40,6 @@ export default function LandingLayout({
     const [mobileOpen, setMobileOpen] = useState(false);
     const page = usePage<SharedPageProps>();
     const currentPath = (page.url || '/').split('?')[0].split('#')[0] || '/';
-    const user = page.props?.auth?.user;
     const resolvedCourses =
         propScheduledCourses ??
         (Array.isArray(page.props?.scheduledCourses)
@@ -107,29 +99,18 @@ export default function LandingLayout({
 
                     {/* Derecha (Desktop): Botones Pill */}
                     <div className="hidden items-center gap-3 lg:flex">
-                        {user ? (
-                            <Link
-                                href="/dashboard"
-                                className="inline-flex items-center justify-center rounded-full bg-[#FF6B52] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
-                            >
-                                Ir a mi panel
-                            </Link>
-                        ) : (
-                            <>
-                                <Link
-                                    href="/login"
-                                    className="inline-flex items-center justify-center rounded-full bg-[#FF6B52] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
-                                >
-                                    Iniciar sesión
-                                </Link>
-                                <Link
-                                    href="/register"
-                                    className="inline-flex items-center justify-center rounded-full bg-[#101E33] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#192B47]"
-                                >
-                                    Regístrate
-                                </Link>
-                            </>
-                        )}
+                        <Link
+                            href="/login"
+                            className="inline-flex items-center justify-center rounded-full bg-[#FF6B52] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
+                        >
+                            Iniciar sesión
+                        </Link>
+                        <Link
+                            href="/register"
+                            className="inline-flex items-center justify-center rounded-full bg-[#101E33] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#192B47]"
+                        >
+                            Regístrate
+                        </Link>
                     </div>
 
                     {/* Botón Menú Móvil */}
@@ -182,36 +163,20 @@ export default function LandingLayout({
                                 </nav>
 
                                 <div className="flex flex-col gap-2.5 border-t border-[#101E33]/10 pt-4">
-                                    {user ? (
-                                        <Link
-                                            href="/dashboard"
-                                            onClick={() => setMobileOpen(false)}
-                                            className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-sm font-bold text-white shadow-sm"
-                                        >
-                                            Ir a mi panel
-                                        </Link>
-                                    ) : (
-                                        <>
-                                            <Link
-                                                href="/login"
-                                                onClick={() =>
-                                                    setMobileOpen(false)
-                                                }
-                                                className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-sm font-semibold text-white shadow-sm"
-                                            >
-                                                Iniciar sesión
-                                            </Link>
-                                            <Link
-                                                href="/register"
-                                                onClick={() =>
-                                                    setMobileOpen(false)
-                                                }
-                                                className="inline-flex w-full items-center justify-center rounded-full bg-[#101E33] px-6 py-3 text-sm font-semibold text-white shadow-sm"
-                                            >
-                                                Regístrate
-                                            </Link>
-                                        </>
-                                    )}
+                                    <Link
+                                        href="/login"
+                                        onClick={() => setMobileOpen(false)}
+                                        className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-sm font-semibold text-white shadow-sm"
+                                    >
+                                        Iniciar sesión
+                                    </Link>
+                                    <Link
+                                        href="/register"
+                                        onClick={() => setMobileOpen(false)}
+                                        className="inline-flex w-full items-center justify-center rounded-full bg-[#101E33] px-6 py-3 text-sm font-semibold text-white shadow-sm"
+                                    >
+                                        Regístrate
+                                    </Link>
                                 </div>
                             </div>
                         </motion.div>
