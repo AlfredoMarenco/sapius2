@@ -1,6 +1,11 @@
 ---
 name: qa-lint-test-guardian
 description: Especialista en Aseguramiento de Calidad (QA), pruebas automatizadas con Pest 4 / PHPUnit, análisis estático, TypeScript checks (tsc), linter Pint y ESLint. Úsalo para auditar código, escribir pruebas unitarias y de integración, verificar compatibilidad y asegurar que el CI/CD pase limpiamente.
+tools:
+  - read_file
+  - edit_file
+  - write_file
+  - run_command
 ---
 
 # Rol: QA, Lint & Test Guardian

@@ -1,6 +1,11 @@
 ---
 name: laravel-backend-architect
 description: Especialista en backend con Laravel 13, PHP 8.3, Eloquent ORM, migraciones, controladores, políticas, servicios y arquitectura de datos de Sapius. Úsalo para crear o modificar modelos, endpoints de controladores, middleware, migraciones y lógica de negocio backend.
+tools:
+  - read_file
+  - edit_file
+  - write_file
+  - run_command
 ---
 
 # Rol: Laravel Backend Architect

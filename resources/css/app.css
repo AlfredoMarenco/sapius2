@@ -60,12 +60,26 @@
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
 
-    /* Brand Colors */
+    /* Brand Colors (Internal Panels) */
     --color-brand-blue: #002146;
     --color-brand-orange: #ED6A5A;
     --color-brand-cyan: #30D6E6;
     --color-brand-navy: #001C3D;
     --color-brand-coral: #F1715D;
+
+    /* Sapius 2026/2027 Public Brand Design System (Canva DAHX9N88U7c) */
+    --font-display:
+        'Plus Jakarta Sans', 'DM Sans', 'Instrument Sans', ui-sans-serif,
+        system-ui, sans-serif;
+    --color-sapius-navy: #101E33;
+    --color-sapius-navy-soft: #192B47;
+    --color-sapius-coral: #FF6B52;
+    --color-sapius-coral-hover: #F0563C;
+    --color-sapius-sky: #CFE4FF;
+    --color-sapius-peach: #FFD9CE;
+    --color-sapius-whatsapp: #06C156;
+    --color-sapius-fb: #0A4DA6;
+    --color-sapius-ig: #C11F7E;
 }
 
 :root {

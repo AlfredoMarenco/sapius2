@@ -1,13 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
-
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\User\CheckoutController;
+use App\Http\Controllers\User\CourseLearningController;
+use Illuminate\Support\Facades\Route;
 
-// Public Landing Pages (Identical to ../Sapius)
+// Public Landing Pages (Identical to ../Sapius + 2026 Redesign Hub Routes)
 Route::get('/', [LandingController::class, 'index'])->name('home');
+Route::get('/cursos', [LandingController::class, 'coursesHub'])->name('public.courses');
+Route::get('/nosotros', [LandingController::class, 'about'])->name('public.about');
+Route::get('/orgullo-sapius', [LandingController::class, 'pride'])->name('public.pride');
+Route::get('/contacto', [LandingController::class, 'contact'])->name('public.contact');
 
 Route::get('/terms/conditions', function () {
     return app(LandingController::class)->legal('terms');
@@ -38,7 +41,7 @@ $publicCourses = [
 ];
 
 foreach ($publicCourses as $courseSlug) {
-    Route::get('/' . $courseSlug, function () use ($courseSlug) {
+    Route::get('/'.$courseSlug, function () use ($courseSlug) {
         return app(LandingController::class)->coursePage($courseSlug);
     });
 }
@@ -65,7 +68,7 @@ Route::get('/checkout/{curso_id?}', [CheckoutController::class, 'createCheckout'
 Route::post('/payout', [CheckoutController::class, 'processPay'])->name('public.checkout.processPayout');
 
 // Global media streaming fallback (for images and videos)
-Route::get('/media/stream/{filename}', [\App\Http\Controllers\User\CourseLearningController::class, 'streamMedia'])
+Route::get('/media/stream/{filename}', [CourseLearningController::class, 'streamMedia'])
     ->where('filename', '.*')
     ->name('public.media.stream');
 
@@ -79,6 +82,7 @@ Route::middleware(['auth', 'verified'])
             if (auth()->user()->hasRole('instructor')) {
                 return redirect()->route('instructor.dashboard');
             }
+
             return redirect()->route('alumno.home');
         })->name('dashboard');
     });

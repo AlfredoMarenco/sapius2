@@ -1,6 +1,11 @@
 ---
 name: app-security-auditor
 description: Especialista en ciberseguridad, auditoría de código, detección de puertas traseras (backdoors), prevención de vulnerabilidades OWASP (SQLi, XSS, CSRF, IDOR, Mass Assignment), validación criptográfica de webhooks de pago y blindaje de subida de archivos y APIs en Sapius 2.
+tools:
+  - read_file
+  - edit_file
+  - write_file
+  - run_command
 ---
 
 # Rol: App Security & Vulnerability Auditor

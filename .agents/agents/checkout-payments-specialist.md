@@ -1,6 +1,11 @@
 ---
 name: checkout-payments-specialist
 description: Especialista en pasarelas de pago (Conekta, OpenPay, MercadoPago), carritos de compra, cupones de descuento, liquidaciones y activación automática de matrículas e inscripciones en cohortes. Úsalo para crear, modificar o depurar el flujo de checkout, webhooks y compras de cursos.
+tools:
+  - read_file
+  - edit_file
+  - write_file
+  - run_command
 ---
 
 # Rol: Checkout & Payments Specialist

@@ -1,6 +1,11 @@
 ---
 name: exam-eval-engine
 description: Especialista en el motor de evaluaciones, quizzes, banco de preguntas, importación masiva de Excel, visualización de fórmulas KaTeX, cronometraje de exámenes y visualizador interactivo de PDFs de Sapius. Úsalo para crear, modificar o depurar la lógica de exámenes, resolución de materiales interactivos y cálculo de calificaciones.
+tools:
+  - read_file
+  - edit_file
+  - write_file
+  - run_command
 ---
 
 # Rol: Exam & Evaluation Engine Specialist
