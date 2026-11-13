@@ -183,11 +183,24 @@ class CheckoutController extends Controller
             return redirect()->route('checkout.payout.approved', ['id' => $enrollment->id]);
         }
 
-        // Si no es gratuito, procesar con OpenPay Smart Checkout (Payment Link)
+        // Si no es gratuito, procesar con OpenPay Cargo Tokenizado + 3D Secure
+        $request->validate([
+            'token_id' => 'required|string',
+            'device_session_id' => 'required|string',
+        ], [
+            'token_id.required' => 'No se pudo generar el token de la tarjeta. Verifica los datos e intenta de nuevo.',
+            'device_session_id.required' => 'No se pudo inicializar la sesión antifraude de OpenPay. Recarga la página e intenta de nuevo.',
+        ]);
+
         try {
-            $merchantId = config('services.openpay.merchant_id', env('OPENPAY_MERCHANT_ID', ''));
-            $privateKey = config('services.openpay.private_key', env('OPENPAY_PRIVATE_KEY', ''));
-            $sandbox = config('services.openpay.sandbox', env('OPENPAY_SANDBOX', true));
+            $merchantId = config('openpay.merchant_id', config('services.openpay.merchant_id'));
+            $privateKey = config('openpay.private_key', config('services.openpay.private_key'));
+            $sandbox = filter_var(config('openpay.sandbox', config('services.openpay.sandbox', true)), FILTER_VALIDATE_BOOLEAN);
+            $currency = config('openpay.currency', 'MX');
+            $ip = $request->ip() ?: config('openpay.ip', '127.0.0.1');
+
+            \Openpay\Data\Openpay::setProductionMode(!$sandbox);
+            $openpay = \Openpay\Data\Openpay::getInstance($merchantId, $privateKey, $currency, $ip);
 
             $customer = [
                 'name' => $request->user_name,
@@ -197,51 +210,57 @@ class CheckoutController extends Controller
                 $customer['phone_number'] = $request->user_phone;
             }
 
-            // Limpiar la descripción de caracteres especiales y acentos para evitar errores 422 de OpenPay
             $cleanTitle = preg_replace('/[^a-zA-Z0-9\s-]/', '', \Illuminate\Support\Str::ascii($scheduled->course->title));
-            // No usar dos puntos (:) ni símbolos raros porque OpenPay los rechaza en Checkouts
             $description = substr("Inscripcion a " . $cleanTitle, 0, 240);
 
-            $checkoutData = [
+            $chargeData = [
+                'method' => 'card',
+                'source_id' => $request->token_id,
                 'amount' => (float) $finalPrice,
                 'currency' => 'MXN',
                 'description' => $description,
-                'order_id' => 'checkout-' . $user->id . '-' . $scheduled->id . '-' . time(),
+                'device_session_id' => $request->device_session_id,
+                'order_id' => $scheduled->id . '-' . $user->id . '-' . rand(100, 999),
                 'redirect_url' => url('/alumno/checkout/callback'),
+                'use_3d_secure' => 'true',
                 'customer' => $customer,
-                'send_email' => false,
             ];
 
-            $baseUrl = $sandbox 
-                ? "https://sandbox-api.openpay.mx/v1/{$merchantId}/checkouts" 
-                : "https://api.openpay.mx/v1/{$merchantId}/checkouts";
+            $charge = $openpay->charges->create($chargeData);
 
-            $response = \Illuminate\Support\Facades\Http::withBasicAuth($privateKey, '')
-                ->post($baseUrl, $checkoutData);
+            $pending = [
+                'user_id' => $user->id,
+                'curso_programado_id' => $scheduled->id,
+                'cuponCode' => $cuponCode,
+                'finalPrice' => $finalPrice,
+                'identificador' => $scheduled->identificador,
+                'title' => $scheduled->course->title,
+            ];
 
-            if ($response->successful()) {
-                $checkout = $response->json();
-                
-                // Guardar datos temporales en sesión para usarlos en el callback
+            if (!empty($charge->payment_method->url)) {
                 session([
-                    'checkout_id' => $checkout['id'], // ID of the checkout to verify later
-                    'pending_enrollment' => [
-                        'user_id' => $user->id,
-                        'curso_programado_id' => $scheduled->id,
-                        'cuponCode' => $cuponCode,
-                        'finalPrice' => $finalPrice,
-                        'identificador' => $scheduled->identificador,
-                        'title' => $scheduled->course->title,
-                    ]
+                    'openpay_charge_id' => $charge->id,
+                    'pending_enrollment' => $pending,
                 ]);
 
-                // Redirigir al Hosted Checkout de OpenPay
-                return \Inertia\Inertia::location($checkout['checkout_link']);
-            } else {
-                \Illuminate\Support\Facades\Log::error('OpenPay Checkout API Error: ' . $response->body());
-                return redirect()->back()->with('error', 'Error en el servicio de pago. Por favor intenta más tarde.');
+                return \Inertia\Inertia::location($charge->payment_method->url);
             }
-            
+
+            if ($charge->status === 'completed') {
+                $enrollment = $this->completeEnrollment($pending, $charge->id);
+                return redirect()->route('checkout.payout.approved', ['id' => $enrollment->id]);
+            }
+
+            return redirect()->back()->with('error', 'El pago no pudo ser completado. Intenta con otra tarjeta.');
+        } catch (\Openpay\Data\OpenpayApiTransactionError | \Openpay\Data\OpenpayApiRequestError | \Openpay\Data\OpenpayApiAuthError | \Openpay\Data\OpenpayApiConnectionError $e) {
+            \Illuminate\Support\Facades\Log::error('OpenPay Charge Error: ' . $e->getMessage(), [
+                'code' => method_exists($e, 'getErrorCode') ? $e->getErrorCode() : null,
+                'description' => method_exists($e, 'getDescription') ? $e->getDescription() : $e->getMessage(),
+            ]);
+            $msg = method_exists($e, 'getDescription') && $e->getDescription()
+                ? $e->getDescription()
+                : 'Error en el servicio de pago. Por favor intenta más tarde.';
+            return redirect()->back()->with('error', $msg);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('OpenPay Exception: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
             return redirect()->back()->with('error', 'Error en la conexión con el procesador de pagos: ' . $e->getMessage());
@@ -250,14 +269,9 @@ class CheckoutController extends Controller
 
     public function callback(Request $request)
     {
-        $checkoutId = session('checkout_id');
-        
-        if (!$checkoutId) {
-            // Failsafe: if session expired but OpenPay sent ?id=ck_xxx
-            $checkoutId = $request->input('id');
-        }
-        
-        if (!$checkoutId) {
+        $chargeId = $request->input('id') ?: session('openpay_charge_id');
+
+        if (!$chargeId) {
             return redirect()->route('checkout.index')->with('error', 'No se recibió la confirmación del pago.');
         }
 
@@ -267,76 +281,71 @@ class CheckoutController extends Controller
         }
 
         try {
-            $merchantId = config('services.openpay.merchant_id', env('OPENPAY_MERCHANT_ID', ''));
-            $privateKey = config('services.openpay.private_key', env('OPENPAY_PRIVATE_KEY', ''));
-            $sandbox = config('services.openpay.sandbox', env('OPENPAY_SANDBOX', true));
+            $merchantId = config('openpay.merchant_id', config('services.openpay.merchant_id'));
+            $privateKey = config('openpay.private_key', config('services.openpay.private_key'));
+            $sandbox = filter_var(config('openpay.sandbox', config('services.openpay.sandbox', true)), FILTER_VALIDATE_BOOLEAN);
+            $currency = config('openpay.currency', 'MX');
+            $ip = $request->ip() ?: config('openpay.ip', '127.0.0.1');
 
-            $baseUrl = $sandbox 
-                ? "https://sandbox-api.openpay.mx/v1/{$merchantId}/checkouts/{$checkoutId}" 
-                : "https://api.openpay.mx/v1/{$merchantId}/checkouts/{$checkoutId}";
+            \Openpay\Data\Openpay::setProductionMode(!$sandbox);
+            $openpay = \Openpay\Data\Openpay::getInstance($merchantId, $privateKey, $currency, $ip);
 
-            $response = \Illuminate\Support\Facades\Http::withBasicAuth($privateKey, '')->get($baseUrl);
+            $charge = $openpay->charges->get($chargeId);
 
-            if (!$response->successful()) {
-                return redirect()->route('checkout.index')->with('error', 'No se pudo verificar el estado del pago.');
-            }
-
-            $checkout = $response->json();
-
-            // Status can be 'completed', 'paid', or 'expired'/'cancelled'
-            if (!in_array(strtolower($checkout['status']), ['completed', 'paid', 'success'])) {
+            if ($charge->status !== 'completed') {
                 return redirect()->route('checkout.index')->with('error', 'El pago fue rechazado o no fue completado.');
             }
 
-            // We can use the checkout ID as reference
-            $chargeId = $checkout['id'];
+            $enrollment = $this->completeEnrollment($pending, $charge->id);
 
-            // Crear la inscripción
-            $enrollment = Enrollment::firstOrCreate(
-                [
-                    'user_id' => $pending['user_id'],
-                    'curso_programado_id' => $pending['curso_programado_id'],
-                ],
-                [
-                    'aceptado' => 'si',
-                    'tipo_pago' => 'tarjeta',
-                    'referencia' => $chargeId,
-                    'clave' => $pending['cuponCode']
-                ]
-            );
-
-            // Descontar cupón
-            if ($pending['cuponCode']) {
-                $descuentoModel = Discount::where('clave', $pending['cuponCode'])->first();
-                if ($descuentoModel && $descuentoModel->limite > 0) {
-                    $descuentoModel->decrement('limite');
-                }
-            }
-            
-            // Enviar Correos
-            $user = User::find($pending['user_id']);
-            $datosTarjeta = [
-                'name_alumno' => $user->nombre_completo ?? $user->name,
-                'identificador' => $pending['identificador'],
-                'precio' => $pending['finalPrice'],
-                'id_carge' => $chargeId,
-            ];
-            
-            \Illuminate\Support\Facades\Mail::to($user->email)
-                ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                ->send(new \App\Mail\TarjetaEmail($datosTarjeta));
-
-            \Illuminate\Support\Facades\Mail::to($user->email)
-                ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                ->send(new \App\Mail\AutoAceptacionEmail($enrollment));
-
-            session()->forget(['cupon_code', 'cupon_discount', 'pending_enrollment']);
             return redirect()->route('checkout.payout.approved', ['id' => $enrollment->id]);
-
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('OpenPay Callback Error: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
             return redirect()->route('checkout.index')->with('error', 'Hubo un error al verificar tu pago: ' . $e->getMessage());
         }
+    }
+
+    private function completeEnrollment(array $pending, string $chargeId): Enrollment
+    {
+        $enrollment = Enrollment::firstOrCreate(
+            [
+                'user_id' => $pending['user_id'],
+                'curso_programado_id' => $pending['curso_programado_id'],
+            ],
+            [
+                'aceptado' => 'si',
+                'tipo_pago' => 'tarjeta',
+                'referencia' => $chargeId,
+                'clave' => $pending['cuponCode']
+            ]
+        );
+
+        if (!empty($pending['cuponCode'])) {
+            $descuentoModel = Discount::where('clave', $pending['cuponCode'])->first();
+            if ($descuentoModel && $descuentoModel->limite > 0) {
+                $descuentoModel->decrement('limite');
+            }
+        }
+
+        $user = User::find($pending['user_id']);
+        $datosTarjeta = [
+            'name_alumno' => $user->nombre_completo ?? $user->name,
+            'identificador' => $pending['identificador'],
+            'precio' => $pending['finalPrice'],
+            'id_carge' => $chargeId,
+        ];
+
+        \Illuminate\Support\Facades\Mail::to($user->email)
+            ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
+            ->send(new \App\Mail\TarjetaEmail($datosTarjeta));
+
+        \Illuminate\Support\Facades\Mail::to($user->email)
+            ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
+            ->send(new \App\Mail\AutoAceptacionEmail($enrollment));
+
+        session()->forget(['openpay_charge_id', 'checkout_id', 'pending_enrollment', 'cupon_code', 'cupon_discount']);
+
+        return $enrollment;
     }
 
     /**

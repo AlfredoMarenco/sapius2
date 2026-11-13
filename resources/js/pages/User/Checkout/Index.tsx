@@ -74,18 +74,112 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
 
     const [isTokenizing, setIsTokenizing] = useState(false);
     const [paymentError, setPaymentError] = useState<string | null>(null);
+    const [deviceSessionId, setDeviceSessionId] = useState<string>('');
+    const [openpayReady, setOpenpayReady] = useState(false);
+
+    useEffect(() => {
+        if (course.price <= 0) return;
+
+        const initOpenPay = () => {
+            if (window.OpenPay) {
+                window.OpenPay.setId(openpay.merchantId);
+                window.OpenPay.setApiKey(openpay.publicKey);
+                window.OpenPay.setSandboxMode(openpay.sandbox);
+                if (window.OpenPay.deviceData) {
+                    const sessionId = window.OpenPay.deviceData.setup();
+                    setDeviceSessionId(sessionId);
+                }
+                setOpenpayReady(true);
+            }
+        };
+
+        const loadScript = (src: string) =>
+            new Promise<void>((resolve, reject) => {
+                const existing = document.querySelector(`script[src="${src}"]`);
+                if (existing) {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+                document.head.appendChild(script);
+            });
+
+        if (window.OpenPay && window.OpenPay.deviceData) {
+            initOpenPay();
+        } else {
+            loadScript('https://openpay.s3.amazonaws.com/openpay.v1.min.js')
+                .then(() => loadScript('https://openpay.s3.amazonaws.com/openpay-data.v1.min.js'))
+                .then(() => initOpenPay())
+                .catch(() => {
+                    setPaymentError('No se pudo cargar el módulo de pago seguro de OpenPay. Recarga la página.');
+                });
+        }
+    }, [openpay.merchantId, openpay.publicKey, openpay.sandbox, course.price]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setPaymentError(null);
 
-        // Envía todo al backend, el backend decide si redirige a Smart Checkout de OpenPay o inscribe si es gratis
-        post('/alumno/payout', {
-            onError: (errors) => {
-                const errMsg = errors.payment || "Ocurrió un error inesperado al procesar la solicitud.";
-                setPaymentError(errMsg);
+        if (isFree) {
+            post('/alumno/payout', {
+                onError: (errs) => {
+                    setPaymentError(errs.payment || 'Ocurrió un error inesperado al procesar la solicitud.');
+                },
+            });
+            return;
+        }
+
+        if (!openpayReady || !window.OpenPay) {
+            setPaymentError('El módulo de pago aún está cargando. Espera un momento e intenta de nuevo.');
+            return;
+        }
+
+        const cleanCardNumber = data.card_number.replace(/\s+/g, '');
+        if (!data.card_holder || !cleanCardNumber || !data.card_month || !data.card_year || !data.card_cvv) {
+            setPaymentError('Por favor completa todos los datos de tu tarjeta.');
+            return;
+        }
+
+        setIsTokenizing(true);
+        window.OpenPay.token.create(
+            {
+                card_number: cleanCardNumber,
+                holder_name: data.card_holder,
+                expiration_year: data.card_year.slice(-2),
+                expiration_month: data.card_month.padStart(2, '0'),
+                cvv2: data.card_cvv,
+            },
+            (response: any) => {
+                const tokenId = response.data.id;
+                router.post(
+                    '/alumno/payout',
+                    {
+                        curso_id: data.curso_id,
+                        user_name: data.user_name,
+                        user_email: data.user_email,
+                        user_phone: data.user_phone,
+                        token_id: tokenId,
+                        device_session_id: deviceSessionId,
+                    },
+                    {
+                        onFinish: () => setIsTokenizing(false),
+                        onError: (errs) => {
+                            const firstErr = Object.values(errs)[0] as string | undefined;
+                            setPaymentError(firstErr || 'Ocurrió un error al procesar el pago.');
+                        },
+                    }
+                );
+            },
+            (errResponse: any) => {
+                setIsTokenizing(false);
+                const desc = errResponse?.data?.description || 'Datos de tarjeta inválidos. Verifica e intenta de nuevo.';
+                setPaymentError(desc);
             }
-        });
+        );
     };
 
     const handleApplyCoupon = () => {
@@ -187,31 +281,93 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
 
                                     {!isFree && <Separator />}
 
-                                    {/* Smart Checkout Information */}
+                                    {/* Tokenized Card Form */}
                                     {!isFree && (
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
-                                                    <CreditCard className="w-4 h-4" /> Pago Seguro
+                                                    <CreditCard className="w-4 h-4" /> Datos de la Tarjeta
                                                 </h3>
                                                 <Lock className="w-4 h-4 text-emerald-600" />
                                             </div>
-                                            
-                                            <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-lg p-5 flex flex-col gap-3 text-sm text-blue-800 dark:text-blue-300">
-                                                <div className="flex gap-3">
-                                                    <ShieldCheck className="w-5 h-5 shrink-0 text-blue-600 mt-0.5" />
-                                                    <p className="leading-relaxed">
-                                                        Al dar clic en <strong>Pagar con OpenPay</strong>, serás redirigido a una página segura alojada por OpenPay para completar tu pago con tarjeta de crédito o débito, protegiendo tus datos al 100%.
-                                                    </p>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5 sm:col-span-2">
+                                                    <Label htmlFor="card_holder">Nombre del Titular</Label>
+                                                    <Input
+                                                        id="card_holder"
+                                                        type="text"
+                                                        placeholder="Como aparece en la tarjeta"
+                                                        value={data.card_holder}
+                                                        onChange={e => setData('card_holder', e.target.value)}
+                                                        required
+                                                    />
                                                 </div>
-                                                <div className="flex items-center gap-4 mt-2 justify-center py-2 bg-white/50 dark:bg-black/20 rounded-md">
-                                                    {/* Tarjetas soportadas */}
-                                                    <div className="font-bold text-xs uppercase tracking-wider text-neutral-400">Tarjetas soportadas:</div>
-                                                    <div className="flex gap-2">
-                                                        <span className="font-bold text-blue-600">Visa</span>
-                                                        <span className="font-bold text-orange-500">Mastercard</span>
-                                                        <span className="font-bold text-sky-500">Amex</span>
+
+                                                <div className="space-y-1.5 sm:col-span-2">
+                                                    <Label htmlFor="card_number">Número de Tarjeta</Label>
+                                                    <Input
+                                                        id="card_number"
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        maxLength={19}
+                                                        placeholder="0000 0000 0000 0000"
+                                                        value={data.card_number}
+                                                        onChange={e => setData('card_number', e.target.value)}
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="card_month">Mes (MM)</Label>
+                                                        <Input
+                                                            id="card_month"
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            maxLength={2}
+                                                            placeholder="MM"
+                                                            value={data.card_month}
+                                                            onChange={e => setData('card_month', e.target.value)}
+                                                            required
+                                                        />
                                                     </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="card_year">Año (AA)</Label>
+                                                        <Input
+                                                            id="card_year"
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            maxLength={2}
+                                                            placeholder="AA"
+                                                            value={data.card_year}
+                                                            onChange={e => setData('card_year', e.target.value)}
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="card_cvv">Código de Seguridad (CVV)</Label>
+                                                    <Input
+                                                        id="card_cvv"
+                                                        type="password"
+                                                        inputMode="numeric"
+                                                        maxLength={4}
+                                                        placeholder="3 o 4 dígitos"
+                                                        value={data.card_cvv}
+                                                        onChange={e => setData('card_cvv', e.target.value)}
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-4 justify-center py-2 bg-neutral-50 dark:bg-black/20 rounded-md border border-neutral-100 dark:border-neutral-800">
+                                                <div className="font-bold text-xs uppercase tracking-wider text-neutral-400">Tarjetas soportadas:</div>
+                                                <div className="flex gap-2 text-xs">
+                                                    <span className="font-bold text-blue-600">Visa</span>
+                                                    <span className="font-bold text-orange-500">Mastercard</span>
+                                                    <span className="font-bold text-sky-500">Amex</span>
                                                 </div>
                                             </div>
                                         </div>
