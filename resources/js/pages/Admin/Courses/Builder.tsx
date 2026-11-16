@@ -103,12 +103,16 @@ interface Media {
     file_type: string;
     file_path: string;
     is_downloadable: boolean;
+    tipo?: string;
+    ruta?: string;
+    url?: string;
 }
 
 interface Lesson {
     id: number;
     title: string;
     content: string | null;
+    summary?: string | null;
     is_active: boolean;
     is_scheduled: boolean;
     available_at: string | null;
@@ -282,7 +286,7 @@ export default function Builder({ course }: Props) {
                 //@ts-ignore
                 title: (activeLesson.homeworkAssignments?.[0] || activeLesson.homework_assignments?.[0])?.title ?? 'Tarea de Refuerzo',
                 //@ts-ignore
-                description: (activeLesson.homeworkAssignments?.[0] || activeLesson.homework_assignments?.[0])?.description ?? '',
+                description: activeLesson.summary || (activeLesson.homeworkAssignments?.[0] || activeLesson.homework_assignments?.[0])?.description || '',
                 //@ts-ignore
                 points: (activeLesson.homeworkAssignments?.[0] || activeLesson.homework_assignments?.[0])?.points ?? 100,
             });
@@ -756,17 +760,22 @@ export default function Builder({ course }: Props) {
                                                     <Card key={q.id} className="rounded-[2.5rem] border-2 hover:border-brand-blue/20 transition-all shadow-xl shadow-brand-navy/5 overflow-hidden">
                                                         <CardContent className="p-8 space-y-6">
                                                             <div className="flex items-start justify-between">
-                                                                <div className="flex items-center gap-4">
-                                                                    <Badge className="bg-brand-navy text-white rounded-2xl h-10 w-10 flex items-center justify-center font-black text-lg">{idx + 1}</Badge>
-                                                                    <p className="font-bold text-brand-navy text-base leading-snug">{q.text}</p>
+                                                                <div className="flex items-start gap-4">
+                                                                    <Badge className="bg-brand-navy text-white rounded-2xl h-10 w-10 flex items-center justify-center font-black text-lg shrink-0">{idx + 1}</Badge>
+                                                                    <div className="space-y-1">
+                                                                        <div className="font-bold text-brand-navy text-base leading-snug prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                                                        {q.explanation && (
+                                                                            <div className="text-xs text-muted-foreground bg-amber-50/70 border border-amber-200/60 rounded-xl px-3 py-2 mt-2 prose prose-xs max-w-none" dangerouslySetInnerHTML={{ __html: `<strong class="text-amber-800">Retroalimentación:</strong> ${q.explanation}` }} />
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                                <Button variant="ghost" size="icon" onClick={() => handleDeleteQuestion(q.id)} className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/5"><Trash2 className="h-4 w-4" /></Button>
+                                                                <Button variant="ghost" size="icon" onClick={() => handleDeleteQuestion(q.id)} className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/5 shrink-0"><Trash2 className="h-4 w-4" /></Button>
                                                             </div>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-14">
                                                                 {q.answers.map((a, aidx) => (
                                                                     <div key={aidx} className={cn("p-4 rounded-2xl border-2 text-[11px] font-bold flex items-center gap-3 transition-all", a.is_correct ? "bg-green-50 border-green-200 text-green-700 shadow-sm" : "bg-gray-50/50 border-gray-100 text-gray-500")}>
-                                                                        {a.is_correct ? <CheckCircle2 className="h-4 w-4 fill-green-600 text-white" /> : <div className="h-4 w-4 rounded-full border-2 border-gray-300" />}
-                                                                        {a.text}
+                                                                        {a.is_correct ? <CheckCircle2 className="h-4 w-4 fill-green-600 text-white shrink-0" /> : <div className="h-4 w-4 rounded-full border-2 border-gray-300 shrink-0" />}
+                                                                        <div className="prose prose-xs max-w-none" dangerouslySetInnerHTML={{ __html: a.text }} />
                                                                     </div>
                                                                 ))}
                                                             </div>

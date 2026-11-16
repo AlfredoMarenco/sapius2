@@ -22,7 +22,16 @@ class CourseController extends Controller
         $courses = Course::with('category')
             ->withCount(['modules', 'scheduledCourses'])
             ->orderBy('id', 'desc')
-            ->get();
+            ->get()
+            ->map(function (Course $course) {
+                if (!$course->relationLoaded('category') || !$course->category) {
+                    $fallbackCat = \App\Services\CourseCategoryService::getCategoryForCourse($course->id);
+                    if ($fallbackCat) {
+                        $course->setRelation('category', $fallbackCat);
+                    }
+                }
+                return $course;
+            });
 
         return Inertia::render('Admin/Courses/Index', [
             'courses' => $courses,
@@ -68,12 +77,23 @@ class CourseController extends Controller
 
         $course->save();
 
+        if (!empty($validated['category_id'])) {
+            \App\Services\CourseCategoryService::setForCourse($course->id, (int) $validated['category_id']);
+            $course->scheduledCourses()->update(['category_id' => (int) $validated['category_id']]);
+        }
+
         return redirect()->route('admin.courses.index')->with('success', 'Curso creado con éxito');
     }
 
     public function show($id)
     {
         $course = Course::with(['category', 'modules.lessons', 'scheduledCourses.instructor'])->findOrFail($id);
+        if (!$course->category) {
+            $fallbackCat = \App\Services\CourseCategoryService::getCategoryForCourse($course->id);
+            if ($fallbackCat) {
+                $course->setRelation('category', $fallbackCat);
+            }
+        }
         
         $instructors = User::whereHas('roles', function ($q) {
             $q->where('name', 'instructor');
@@ -82,16 +102,18 @@ class CourseController extends Controller
         return Inertia::render('Admin/Courses/Show', [
             'course' => $course,
             'instructors' => $instructors,
+            'categories' => Category::all(),
         ]);
     }
 
     public function edit($id)
     {
         $course = Course::with('category')->findOrFail($id);
+        $resolvedCategoryId = $course->category?->id ?? \App\Services\CourseCategoryService::getCategoryIdForCourse($course->id);
 
         return Inertia::render('Admin/Courses/Edit', [
             'course' => array_merge($course->toArray(), [
-                'category_id' => $course->category?->id ?? '',
+                'category_id' => $resolvedCategoryId ?? '',
             ]),
             'categories' => Category::all(),
         ]);
@@ -121,7 +143,8 @@ class CourseController extends Controller
         $course->save();
 
         if ($request->filled('category_id')) {
-            $course->scheduledCourses()->update(['category_id' => $request->category_id]);
+            \App\Services\CourseCategoryService::setForCourse($course->id, (int) $request->category_id);
+            $course->scheduledCourses()->update(['category_id' => (int) $request->category_id]);
         }
 
         return redirect()->route('admin.courses.index')->with('success', 'Curso actualizado con éxito');

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Head, useForm, router, Link } from '@inertiajs/react';
+import { Head, useForm, router, Link, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { Award, Search, Trash2, Eye, PlusCircle } from 'lucide-react';
+import { Award, Search, Trash2, Eye, PlusCircle, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,8 @@ interface Props {
 }
 
 export default function CertificatesIndex({ certificates, filters, cohorts }: Props) {
+    const { props } = usePage();
+    const flash = (props as any).flash as { success?: string | null; error?: string | null } | undefined;
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
     const [isEmitModalOpen, setIsEmitModalOpen] = useState(false);
 
@@ -101,6 +103,20 @@ export default function CertificatesIndex({ certificates, filters, cohorts }: Pr
                         Emitir Certificados
                     </Button>
                 </div>
+
+                {flash?.success && (
+                    <div className="flex items-center gap-2.5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <span>{flash.success}</span>
+                    </div>
+                )}
+
+                {flash?.error && (
+                    <div className="flex items-center gap-2.5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm font-medium">
+                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                        <span>{flash.error}</span>
+                    </div>
+                )}
 
                 {/* Search Bar */}
                 <form onSubmit={handleSearch} className="flex gap-2 max-w-md">

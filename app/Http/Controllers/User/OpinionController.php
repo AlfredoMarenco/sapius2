@@ -58,12 +58,17 @@ class OpinionController extends Controller
             $visible = $request->rating >= 4 ? 1 : 0;
         }
 
+        $enrollment = \App\Models\Enrollment::where('user_id', Auth::id())
+            ->orderBy('id', 'desc')
+            ->first();
+
         Review::create([
             'user_id' => Auth::id(),
             'name' => strip_tags($request->name),
             'rating' => $rating,
             'comment' => strip_tags($request->comment),
             'visible' => $visible,
+            'curso_programado_id' => $enrollment?->curso_programado_id,
         ]);
 
         return redirect()->back()->with('success', '¡Gracias por tu opinión! Tu comentario ha sido enviado.');

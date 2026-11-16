@@ -100,6 +100,11 @@ export default function Dashboard({ enrolledCourses = [] }: DashboardProps) {
                                                 src={item.image.startsWith('http') ? item.image : `/media/stream/${item.image}`}
                                                 alt={item.title}
                                                 className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.currentTarget as HTMLImageElement;
+                                                    target.onerror = null;
+                                                    target.src = '/img/brand2026/card-simuladores.png';
+                                                }}
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-neutral-800 dark:to-neutral-900">

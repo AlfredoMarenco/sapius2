@@ -54,15 +54,15 @@ export default function Security({
 
     return (
         <>
-            <Head title="Security settings" />
+            <Head title="Seguridad de la Cuenta" />
 
-            <h1 className="sr-only">Security settings</h1>
+            <h1 className="sr-only">Seguridad de la Cuenta</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Update password"
-                    description="Ensure your account is using a long, random password to stay secure"
+                    title="Actualizar contraseña"
+                    description="Asegúrate de usar una contraseña segura para proteger tu cuenta"
                 />
 
                 <Form
@@ -91,7 +91,7 @@ export default function Security({
                         <>
                             <div className="grid gap-2">
                                 <Label htmlFor="current_password">
-                                    Current password
+                                    Contraseña actual
                                 </Label>
 
                                 <PasswordInput
@@ -100,14 +100,14 @@ export default function Security({
                                     name="current_password"
                                     className="mt-1 block w-full"
                                     autoComplete="current-password"
-                                    placeholder="Current password"
+                                    placeholder="Contraseña actual"
                                 />
 
                                 <InputError message={errors.current_password} />
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="password">New password</Label>
+                                <Label htmlFor="password">Nueva contraseña</Label>
 
                                 <PasswordInput
                                     id="password"
@@ -115,7 +115,7 @@ export default function Security({
                                     name="password"
                                     className="mt-1 block w-full"
                                     autoComplete="new-password"
-                                    placeholder="New password"
+                                    placeholder="Nueva contraseña"
                                 />
 
                                 <InputError message={errors.password} />
@@ -123,7 +123,7 @@ export default function Security({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="password_confirmation">
-                                    Confirm password
+                                    Confirmar nueva contraseña
                                 </Label>
 
                                 <PasswordInput
@@ -131,7 +131,7 @@ export default function Security({
                                     name="password_confirmation"
                                     className="mt-1 block w-full"
                                     autoComplete="new-password"
-                                    placeholder="Confirm password"
+                                    placeholder="Confirmar nueva contraseña"
                                 />
 
                                 <InputError
@@ -144,7 +144,7 @@ export default function Security({
                                     disabled={processing}
                                     data-test="update-password-button"
                                 >
-                                    Save password
+                                    Guardar contraseña
                                 </Button>
 
                                 <Transition
@@ -154,8 +154,8 @@ export default function Security({
                                     leave="transition ease-in-out"
                                     leaveTo="opacity-0"
                                 >
-                                    <p className="text-sm text-neutral-600">
-                                        Saved
+                                    <p className="text-sm text-emerald-600 font-medium">
+                                        Contraseña actualizada
                                     </p>
                                 </Transition>
                             </div>
@@ -168,15 +168,13 @@ export default function Security({
                 <div className="space-y-6">
                     <Heading
                         variant="small"
-                        title="Two-factor authentication"
-                        description="Manage your two-factor authentication settings"
+                        title="Autenticación de dos factores (2FA)"
+                        description="Administra la verificación en dos pasos de tu cuenta"
                     />
                     {twoFactorEnabled ? (
                         <div className="flex flex-col items-start justify-start space-y-4">
                             <p className="text-sm text-muted-foreground">
-                                You will be prompted for a secure, random pin
-                                during login, which you can retrieve from the
-                                TOTP-supported application on your phone.
+                                Se te solicitará un código de seguridad temporal durante el inicio de sesión desde tu aplicación autenticadora.
                             </p>
 
                             <div className="relative inline">
@@ -187,7 +185,7 @@ export default function Security({
                                             type="submit"
                                             disabled={processing}
                                         >
-                                            Disable 2FA
+                                            Desactivar 2FA
                                         </Button>
                                     )}
                                 </Form>
@@ -202,10 +200,7 @@ export default function Security({
                     ) : (
                         <div className="flex flex-col items-start justify-start space-y-4">
                             <p className="text-sm text-muted-foreground">
-                                When you enable two-factor authentication, you
-                                will be prompted for a secure pin during login.
-                                This pin can be retrieved from a TOTP-supported
-                                application on your phone.
+                                Al activar la autenticación en dos pasos, se te pedirá un PIN seguro generado en tu teléfono al iniciar sesión.
                             </p>
 
                             <div>
@@ -214,7 +209,7 @@ export default function Security({
                                         onClick={() => setShowSetupModal(true)}
                                     >
                                         <ShieldCheck />
-                                        Continue setup
+                                        Continuar configuración
                                     </Button>
                                 ) : (
                                     <Form
@@ -228,7 +223,7 @@ export default function Security({
                                                 type="submit"
                                                 disabled={processing}
                                             >
-                                                Enable 2FA
+                                                Activar 2FA
                                             </Button>
                                         )}
                                     </Form>
@@ -255,7 +250,7 @@ export default function Security({
 }
 
 Security.layout = (page: React.ReactNode) => (
-    <AppLayout breadcrumbs={[{ title: 'Security settings', href: edit() }]}>
+    <AppLayout breadcrumbs={[{ title: 'Seguridad', href: edit() }]}>
         <SettingsLayout>{page}</SettingsLayout>
     </AppLayout>
 );

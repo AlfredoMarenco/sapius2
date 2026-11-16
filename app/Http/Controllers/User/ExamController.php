@@ -118,7 +118,7 @@ class ExamController extends Controller
         }
 
         if ($timeLimitSeconds > 0) {
-            $elapsedSeconds = \Carbon\Carbon::now()->diffInSeconds($exam->created_at);
+            $elapsedSeconds = max(0, (int) \Carbon\Carbon::parse($exam->created_at)->diffInSeconds(\Carbon\Carbon::now(), false));
             $timeLeft = max(0, $timeLimitSeconds - $elapsedSeconds);
         } else {
             $timeLeft = 0; // Ilimitado o sin límite
@@ -295,20 +295,20 @@ class ExamController extends Controller
         if ($exam->quiz && $exam->quiz->tiempo_vigencia) {
             $timeParts = explode(':', $exam->quiz->tiempo_vigencia);
             if (count($timeParts) === 3) {
-                $vigenciaSeconds = ($timeParts[0] * 3600) + ($timeParts[1] * 60) + $timeParts[2];
+                $vigenciaSeconds = ((int)$timeParts[0] * 3600) + ((int)$timeParts[1] * 60) + (int)$timeParts[2];
             } else {
                 $vigenciaSeconds = (int)$exam->quiz->tiempo_vigencia * 60;
             }
             
             if ($vigenciaSeconds > 0) {
                 // Ticking from the moment the exam was finished (updated_at is updated when finalizado='si' is saved)
-                $elapsedSeconds = \Carbon\Carbon::now()->diffInSeconds($exam->updated_at);
+                $elapsedSeconds = max(0, (int) \Carbon\Carbon::parse($exam->updated_at)->diffInSeconds(\Carbon\Carbon::now(), false));
                 $feedbackTimeLeft = max(0, $vigenciaSeconds - $elapsedSeconds);
                 
                 // Si el tiempo expiró, redirigir
                 if ($feedbackTimeLeft <= 0) {
                     $redirectId = $exam->enrollment->curso_programado_id ?? $exam->enrollment->curso_id;
-                    return redirect()->route('alumno.curso', ['id' => $redirectId])
+                    return redirect()->route('cursos.detallado', ['id' => $redirectId])
                         ->with('error', 'El tiempo de visualización de la retroalimentación ha concluido.');
                 }
             }
@@ -318,7 +318,8 @@ class ExamController extends Controller
             'exam' => $exam,
             'feedback' => $feedback,
             'questions' => $questions,
-            'timeLeft' => $feedbackTimeLeft
+            'timeLeft' => $feedbackTimeLeft,
+            'examCriteria' => \App\Services\ExamCriteriaService::getAll(),
         ]);
     }
 

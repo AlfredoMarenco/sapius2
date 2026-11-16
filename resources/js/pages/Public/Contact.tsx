@@ -168,7 +168,7 @@ export default function Contact({ scheduledCourses }: ContactProps) {
                                 </div>
 
                                 <div className="mt-5 space-y-1.5 text-sm leading-relaxed text-[#101E33]/90">
-                                    <p>+ 52 123 456 7890</p>
+                                    <p>+52 999 298 8744</p>
                                     <p>
                                         Atención directa para dudas sobre
                                         cursos.
@@ -178,7 +178,7 @@ export default function Contact({ scheduledCourses }: ContactProps) {
 
                             <div className="mt-6">
                                 <a
-                                    href="tel:+521234567890"
+                                    href="tel:+529992988744"
                                     className="inline-flex w-full items-center justify-center rounded-full bg-[#06C156] px-7 py-2.5 text-[15px] font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#05A84B] sm:w-[220px]"
                                 >
                                     Llamar ahora
@@ -210,7 +210,7 @@ export default function Contact({ scheduledCourses }: ContactProps) {
                                 </div>
 
                                 <div className="mt-5 space-y-1.5 text-sm leading-relaxed text-[#101E33]/90">
-                                    <p>+ 52 123 456 7890</p>
+                                    <p>+52 999 298 8744</p>
                                     <p>
                                         Atención directa para dudas sobre
                                         cursos.
@@ -220,7 +220,7 @@ export default function Contact({ scheduledCourses }: ContactProps) {
 
                             <div className="mt-6">
                                 <a
-                                    href="https://api.whatsapp.com/send?phone=521234567890&text=Hola%20Sapius%2C%20tengo%20dudas%20sobre%20sus%20cursos."
+                                    href="https://api.whatsapp.com/send?phone=529992988744&text=Hola%20Sapius%2C%20tengo%20dudas%20sobre%20sus%20cursos."
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex w-full items-center justify-center rounded-full bg-[#06C156] px-7 py-2.5 text-[15px] font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#05A84B] sm:w-[220px]"
@@ -254,17 +254,16 @@ export default function Contact({ scheduledCourses }: ContactProps) {
                                 </div>
 
                                 <div className="mt-5 space-y-1.5 text-sm leading-relaxed text-[#101E33]/90">
-                                    <p>+ 52 123 456 7890</p>
+                                    <p>Sapius Latinoamérica</p>
                                     <p>
-                                        Atención directa para dudas sobre
-                                        cursos.
+                                        Síguenos y escríbenos para atención directa sobre cursos y convocatorias.
                                     </p>
                                 </div>
                             </div>
 
                             <div className="mt-6">
                                 <a
-                                    href="https://www.facebook.com"
+                                    href="https://www.facebook.com/Sapius-latinoam%C3%A9rica-104931991400060"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex w-full items-center justify-center rounded-full bg-[#0A4DA6] px-7 py-2.5 text-[15px] font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#083E87] sm:w-[220px]"
@@ -310,17 +309,16 @@ export default function Contact({ scheduledCourses }: ContactProps) {
                                 </div>
 
                                 <div className="mt-5 space-y-1.5 text-sm leading-relaxed text-[#101E33]/90">
-                                    <p>+ 52 123 456 7890</p>
+                                    <p>@sapius_latinoamerica</p>
                                     <p>
-                                        Atención directa para dudas sobre
-                                        cursos.
+                                        Tips de estudio, testimonios y fechas clave para tu examen.
                                     </p>
                                 </div>
                             </div>
 
                             <div className="mt-6">
                                 <a
-                                    href="https://www.instagram.com"
+                                    href="https://www.instagram.com/sapius_latinoamerica/"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex w-full items-center justify-center rounded-full bg-[#C11F7E] px-7 py-2.5 text-[15px] font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#A6196B] sm:w-[220px]"

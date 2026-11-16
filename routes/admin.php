@@ -203,6 +203,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/manageable', [ManageableController::class, 'index'])->name('manageable.index');
     Route::post('/manageable/store', [ManageableController::class, 'store'])->name('manageable.store');
     Route::put('/manageable/update', [ManageableController::class, 'update'])->name('manageable.update');
+    Route::post('/manageable/exam-criteria', [ManageableController::class, 'updateExamCriteria'])->name('manageable.exam-criteria.update');
     Route::get('/manageable/simulators/medicine/delete/{id}', [ManageableController::class, 'deleteManageablesimulatormedicine'])->name('manageablesimulatormedicine.delete');
     Route::get('/manageable/simulators/nutrition/delete/{id}', [ManageableController::class, 'deleteManageablesimulatornutrition'])->name('manageablesimulatornutrition.delete');
     Route::get('/manageable/guides/medicine/delete/{id}', [ManageableController::class, 'deleteManageableguiamedicine'])->name('manageableguiamedicine.delete');

@@ -99,17 +99,21 @@ class CourseLearningController extends Controller
 
         $globalProgress = $totalClases > 0 ? round((count($completedLessonIds) / $totalClases) * 100) : 0;
 
+        $categoryName = $scheduled->category?->name
+            ?? \App\Services\CourseCategoryService::getCategoryForCourse($course->id)?->name
+            ?? 'General';
+
         return Inertia::render('User/Courses/Detail', [
             'scheduled' => [
                 'id' => $scheduled->id,
                 'identifier' => $scheduled->identificador,
                 'title' => $course->title,
                 'description' => $course->description,
-                'category' => $scheduled->category ? $scheduled->category->name : 'General',
+                'category' => $categoryName,
                 'image' => $course->image,
                 'instructor' => $scheduled->instructor ? $scheduled->instructor->name : 'Sapius Team',
-                'start_date' => $scheduled->fecha_inicio,
-                'end_date' => $scheduled->fecha_fin,
+                'start_date' => $scheduled->fecha_inicio ? Carbon::parse($scheduled->fecha_inicio)->format('d/m/Y') : null,
+                'end_date' => $scheduled->fecha_fin ? Carbon::parse($scheduled->fecha_fin)->format('d/m/Y') : null,
             ],
             'enrollment' => [
                 'id' => $inscripcion->id,
@@ -184,7 +188,7 @@ class CourseLearningController extends Controller
                 'quizzes' => $leccion->quizzes,
                 'homework' => $leccion->homeworks ? $leccion->homeworks->first() : null,
                 'interactive_pdfs' => $leccion->interactivePdfs,
-                'has_homework_feature' => ($scheduled->category && $scheduled->category->name !== 'Guias'),
+                'has_homework_feature' => !empty(trim((string) $leccion->summary)) || ($leccion->homeworks && $leccion->homeworks->isNotEmpty()),
             ],
             'scheduled' => [
                 'id' => $scheduled->id,
@@ -254,37 +258,66 @@ class CourseLearningController extends Controller
      */
     public function streamMedia($filename)
     {
-        $videosDir = storage_path('app/uploads/');
-        $filePath = $videosDir . "/" . $filename;
-
-        // Fallback 1: Directorio public local
-        if (!file_exists($filePath)) {
-            $videosDir = storage_path('app/public/');
-            $filePath = $videosDir . "/" . $filename;
+        $cleanFilename = ltrim((string) $filename, '/');
+        if ($cleanFilename === '' || str_contains($cleanFilename, '..') || str_contains($cleanFilename, "\0")) {
+            abort(404);
         }
+        $basename = basename($cleanFilename);
 
-        // Fallback 2: Si no existe en el disco local, redirigir al de producción
-        if (!file_exists($filePath)) {
-            return redirect("https://sapius.com.mx/storage/" . $filename);
-        }
+        $candidatePaths = [
+            storage_path('app/uploads/' . $cleanFilename),
+            storage_path('app/public/' . $cleanFilename),
+            storage_path('app/images/cursos/' . $cleanFilename),
+            storage_path('app/images/cursos/' . $basename),
+            storage_path('app/images/usuarios/' . $cleanFilename),
+            storage_path('app/images/usuarios/' . $basename),
+            storage_path('app/public/courses/' . $basename),
+            public_path('storage/' . $cleanFilename),
+            public_path($cleanFilename),
+            base_path('../TestSapius/storage/app/public/' . $cleanFilename),
+            base_path('../TestSapius/storage/app/images/cursos/' . $basename),
+            base_path('../TestSapius/storage/app/images/usuarios/' . $basename),
+            base_path('../TestSapius/storage/app/uploads/' . $cleanFilename),
+            base_path('../SapiusProduction/storage/app/public/' . $cleanFilename),
+            base_path('../SapiusProduction/storage/app/images/cursos/' . $basename),
+            base_path('../SapiusProduction/storage/app/images/usuarios/' . $basename),
+            base_path('../SapiusProduction/storage/app/uploads/' . $cleanFilename),
+            base_path('../Sapius/storage/app/public/' . $cleanFilename),
+            base_path('../Sapius/storage/app/images/cursos/' . $basename),
+        ];
 
-        if (file_exists($filePath)) {
-            // Liberar la sesión antes de redireccionar o servir el archivo
-            if (session_id()) {
-                session_write_close();
+        foreach ($candidatePaths as $filePath) {
+            if (is_file($filePath) && file_exists($filePath)) {
+                if (session_id()) {
+                    session_write_close();
+                }
+                if (function_exists('session') && session()->isStarted()) {
+                    session()->save();
+                }
+
+                $realPath = realpath($filePath);
+                $mimeType = mime_content_type($realPath) ?: 'application/octet-stream';
+
+                return response()->file($realPath, [
+                    'Content-Type' => $mimeType,
+                ]);
             }
-            if (function_exists('session') && session()->isStarted()) {
-                session()->save();
-            }
-            
-            $realPath = realpath($filePath);
-            $mimeType = mime_content_type($realPath) ?: 'application/octet-stream';
-
-            return response()->file($realPath, [
-                'Content-Type' => $mimeType
-            ]);
         }
 
-        return response("File doesn't exists", 404);
+        // Si parece ser un archivo de imagen y no existe localmente, devolver la imagen placeholder local
+        $ext = strtolower(pathinfo($cleanFilename, PATHINFO_EXTENSION));
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'])) {
+            $fallbackImage = public_path('img/brand2026/card-simuladores.png');
+            if (!file_exists($fallbackImage)) {
+                $fallbackImage = public_path('img/egel-plus.png');
+            }
+            if (file_exists($fallbackImage)) {
+                return response()->file($fallbackImage, [
+                    'Content-Type' => mime_content_type($fallbackImage) ?: 'image/png',
+                ]);
+            }
+        }
+
+        return redirect('https://sapius.com.mx/storage/' . $cleanFilename);
     }
 }

@@ -11,6 +11,41 @@ use Illuminate\Support\Facades\Auth;
 
 class CertificateController extends Controller
 {
+    protected function formatSpanishDate($date): string
+    {
+        if (!$date) {
+            $date = now();
+        }
+        $c = \Carbon\Carbon::parse($date);
+        $meses = [
+            1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
+            5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
+            9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+        ];
+        $mes = $meses[(int) $c->format('n')] ?? 'enero';
+        return $c->format('d') . ' de ' . $mes . ' de ' . $c->format('Y');
+    }
+
+    protected function getLogoBase64(): ?string
+    {
+        $candidates = [
+            public_path('img/brand2026/logo-sapius-dark.png'),
+            public_path('img/brand/logo.png'),
+            public_path('img/logo-sapius.png'),
+            public_path('img/logo.png'),
+        ];
+
+        foreach ($candidates as $path) {
+            if (file_exists($path)) {
+                $data = @file_get_contents($path);
+                if ($data !== false) {
+                    return 'data:image/png;base64,' . base64_encode($data);
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Display a listing of the user's certificates.
      */
@@ -26,7 +61,7 @@ class CertificateController extends Controller
                     'course_title' => $cert->scheduledCourse && $cert->scheduledCourse->course ? $cert->scheduledCourse->course->title : 'Curso no disponible',
                     'cohort_id' => $cert->scheduledCourse ? $cert->scheduledCourse->identificador : 'N/A',
                     'validation_code' => $cert->codigo_validacion,
-                    'issue_date' => $cert->fecha_emision ? $cert->fecha_emision->translatedFormat('d \d\e F \d\e Y') : null,
+                    'issue_date' => $cert->fecha_emision ? $this->formatSpanishDate($cert->fecha_emision) : null,
                 ];
             });
 
@@ -48,8 +83,9 @@ class CertificateController extends Controller
             'student_name' => $certificate->user ? $certificate->user->name : 'N/A',
             'course_name' => $certificate->scheduledCourse && $certificate->scheduledCourse->course ? $certificate->scheduledCourse->course->title : 'N/A',
             'instructor_name' => $certificate->scheduledCourse && $certificate->scheduledCourse->instructor ? $certificate->scheduledCourse->instructor->name : 'Instructor',
-            'issue_date' => $certificate->fecha_emision ? $certificate->fecha_emision->translatedFormat('d \d\e F \d\e Y') : date('d/m/Y'),
+            'issue_date' => $this->formatSpanishDate($certificate->fecha_emision),
             'validation_code' => $certificate->codigo_validacion,
+            'logo_base64' => $this->getLogoBase64(),
         ];
 
         // Se usa view de pdf/certificate

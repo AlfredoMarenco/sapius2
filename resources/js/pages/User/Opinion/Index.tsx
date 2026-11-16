@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { Star, MessageSquare, Send, CheckCircle2 } from 'lucide-react';
+import { Star, MessageSquare, Send, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,7 +23,10 @@ interface OpinionProps {
 }
 
 export default function Opinion({ reviews = [] }: OpinionProps) {
+    const { props } = usePage<any>();
+    const flash = props.flash as { success?: string | null; error?: string | null } | undefined;
     const [hoverRating, setHoverRating] = useState(0);
+    const [sentSuccess, setSentSuccess] = useState(false);
 
     const { data, setData, post, processing, reset, errors } = useForm({
         name: '',
@@ -33,10 +36,17 @@ export default function Opinion({ reviews = [] }: OpinionProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setSentSuccess(false);
         post('/alumno/tu-opinion/store', {
-            onSuccess: () => reset(),
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                setSentSuccess(true);
+            },
         });
     };
+
+    const bannerMessage = flash?.success || (sentSuccess ? '¡Gracias por tu opinión! Tu testimonio ha sido enviado correctamente.' : null);
 
     return (
         <>
@@ -51,6 +61,13 @@ export default function Opinion({ reviews = [] }: OpinionProps) {
                         Comparte tu experiencia de estudio en Sapius para ayudarnos a mejorar día a día.
                     </p>
                 </div>
+
+                {bannerMessage && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 shadow-xs">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="text-sm font-medium">{bannerMessage}</div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                     {/* Opinion Form */}

@@ -28,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         \Illuminate\Support\Facades\Schema::defaultStringLength(191);
+        \Carbon\Carbon::setLocale(config('app.locale', 'es'));
+        \Carbon\CarbonImmutable::setLocale(config('app.locale', 'es'));
         $this->configureDefaults();
         $this->registerShinobiGates();
     }

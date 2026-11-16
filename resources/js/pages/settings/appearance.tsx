@@ -8,15 +8,15 @@ import { edit as editAppearance } from '@/routes/appearance';
 export default function Appearance() {
     return (
         <>
-            <Head title="Appearance settings" />
+            <Head title="Apariencia" />
 
-            <h1 className="sr-only">Appearance settings</h1>
+            <h1 className="sr-only">Configuración de Apariencia</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Appearance settings"
-                    description="Update your account's appearance settings"
+                    title="Apariencia"
+                    description="Personaliza el tema visual de tu plataforma"
                 />
                 <AppearanceTabs />
             </div>
@@ -25,7 +25,7 @@ export default function Appearance() {
 }
 
 Appearance.layout = (page: React.ReactNode) => (
-    <AppLayout breadcrumbs={[{ title: 'Appearance settings', href: editAppearance() }]}>
+    <AppLayout breadcrumbs={[{ title: 'Apariencia', href: editAppearance() }]}>
         <SettingsLayout>{page}</SettingsLayout>
     </AppLayout>
 );

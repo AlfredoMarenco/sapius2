@@ -161,8 +161,9 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                                 alt={cohort.course.title}
                                                 className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                 onError={(e) => {
-                                                    // Fallback si la imagen no existe
-                                                    (e.target as HTMLImageElement).src = '/vendor/adminmart/assets/images/big/cursos.png';
+                                                    const target = e.currentTarget as HTMLImageElement;
+                                                    target.onerror = null;
+                                                    target.src = '/img/brand2026/card-simuladores.png';
                                                 }}
                                             />
                                         ) : (

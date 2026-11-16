@@ -30,11 +30,26 @@ interface ManageableItem {
     position: number;
 }
 
+interface CriteriaRow {
+    label: string;
+    value: string;
+    max?: string;
+    badge?: string;
+}
+
+interface CriteriaTable {
+    title: string;
+    subtitle: string;
+    columns: string[];
+    rows: CriteriaRow[];
+}
+
 interface ManageableProps {
     simulatorsMedicine: ManageableItem[];
     simulatorsNutrition: ManageableItem[];
     guiasMedicine: ManageableItem[];
     guiasNutrition: ManageableItem[];
+    examCriteria?: Record<string, CriteriaTable>;
 }
 
 export default function ManageableIndex({
@@ -42,9 +57,13 @@ export default function ManageableIndex({
     simulatorsNutrition = [],
     guiasMedicine = [],
     guiasNutrition = [],
+    examCriteria = {},
 }: ManageableProps) {
-    const [selectedType, setSelectedType] = useState<'simuladores' | 'guias'>('simuladores');
+    const [selectedType, setSelectedType] = useState<'simuladores' | 'guias' | 'criterios'>('simuladores');
     const [selectedCategory, setSelectedCategory] = useState<'medicina' | 'nutricion'>('medicina');
+    const [selectedExamType, setSelectedExamType] = useState<'EGEL' | 'EXANI' | 'ENARM'>('EGEL');
+    const [criteriaState, setCriteriaState] = useState<Record<string, CriteriaTable>>(examCriteria);
+    const [savingCriteria, setSavingCriteria] = useState(false);
 
     // Create Modal state
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -154,7 +173,7 @@ export default function ManageableIndex({
                 {/* Filters Row */}
                 <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-sm">
                     {/* Type Filter */}
-                    <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                    <div className="flex flex-wrap items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
                         <Button
                             variant={selectedType === 'simuladores' ? 'default' : 'ghost'}
                             size="sm"
@@ -171,31 +190,208 @@ export default function ManageableIndex({
                         >
                             <FileText className="w-4 h-4 mr-1.5" /> Guías de Estudio
                         </Button>
+                        <Button
+                            variant={selectedType === 'criterios' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => setSelectedType('criterios')}
+                            className={selectedType === 'criterios' ? 'bg-indigo-600 text-white' : ''}
+                        >
+                            <Layers className="w-4 h-4 mr-1.5" /> Tablas de Puntaje (EGEL / EXANI / ENARM)
+                        </Button>
                     </div>
 
                     {/* Category Filter */}
-                    <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
-                        <Button
-                            variant={selectedCategory === 'medicina' ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => setSelectedCategory('medicina')}
-                            className={selectedCategory === 'medicina' ? 'bg-emerald-600 text-white' : ''}
-                        >
-                            <Stethoscope className="w-4 h-4 mr-1.5" /> Medicina (ENARM / EGEL)
-                        </Button>
-                        <Button
-                            variant={selectedCategory === 'nutricion' ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => setSelectedCategory('nutricion')}
-                            className={selectedCategory === 'nutricion' ? 'bg-emerald-600 text-white' : ''}
-                        >
-                            <Apple className="w-4 h-4 mr-1.5" /> Nutrición
-                        </Button>
-                    </div>
+                    {selectedType !== 'criterios' ? (
+                        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                            <Button
+                                variant={selectedCategory === 'medicina' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setSelectedCategory('medicina')}
+                                className={selectedCategory === 'medicina' ? 'bg-emerald-600 text-white' : ''}
+                            >
+                                <Stethoscope className="w-4 h-4 mr-1.5" /> Medicina (ENARM / EGEL)
+                            </Button>
+                            <Button
+                                variant={selectedCategory === 'nutricion' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setSelectedCategory('nutricion')}
+                                className={selectedCategory === 'nutricion' ? 'bg-emerald-600 text-white' : ''}
+                            >
+                                <Apple className="w-4 h-4 mr-1.5" /> Nutrición
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                            {(['EGEL', 'EXANI', 'ENARM'] as const).map((etype) => (
+                                <Button
+                                    key={etype}
+                                    variant={selectedExamType === etype ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setSelectedExamType(etype)}
+                                    className={selectedExamType === etype ? 'bg-indigo-600 text-white' : ''}
+                                >
+                                    {etype}
+                                </Button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {/* Cards Grid */}
-                {activeList.length === 0 ? (
+                {/* Cards Grid or Exam Criteria Editor */}
+                {selectedType === 'criterios' ? (
+                    <Card className="border-neutral-200/80 dark:border-neutral-800 shadow-sm">
+                        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-100 dark:border-neutral-800">
+                            <div>
+                                <CardTitle className="text-lg font-bold">
+                                    {criteriaState[selectedExamType]?.title || `Tabla de Criterios ${selectedExamType}`}
+                                </CardTitle>
+                                <CardDescription>
+                                    {criteriaState[selectedExamType]?.subtitle || 'Edita los niveles o puntajes de referencia que ven los alumnos en sus resultados.'}
+                                </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        const current = criteriaState[selectedExamType] || {
+                                            title: `Criterios ${selectedExamType}`,
+                                            subtitle: '',
+                                            columns: ['Categoría / Nivel', 'Puntaje'],
+                                            rows: [],
+                                        };
+                                        const newRow: CriteriaRow = selectedExamType === 'ENARM'
+                                            ? { label: 'Nueva Especialidad', max: '80.000', value: '65.000' }
+                                            : { label: 'Nuevo Nivel / Carrera', value: '1000', badge: 'info' };
+                                        setCriteriaState({
+                                            ...criteriaState,
+                                            [selectedExamType]: {
+                                                ...current,
+                                                rows: [...(current.rows || []), newRow],
+                                            },
+                                        });
+                                    }}
+                                >
+                                    <Plus className="w-4 h-4 mr-1" /> Agregar Fila
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={savingCriteria}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    onClick={() => {
+                                        setSavingCriteria(true);
+                                        router.post('/admin/manageable/exam-criteria', { criteria: criteriaState as any }, {
+                                            preserveScroll: true,
+                                            onFinish: () => setSavingCriteria(false),
+                                        });
+                                    }}
+                                >
+                                    <Save className="w-4 h-4 mr-1.5" /> {savingCriteria ? 'Guardando...' : 'Guardar Cambios'}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Título de la Tabla</Label>
+                                    <Input
+                                        value={criteriaState[selectedExamType]?.title || ''}
+                                        onChange={(e) => setCriteriaState({
+                                            ...criteriaState,
+                                            [selectedExamType]: {
+                                                ...criteriaState[selectedExamType],
+                                                title: e.target.value,
+                                            },
+                                        })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Subtítulo / Nota explicativa</Label>
+                                    <Input
+                                        value={criteriaState[selectedExamType]?.subtitle || ''}
+                                        onChange={(e) => setCriteriaState({
+                                            ...criteriaState,
+                                            [selectedExamType]: {
+                                                ...criteriaState[selectedExamType],
+                                                subtitle: e.target.value,
+                                            },
+                                        })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 pt-2">
+                                {(criteriaState[selectedExamType]?.rows || []).map((row, rIdx) => (
+                                    <div key={rIdx} className="flex flex-wrap sm:flex-nowrap items-center gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/70 dark:border-neutral-800">
+                                        <div className="flex-1 min-w-[180px]">
+                                            <Label className="text-[10px] uppercase text-neutral-400">Nombre / Nivel / Carrera</Label>
+                                            <Input
+                                                value={row.label}
+                                                onChange={(e) => {
+                                                    const updatedRows = [...(criteriaState[selectedExamType]?.rows || [])];
+                                                    updatedRows[rIdx] = { ...updatedRows[rIdx], label: e.target.value };
+                                                    setCriteriaState({
+                                                        ...criteriaState,
+                                                        [selectedExamType]: { ...criteriaState[selectedExamType], rows: updatedRows },
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                        {selectedExamType === 'ENARM' && (
+                                            <div className="w-36">
+                                                <Label className="text-[10px] uppercase text-neutral-400">Puntaje Máximo</Label>
+                                                <Input
+                                                    value={row.max || ''}
+                                                    onChange={(e) => {
+                                                        const updatedRows = [...(criteriaState[selectedExamType]?.rows || [])];
+                                                        updatedRows[rIdx] = { ...updatedRows[rIdx], max: e.target.value };
+                                                        setCriteriaState({
+                                                            ...criteriaState,
+                                                            [selectedExamType]: { ...criteriaState[selectedExamType], rows: updatedRows },
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="w-44">
+                                            <Label className="text-[10px] uppercase text-neutral-400">
+                                                {selectedExamType === 'ENARM' ? 'Puntaje Mínimo' : 'Rango / Puntaje'}
+                                            </Label>
+                                            <Input
+                                                value={row.value}
+                                                onChange={(e) => {
+                                                    const updatedRows = [...(criteriaState[selectedExamType]?.rows || [])];
+                                                    updatedRows[rIdx] = { ...updatedRows[rIdx], value: e.target.value };
+                                                    setCriteriaState({
+                                                        ...criteriaState,
+                                                        [selectedExamType]: { ...criteriaState[selectedExamType], rows: updatedRows },
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="mt-4 text-red-500 hover:text-red-700"
+                                            onClick={() => {
+                                                const updatedRows = (criteriaState[selectedExamType]?.rows || []).filter((_, idx) => idx !== rIdx);
+                                                setCriteriaState({
+                                                    ...criteriaState,
+                                                    [selectedExamType]: { ...criteriaState[selectedExamType], rows: updatedRows },
+                                                });
+                                            }}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : activeList.length === 0 ? (
                     <Card className="border-dashed border-2 text-center py-16">
                         <CardContent className="space-y-3">
                             <Layers className="w-12 h-12 mx-auto text-neutral-300 dark:text-neutral-700" />
@@ -228,9 +424,10 @@ export default function ManageableIndex({
                                             #{item.id}
                                         </Badge>
                                     </div>
-                                    <CardDescription className="text-xs text-neutral-500 mt-1 line-clamp-3">
-                                        {item.descripcion || 'Sin descripción detallada.'}
-                                    </CardDescription>
+                                    <CardDescription
+                                        className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-4 prose prose-xs max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: item.descripcion || 'Sin descripción detallada.' }}
+                                    />
                                 </CardHeader>
                                 <CardContent className="pt-0 border-t border-neutral-100 dark:border-neutral-800/60 mt-3 pt-3 flex items-center justify-between">
                                     <span className="text-[11px] text-neutral-400 font-mono">

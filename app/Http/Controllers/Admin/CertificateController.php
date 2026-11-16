@@ -5,14 +5,115 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\Enrollment;
+use App\Models\Exam;
 use App\Models\ScheduledCourse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 
 class CertificateController extends Controller
 {
+    protected function formatSpanishDate($date): string
+    {
+        if (!$date) {
+            $date = now();
+        }
+        $c = \Carbon\Carbon::parse($date);
+        $meses = [
+            1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
+            5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
+            9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+        ];
+        $mes = $meses[(int) $c->format('n')] ?? 'enero';
+        return $c->format('d') . ' de ' . $mes . ' de ' . $c->format('Y');
+    }
+
+    protected function getLogoBase64(): ?string
+    {
+        $candidates = [
+            public_path('img/brand2026/logo-sapius-dark.png'),
+            public_path('img/brand/logo.png'),
+            public_path('img/logo-sapius.png'),
+            public_path('img/logo.png'),
+        ];
+
+        foreach ($candidates as $path) {
+            if (file_exists($path)) {
+                $data = @file_get_contents($path);
+                if ($data !== false) {
+                    return 'data:image/png;base64,' . base64_encode($data);
+                }
+            }
+        }
+        return null;
+    }
+
+    protected function hasStudentApprovedCohort(Enrollment $enrollment, ScheduledCourse $cohort): bool
+    {
+        $course = $cohort->course;
+        if (!$course) {
+            return false;
+        }
+
+        // Collect all active lessons and quizzes for the course
+        $lessonIds = [];
+        $quizIds = [];
+        foreach ($course->modules ?? [] as $module) {
+            if ($module->activo !== 'si') continue;
+            foreach ($module->lessons ?? [] as $lesson) {
+                if ($lesson->activo !== 'si') continue;
+                $lessonIds[] = $lesson->id;
+                foreach ($lesson->quizzes ?? [] as $quiz) {
+                    if ($quiz->activo === 'si') {
+                        $quizIds[] = $quiz->id;
+                    }
+                }
+            }
+        }
+
+        if (empty($lessonIds) && empty($quizIds)) {
+            return false;
+        }
+
+        // Check completed lessons
+        $completedCount = 0;
+        if (!empty($lessonIds)) {
+            $completedCount = DB::table('leccion_user')
+                ->where('user_id', $enrollment->user_id)
+                ->where('curso_programado_id', $cohort->id)
+                ->whereIn('leccion_id', $lessonIds)
+                ->count();
+        }
+
+        // Check completed & approved exams
+        $passedExamsCount = 0;
+        if (!empty($quizIds)) {
+            $exams = Exam::where('inscripcion_id', $enrollment->id)
+                ->whereIn('prueba_id', $quizIds)
+                ->where('finalizado', 'si')
+                ->get();
+
+            foreach ($exams as $exam) {
+                $totalQ = (int) ($exam->total_preguntas ?? 0);
+                $correctQ = (int) ($exam->total_correctas ?? 0);
+                $score = (float) ($exam->score_total ?? 0);
+                $ratio = $totalQ > 0 ? ($correctQ / $totalQ) : 0;
+
+                if ($ratio >= 0.6 || $score >= 1000) {
+                    $passedExamsCount++;
+                }
+            }
+        }
+
+        // If the course has quizzes, student must have passed at least one quiz (or completed all lessons if no quizzes exist)
+        if (!empty($quizIds)) {
+            return $passedExamsCount > 0;
+        }
+
+        return !empty($lessonIds) && $completedCount >= count($lessonIds);
+    }
     /**
      * Display a listing of the certificates.
      */
@@ -67,8 +168,9 @@ class CertificateController extends Controller
             'student_name' => $certificate->user ? $certificate->user->name : 'N/A',
             'course_name' => $certificate->scheduledCourse && $certificate->scheduledCourse->course ? $certificate->scheduledCourse->course->title : 'N/A',
             'instructor_name' => $certificate->scheduledCourse && $certificate->scheduledCourse->instructor ? $certificate->scheduledCourse->instructor->name : 'Instructor',
-            'issue_date' => $certificate->fecha_emision ? $certificate->fecha_emision->translatedFormat('d \d\e F \d\e Y') : date('d/m/Y'),
+            'issue_date' => $this->formatSpanishDate($certificate->fecha_emision),
             'validation_code' => $certificate->codigo_validacion,
+            'logo_base64' => $this->getLogoBase64(),
         ];
 
         // Se usa view de pdf/certificate
@@ -93,6 +195,8 @@ class CertificateController extends Controller
         $cohortId = $request->curso_programado_id;
         $userId = $request->user_id;
 
+        $cohort = ScheduledCourse::with(['course.modules.lessons.quizzes'])->findOrFail($cohortId);
+
         $query = Enrollment::where('curso_programado_id', $cohortId)
             ->where('aceptado', 'si');
 
@@ -102,8 +206,15 @@ class CertificateController extends Controller
 
         $enrollments = $query->get();
         $emitted = 0;
+        $skippedNotApproved = 0;
 
         foreach ($enrollments as $enrollment) {
+            // Si es emisión masiva (sin user_id específico), validar que el alumno haya aprobado / completado el curso
+            if (!$userId && !$this->hasStudentApprovedCohort($enrollment, $cohort)) {
+                $skippedNotApproved++;
+                continue;
+            }
+
             // Verificar que no tenga ya un certificado para esta cohorte
             $exists = Certificate::where('user_id', $enrollment->user_id)
                 ->where('curso_programado_id', $cohortId)
@@ -120,7 +231,11 @@ class CertificateController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', "Se emitieron {$emitted} certificados correctamente.");
+        if ($emitted === 0 && $skippedNotApproved > 0) {
+            return redirect()->back()->with('error', "No se emitieron certificados: ninguno de los {$skippedNotApproved} alumnos inscritos ha completado las lecciones ni aprobado las evaluaciones del curso.");
+        }
+
+        return redirect()->back()->with('success', "Se emitieron {$emitted} certificados correctamente." . ($skippedNotApproved > 0 ? " ({$skippedNotApproved} alumnos omitidos por no haber aprobado aún)." : ''));
     }
 
     /**

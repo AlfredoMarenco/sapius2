@@ -3,10 +3,8 @@ import { cn } from '@/lib/utils';
 
 export function LandingAdminNav({ active }: { active: 'slides' | 'prides' | 'teachers' | 'reviews' }) {
     const navItems = [
-        { id: 'slides', title: 'Slides Hero', href: '/admin/landing/slides' },
-        { id: 'prides', title: 'Orgullos Sapius', href: '/admin/landing/prides' },
-        { id: 'teachers', title: 'Docentes', href: '/admin/landing/teachers' },
-        { id: 'reviews', title: 'Reseñas', href: '/admin/landing/reviews' },
+        { id: 'slides', title: 'Configuraciones Landing (Slides, Orgullos y Docentes)', href: '/admin/configuraciones' },
+        { id: 'reviews', title: 'Reseñas de Alumnos', href: '/admin/reviews' },
     ];
 
     return (

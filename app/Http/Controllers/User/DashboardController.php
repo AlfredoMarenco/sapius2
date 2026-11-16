@@ -78,6 +78,10 @@ class DashboardController extends Controller
                 $isAvailable = false;
             }
 
+            $categoryName = $scheduled->category?->name
+                ?? \App\Services\CourseCategoryService::getCategoryForCourse($course->id)?->name
+                ?? 'General';
+
             return [
                 'enrollment_id' => $enrollment->id,
                 'status' => $enrollment->aceptado, // 'si' or 'no'
@@ -85,8 +89,8 @@ class DashboardController extends Controller
                 'identifier' => $scheduled->identificador,
                 'course_id' => $course->id,
                 'title' => $course->title,
-                'category' => $scheduled->category ? $scheduled->category->name : 'General',
-                'category_slug' => $scheduled->category ? strtolower($scheduled->category->name) : 'general',
+                'category' => $categoryName,
+                'category_slug' => strtolower($categoryName),
                 'description' => $course->description,
                 'image' => $course->image,
                 'instructor' => $scheduled->instructor ? $scheduled->instructor->name : 'Sapius Team',

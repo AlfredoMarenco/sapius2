@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Models\LandingPride;
-use App\Models\LandingReview;
-use App\Models\LandingSlide;
-use App\Models\LandingTeacher;
+use App\Models\Pride;
+use App\Models\Review;
+use App\Models\Slide;
+use App\Models\Teacher;
 use App\Models\ManageableGuiaMedicine;
 use App\Models\ManageableGuiaNutrition;
 use App\Models\ManageableSimulatorMedicine;
@@ -33,6 +33,26 @@ class LandingController extends Controller
         } catch (QueryException) {
             return collect();
         }
+    }
+
+    protected function formatPublicReviews(int $limit = 6): Collection
+    {
+        return $this->safeQuery(function () use ($limit) {
+            return Review::with('user')
+                ->where('visible', 1)
+                ->where('rating', '>=', 4)
+                ->orderBy('created_at', 'desc')
+                ->take($limit)
+                ->get()
+                ->map(fn (Review $r) => [
+                    'id' => $r->id,
+                    'user_name' => $r->name ?: ($r->user?->name ?? 'Alumno Sapius'),
+                    'name' => $r->name ?: ($r->user?->name ?? 'Alumno Sapius'),
+                    'content' => $r->comment,
+                    'comment' => $r->comment,
+                    'rating' => (int) ($r->rating ?? 5),
+                ]);
+        });
     }
 
     /**
@@ -89,10 +109,10 @@ class LandingController extends Controller
     public function index(): Response
     {
         return Inertia::render('Welcome', [
-            'slides' => $this->safeQuery(fn () => LandingSlide::where('active', true)->orderBy('position')->get()),
-            'prides' => $this->safeQuery(fn () => LandingPride::orderBy('position')->get()),
-            'teachers' => $this->safeQuery(fn () => LandingTeacher::orderBy('position')->get()),
-            'reviews' => $this->safeQuery(fn () => LandingReview::where('visible', true)->orderBy('created_at', 'desc')->take(6)->get()),
+            'slides' => $this->safeQuery(fn () => Slide::orderBy('position')->get()),
+            'prides' => $this->safeQuery(fn () => Pride::orderBy('position')->get()),
+            'teachers' => $this->safeQuery(fn () => Teacher::orderBy('position')->get()),
+            'reviews' => $this->formatPublicReviews(6),
             'scheduledCourses' => $this->activeScheduledCourses(),
         ]);
     }
@@ -110,13 +130,7 @@ class LandingController extends Controller
 
     public function coursePage($slug): Response
     {
-        $reviews = $this->safeQuery(
-            fn () => LandingReview::where('visible', true)
-                ->where('rating', '>=', 4)
-                ->orderBy('created_at', 'desc')
-                ->take(6)
-                ->get()
-        );
+        $reviews = $this->formatPublicReviews(6);
 
         return Inertia::render('Public/CourseLanding', [
             'slug' => $slug,
@@ -164,15 +178,15 @@ class LandingController extends Controller
     public function about(): Response
     {
         return Inertia::render('Public/About', [
-            'teachers' => $this->safeQuery(fn () => LandingTeacher::orderBy('position')->get()),
+            'teachers' => $this->safeQuery(fn () => Teacher::orderBy('position')->get()),
         ]);
     }
 
     public function pride(): Response
     {
         return Inertia::render('Public/Pride', [
-            'prides' => $this->safeQuery(fn () => LandingPride::orderBy('position')->get()),
-            'reviews' => $this->safeQuery(fn () => LandingReview::where('visible', true)->orderBy('created_at', 'desc')->take(12)->get()),
+            'prides' => $this->safeQuery(fn () => Pride::orderBy('position')->get()),
+            'reviews' => $this->formatPublicReviews(12),
         ]);
     }
 

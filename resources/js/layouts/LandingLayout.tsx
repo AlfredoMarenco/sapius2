@@ -308,10 +308,10 @@ export default function LandingLayout({
                             </p>
                             <p>
                                 <a
-                                    href="tel:1234567890"
+                                    href="tel:+529992988744"
                                     className="transition-colors hover:text-[#FF6B52]"
                                 >
-                                    123-456-7890
+                                    +52 999 298 8744
                                 </a>
                             </p>
                             <p className="pt-0.5">
@@ -339,7 +339,7 @@ export default function LandingLayout({
                             {/* 4 círculos blancos h-10 w-10: Instagram, Twitter, Facebook, LinkedIn */}
                             <div className="mt-5 flex items-center gap-3.5">
                                 <a
-                                    href="https://www.instagram.com"
+                                    href="https://www.instagram.com/sapius_latinoamerica/"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     aria-label="Instagram de Sapius"
@@ -369,7 +369,7 @@ export default function LandingLayout({
                                 </a>
 
                                 <a
-                                    href="https://twitter.com"
+                                    href="https://x.com/SapiusMx"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     aria-label="Twitter de Sapius"
@@ -385,7 +385,7 @@ export default function LandingLayout({
                                 </a>
 
                                 <a
-                                    href="https://www.facebook.com"
+                                    href="https://www.facebook.com/Sapius-latinoam%C3%A9rica-104931991400060"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     aria-label="Facebook de Sapius"

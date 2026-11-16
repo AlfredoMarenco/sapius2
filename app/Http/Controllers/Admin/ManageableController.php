@@ -28,7 +28,19 @@ class ManageableController extends Controller
             'simulatorsNutrition' => $simulatorsNutrition,
             'guiasMedicine' => $guiasMedicine,
             'guiasNutrition' => $guiasNutrition,
+            'examCriteria' => \App\Services\ExamCriteriaService::getAll(),
         ]);
+    }
+
+    public function updateExamCriteria(Request $request)
+    {
+        $validated = $request->validate([
+            'criteria' => 'required|array',
+        ]);
+
+        \App\Services\ExamCriteriaService::save($validated['criteria']);
+
+        return redirect()->back()->with('success', 'Tablas de criterios de evaluación actualizadas correctamente.');
     }
 
     /**

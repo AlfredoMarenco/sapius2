@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { HelpCircle, Send, Mail, Phone, MessageSquare } from 'lucide-react';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { Send, Mail, MessageSquare, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +16,10 @@ interface SupportProps {
 }
 
 export default function Support({ user }: SupportProps) {
+    const { props } = usePage<any>();
+    const flash = props.flash as { success?: string | null; error?: string | null } | undefined;
+    const [submittedSuccess, setSubmittedSuccess] = useState(false);
+
     const { data, setData, post, processing, reset, errors } = useForm({
         asunto: '',
         comentario: '',
@@ -22,10 +27,17 @@ export default function Support({ user }: SupportProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmittedSuccess(false);
         post('/alumno/soporte', {
-            onSuccess: () => reset(),
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                setSubmittedSuccess(true);
+            },
         });
     };
+
+    const successMessage = flash?.success || (submittedSuccess ? '¡Gracias! Tu mensaje ha sido enviado a nuestro equipo de soporte. En breve nos pondremos en contacto contigo.' : null);
 
     return (
         <>
@@ -41,13 +53,31 @@ export default function Support({ user }: SupportProps) {
                     </p>
                 </div>
 
+                {successMessage && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 shadow-xs">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="text-sm font-medium">
+                            {successMessage}
+                        </div>
+                    </div>
+                )}
+
+                {flash?.error && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="text-sm font-medium">
+                            {flash.error}
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                     {/* Contact Form */}
                     <div className="md:col-span-8">
                         <Card className="border-neutral-200/80 dark:border-neutral-800 shadow-sm">
                             <CardHeader>
                                 <CardTitle className="text-xl font-bold">Enviar Mensaje a Soporte Técnico</CardTitle>
-                                <CardDescription>Responderemos a tu correo registrado a la mayor brevedad posible</CardDescription>
+                                <CardDescription>Responderemos a tu correo registrado ({user.email}) a la mayor brevedad posible</CardDescription>
                             </CardHeader>
                             <form onSubmit={handleSubmit}>
                                 <CardContent className="space-y-4">
@@ -98,11 +128,11 @@ export default function Support({ user }: SupportProps) {
                             <div className="space-y-3 text-xs text-neutral-600 dark:text-neutral-400">
                                 <div className="flex items-center gap-2.5">
                                     <Mail className="w-4 h-4 text-blue-600" />
-                                    <span>soporte@sapius.com.mx</span>
+                                    <span>contacto@sapius.com.mx</span>
                                 </div>
                                 <div className="flex items-center gap-2.5">
                                     <MessageSquare className="w-4 h-4 text-emerald-600" />
-                                    <span>Lunes a Viernes: 9:00 - 18:00 hrs</span>
+                                    <span>Lunes a Viernes: 8:00 - 18:00 hrs</span>
                                 </div>
                             </div>
                         </Card>

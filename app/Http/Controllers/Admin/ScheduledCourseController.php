@@ -67,6 +67,7 @@ class ScheduledCourseController extends Controller
         $validated = $request->validate([
             'course_id' => $course ? 'nullable' : 'required|exists:cursos,id',
             'instructor_id' => 'required|exists:users,id',
+            'category_id' => 'nullable|exists:categories,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'price' => 'required|numeric|min:0',
@@ -74,8 +75,13 @@ class ScheduledCourseController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        $resolvedCategoryId = $validated['category_id']
+            ?? \App\Services\CourseCategoryService::getCategoryIdForCourse((int) $courseId)
+            ?? ScheduledCourse::where('curso_id', $courseId)->whereNotNull('category_id')->value('category_id');
+
         ScheduledCourse::create([
             'curso_id' => $courseId,
+            'category_id' => $resolvedCategoryId,
             'user_id' => $validated['instructor_id'],
             'fecha_inicio' => $validated['start_date'],
             'fecha_fin' => $validated['end_date'],

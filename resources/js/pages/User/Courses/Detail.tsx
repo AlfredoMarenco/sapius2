@@ -94,13 +94,16 @@ export default function Detail({
                             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-white">
                                 {scheduled.title}
                             </h1>
-                            <p className="text-blue-100/80 text-sm leading-relaxed line-clamp-3">
-                                {scheduled.description}
-                            </p>
+                            {scheduled.description && (
+                                <div
+                                    className="text-blue-100/90 text-sm leading-relaxed prose prose-invert prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5"
+                                    dangerouslySetInnerHTML={{ __html: scheduled.description }}
+                                />
+                            )}
                             <div className="flex items-center gap-4 text-xs text-blue-200/70 pt-2">
                                 <span>Instructor: <strong>{scheduled.instructor}</strong></span>
                                 {scheduled.start_date && (
-                                    <span>• Inicio: {new Date(scheduled.start_date).toLocaleDateString()}</span>
+                                    <span>• Inicio: {scheduled.start_date}</span>
                                 )}
                             </div>
                         </div>

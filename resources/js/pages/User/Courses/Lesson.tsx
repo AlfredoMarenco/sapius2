@@ -338,6 +338,17 @@ export default function Lesson({
                                             <CardDescription>Sube tu archivo para que el instructor lo revise</CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
+                                            {lesson.summary && (
+                                                <div className="p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+                                                    <h5 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                                        Instrucciones de la actividad:
+                                                    </h5>
+                                                    <div
+                                                        className="text-sm text-neutral-700 dark:text-neutral-300 prose prose-sm max-w-none whitespace-pre-line"
+                                                        dangerouslySetInnerHTML={{ __html: lesson.summary }}
+                                                    />
+                                                </div>
+                                            )}
                                             <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
                                                 <h4 className="font-bold text-neutral-900 dark:text-neutral-100 mb-2">
                                                     Enviar tarea de {lesson.title.toLowerCase()}

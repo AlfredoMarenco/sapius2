@@ -15,11 +15,28 @@ export interface TeacherRecord {
     img?: string | null;
 }
 
+export interface PrideRecord {
+    id: number | string;
+    name: string;
+    text?: string | null;
+    text2?: string | null;
+    img?: string | null;
+}
+
+export interface ReviewRecord {
+    id: number | string;
+    user_name?: string;
+    name?: string;
+    content?: string;
+    comment?: string;
+    rating?: number | null;
+}
+
 export interface WelcomeProps {
     slides?: unknown[];
-    prides?: unknown[];
+    prides?: PrideRecord[];
     teachers?: TeacherRecord[];
-    reviews?: unknown[];
+    reviews?: ReviewRecord[];
     scheduledCourses?: ScheduledCourseCandidate[];
 }
 
@@ -136,22 +153,79 @@ const EXPERIENCE_KPIS = [
 
 const PLACEHOLDER_EXPERTS: TeacherRecord[] = [
     {
-        id: 'placeholder-1',
-        name: 'L.N Nombre y Apellido',
-        description: 'Texto complementario',
+        id: 'expert-1',
+        name: 'L.N. Elsy Verónica González Sansores',
+        description: 'Premio Nacional de Excelencia EGEL',
+        img: '/img/m-4.png',
+    },
+    {
+        id: 'expert-2',
+        name: 'Dra. Erika Elizabeth González Sansores',
+        description: 'Neuróloga egresada del Centro Médico Nacional Siglo XXI',
+        img: '/img/m-5.png',
+    },
+    {
+        id: 'expert-3',
+        name: 'Lic. Trab. Soc. Martín Moisés González Sansores',
+        description: 'Docente titular del curso EGEL Plus',
+        img: '/img/m-3.png',
+    },
+    {
+        id: 'expert-4',
+        name: 'Dr. César Abraham Estrada Aguirre',
+        description: 'Cirujano Plástico Estético y Reconstructivo',
+        img: '/img/m-2.png',
+    },
+    {
+        id: 'expert-5',
+        name: 'L.N. Fernando Iván Pat Poot',
+        description: 'Docente Especialista Sapius',
+        img: '/img/m-6.png',
+    },
+];
+
+const PLACEHOLDER_PRIDES: PrideRecord[] = [
+    {
+        id: 'pride-1',
+        name: 'Premio CENEVAL al Desempeño de Excelencia',
+        text: 'El acompañamiento semanal y los simuladores del Método SUMA me permitieron llegar con total seguridad el día de mi examen EGEL Nutrición.',
+        text2: 'EGEL Plus Nutrición · Sobresaliente',
         img: null,
     },
     {
-        id: 'placeholder-2',
-        name: 'L.N Nombre y Apellido',
-        description: 'Texto complementario',
+        id: 'pride-2',
+        name: 'Testimonio de Desempeño Sobresaliente',
+        text: 'Estudiar con videoclases concretas y exámenes diarios transformó por completo mi organización durante las 10 semanas de preparación.',
+        text2: 'EGEL Plus Medicina · Sobresaliente',
         img: null,
     },
     {
-        id: 'placeholder-3',
-        name: 'L.N Nombre y Apellido',
-        description: 'Texto complementario',
+        id: 'pride-3',
+        name: 'Aprobación en Primera Aplicación',
+        text: 'La guía digital e impresa resume exactamente lo que necesitas dominar sin perder tiempo buscando bibliografía dispersa.',
+        text2: 'EGEL Plus Nutrición · Aprobado',
         img: null,
+    },
+];
+
+const PLACEHOLDER_REVIEWS: ReviewRecord[] = [
+    {
+        id: 'rev-1',
+        user_name: 'Egresada de Nutrición',
+        content: 'Excelente plataforma y profesores súper preparados. Las asesorías dominicales en vivo aclaran cada reactivo paso a paso.',
+        rating: 5,
+    },
+    {
+        id: 'rev-2',
+        user_name: 'Egresado de Medicina',
+        content: 'Los simuladores cronometrados son idénticos en exigencia al examen real; me ayudaron muchísimo a controlar mis tiempos.',
+        rating: 5,
+    },
+    {
+        id: 'rev-3',
+        user_name: 'Alumna Modalidad Asincrónica',
+        content: 'Pude combinar mis prácticas profesionales con el curso asincrónico de 10 semanas y obtuve resultado sobresaliente.',
+        rating: 5,
     },
 ];
 
@@ -179,13 +253,25 @@ const HOME_FAQS: FaqItem[] = [
 ];
 
 export default function Welcome({
+    prides = [],
     teachers = [],
+    reviews = [],
     scheduledCourses,
 }: WelcomeProps) {
     const displayedExperts =
         Array.isArray(teachers) && teachers.length > 0
             ? teachers.slice(0, 6)
             : PLACEHOLDER_EXPERTS;
+
+    const displayedPrides =
+        Array.isArray(prides) && prides.length > 0
+            ? prides.slice(0, 3)
+            : PLACEHOLDER_PRIDES;
+
+    const displayedReviews =
+        Array.isArray(reviews) && reviews.length > 0
+            ? reviews.slice(0, 6)
+            : PLACEHOLDER_REVIEWS;
 
     const resolveTeacherImg = (img?: string | null) => {
         if (!img) return '/img/brand2026/expert-placeholder.png';
@@ -244,9 +330,8 @@ export default function Welcome({
                                 <br className="hidden sm:block" /> preparación
                             </h1>
 
-                            <p className="mt-5 max-w-[440px] text-base leading-[1.4] font-normal text-[#101E33]/85 sm:text-[19px]">
-                                Texto secundario para el uso y aplicación de la
-                                tipografía NeuSans Trial
+                            <p className="mt-5 max-w-[460px] text-base leading-[1.45] font-normal text-[#101E33]/85 sm:text-[19px]">
+                                Prepárate con nuestro Método SUMA, simuladores tipo CENEVAL, videoclases y acompañamiento experto para aprobar tu examen EGEL Plus y EXANI.
                             </p>
 
                             <div className="mt-8 flex flex-col items-start gap-3.5">
@@ -668,7 +753,7 @@ export default function Welcome({
                                     opciones adaptadas a ti.
                                 </p>
                                 <a
-                                    href="https://api.whatsapp.com/send?phone=521234567890&text=Hola%20Sapius%2C%20quiero%20conocer%20las%20opciones%20de%20estudio%20adaptadas%20a%20m%C3%AD."
+                                    href="https://api.whatsapp.com/send?phone=529992988744&text=Hola%20Sapius%2C%20quiero%20conocer%20las%20opciones%20de%20estudio%20adaptadas%20a%20m%C3%AD."
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="mt-4 inline-flex items-center justify-center rounded-full bg-[#06C156] px-8 py-3.5 text-base font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#05A84B]"
@@ -945,11 +1030,109 @@ export default function Welcome({
                                 </h3>
                                 <p className="mt-0.5 text-sm font-normal text-[#FF6B52]">
                                     {expert.description ||
-                                        'Texto complementario'}
+                                        'Docente Especialista Sapius'}
                                 </p>
                             </motion.div>
                         ))}
                     </div>
+                </div>
+            </section>
+
+            {/* =========================================================
+                SECCIÓN 7.5: ORGULLO SAPIUS Y OPINIONES DE ALUMNOS
+               ========================================================= */}
+            <section className="relative overflow-hidden bg-[#101E33] py-20 text-white lg:py-24">
+                <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
+                    <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+                        <div>
+                            <span className="text-xs font-extrabold tracking-widest text-[#FF6B52] uppercase">
+                                Resultados comprobados
+                            </span>
+                            <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                                Orgullo <span className="text-[#FF6B52]">Sapius</span> y Opiniones
+                            </h2>
+                        </div>
+                        <Link
+                            href="/orgullo-sapius"
+                            className="inline-flex items-center justify-center rounded-full bg-[#FF6B52] px-6 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
+                        >
+                            Ver todos los testimonios
+                        </Link>
+                    </div>
+
+                    {/* Casos de Orgullo Sapius */}
+                    <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+                        {displayedPrides.map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex flex-col justify-between rounded-3xl border border-white/10 bg-[#192B47] p-6 shadow-lg"
+                            >
+                                <div>
+                                    <div className="flex items-center gap-3.5">
+                                        <img
+                                            src={resolveTeacherImg(item.img)}
+                                            alt={item.name}
+                                            onError={(e) => {
+                                                (e.currentTarget as HTMLImageElement).src = '/img/brand2026/expert-placeholder.png';
+                                            }}
+                                            className="h-14 w-14 shrink-0 rounded-full border-2 border-[#FF6B52] bg-white object-cover object-top"
+                                        />
+                                        <div>
+                                            <h3 className="font-display text-base font-extrabold text-white leading-snug">
+                                                {item.name}
+                                            </h3>
+                                            {item.text2 && (
+                                                <p className="text-xs font-bold text-[#FF6B52] mt-0.5">
+                                                    {item.text2}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {item.text && (
+                                        <p className="mt-4 text-sm leading-relaxed text-white/85">
+                                            “{item.text}”
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Reseñas de alumnos aprobadas */}
+                    {displayedReviews.length > 0 && (
+                        <div className="mt-12 border-t border-white/10 pt-10">
+                            <h3 className="text-center font-display text-2xl font-extrabold text-white mb-8">
+                                Lo que opinan nuestros alumnos
+                            </h3>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                                {displayedReviews.map((rev) => {
+                                    const author = rev.user_name || rev.name || 'Alumno Sapius';
+                                    const body = rev.content || rev.comment || '';
+                                    const stars = Math.min(5, Math.max(1, Number(rev.rating ?? 5)));
+                                    return (
+                                        <div
+                                            key={rev.id}
+                                            className="flex flex-col justify-between rounded-2xl bg-white p-6 text-[#101E33] shadow-md"
+                                        >
+                                            <div>
+                                                <div className="flex items-center gap-1 text-[#FF6B52] mb-3">
+                                                    {Array.from({ length: stars }).map((_, i) => (
+                                                        <span key={i}>★</span>
+                                                    ))}
+                                                </div>
+                                                <p className="text-sm leading-relaxed text-[#101E33]/85">
+                                                    “{body}”
+                                                </p>
+                                            </div>
+                                            <div className="mt-4 pt-3 border-t border-[#101E33]/10 text-xs font-extrabold text-[#101E33]">
+                                                {author}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
 

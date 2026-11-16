@@ -47,6 +47,9 @@ class ProfileController extends Controller
     public function destroy(ProfileDeleteRequest $request): RedirectResponse
     {
         $user = $request->user();
+        if ($user->hasRole('alumno') && !$user->hasRole('admin')) {
+            abort(403, 'Los alumnos no pueden eliminar su cuenta.');
+        }
 
         Auth::logout();
 
