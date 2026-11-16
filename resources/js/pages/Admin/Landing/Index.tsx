@@ -1,13 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
+import { Image as ImageIcon, Award, GraduationCap, Plus, Trash2, Edit, BellRing } from 'lucide-react';
 import { useState } from 'react';
-import { Layers, Image as ImageIcon, Award, GraduationCap, Plus, Trash2, Edit, Upload, Eye } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -16,6 +12,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 
 interface Slide {
     id: number;
@@ -64,11 +65,34 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
     const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
     const [teacherForm, setTeacherForm] = useState({ name: '', description: '' });
     const [teacherFile, setTeacherFile] = useState<File | null>(null);
+    const [triggeringReminders, setTriggeringReminders] = useState(false);
+
+    const handleTriggerReminders = () => {
+        setTriggeringReminders(true);
+        router.post(
+            '/admin/configuraciones/trigger-reminders',
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Recordatorios ejecutados correctamente.');
+                },
+                onError: () => {
+                    toast.error('No se pudieron ejecutar los recordatorios.');
+                },
+                onFinish: () => setTriggeringReminders(false),
+            },
+        );
+    };
 
     // Handlers: Slides
     const handleUploadSlide = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!slideFile) return;
+
+        if (!slideFile) {
+return;
+}
+
         setIsSubmitting(true);
         const formData = new FormData();
         formData.append('image', slideFile);
@@ -83,8 +107,11 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
     };
 
     const handleDeleteSlide = (slide: Slide) => {
-        if (!confirm('¿Estás seguro de eliminar este slide?')) return;
-        router.get(`/admin/configuraciones/delete/${slide.id}`);
+        if (!confirm('¿Estás seguro de eliminar este slide?')) {
+return;
+}
+
+        router.delete(`/admin/configuraciones/delete/${slide.id}`, { preserveScroll: true });
     };
 
     // Handlers: Prides
@@ -109,6 +136,7 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
         formData.append('name', prideForm.name);
         formData.append('text', prideForm.text);
         formData.append('text2', prideForm.text2);
+
         if (prideFile) {
             formData.append('image', prideFile);
         }
@@ -128,8 +156,11 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
     };
 
     const handleDeletePride = (pride: Pride) => {
-        if (!confirm(`¿Eliminar orgullo Sapius de ${pride.name}?`)) return;
-        router.get(`/admin/configuraciones/pride/${pride.id}/delete`);
+        if (!confirm(`¿Eliminar orgullo Sapius de ${pride.name}?`)) {
+return;
+}
+
+        router.delete(`/admin/configuraciones/pride/${pride.id}/delete`, { preserveScroll: true });
     };
 
     // Handlers: Teachers
@@ -153,6 +184,7 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
         const formData = new FormData();
         formData.append('name', teacherForm.name);
         formData.append('description', teacherForm.description);
+
         if (teacherFile) {
             formData.append('image', teacherFile);
         }
@@ -172,13 +204,22 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
     };
 
     const handleDeleteTeacher = (teacher: Teacher) => {
-        if (!confirm(`¿Eliminar docente ${teacher.name}?`)) return;
-        router.get(`/admin/configuraciones/teacher/${teacher.id}/delete`);
+        if (!confirm(`¿Eliminar docente ${teacher.name}?`)) {
+return;
+}
+
+        router.delete(`/admin/configuraciones/teacher/${teacher.id}/delete`, { preserveScroll: true });
     };
 
     const getStorageUrl = (path: string) => {
-        if (!path) return '';
-        if (path.startsWith('http')) return path;
+        if (!path) {
+return '';
+}
+
+        if (path.startsWith('http')) {
+return path;
+}
+
         return `/media/stream/${path}`;
     };
 
@@ -187,13 +228,25 @@ export default function LandingConfigIndex({ slides = [], prides = [], teachers 
             <Head title="Configuraciones de la Plataforma - Landing" />
 
             <div className="p-6 max-w-7xl mx-auto space-y-8">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-                        Configuraciones de Landing
-                    </h1>
-                    <p className="text-sm text-neutral-500 mt-1">
-                        Personaliza los banners principales, la sección de testimonios de Orgullo Sapius y los perfiles docentes.
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                            Configuraciones de Landing
+                        </h1>
+                        <p className="text-sm text-neutral-500 mt-1">
+                            Personaliza los banners principales, la sección de testimonios de Orgullo Sapius y los perfiles docentes.
+                        </p>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={triggeringReminders}
+                        onClick={handleTriggerReminders}
+                        className="flex items-center gap-2 self-start sm:self-auto"
+                    >
+                        <BellRing className="w-4 h-4 text-amber-600" />
+                        {triggeringReminders ? 'Ejecutando...' : 'Ejecutar Recordatorios'}
+                    </Button>
                 </div>
 
                 <Tabs defaultValue="slides" className="space-y-6">

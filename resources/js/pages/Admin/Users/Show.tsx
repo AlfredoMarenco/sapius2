@@ -1,10 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, User, Mail, Phone, BookOpen, GraduationCap, Award, Shield, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { ArrowLeft, Shield, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import AppLayout from '@/layouts/app-layout';
 
 interface UserDetailProps {
     user: {
@@ -106,19 +106,19 @@ export default function UserShow({ user, enrollments = [] }: UserDetailProps) {
                                             Nivel de Infracciones (Strikes)
                                         </p>
                                         <p className="text-sm text-neutral-500">
-                                            Los strikes se acumulan por intentos de captura de pantalla, cambio de pestañas o clic derecho. Al llegar a 3, la cuenta se bloquea.
+                                            Los puntos se acumulan por intentos de captura de pantalla, uso de herramientas de desarrollo o clic derecho. Al llegar a 100 pts, la cuenta se bloquea.
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-2 ml-4">
-                                        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg ${
-                                            user.strikes >= 3 ? 'bg-red-100 text-red-600' :
-                                            user.strikes === 2 ? 'bg-orange-100 text-orange-600' :
-                                            user.strikes === 1 ? 'bg-yellow-100 text-yellow-600' :
+                                    <div className="flex items-center gap-2 ml-4 shrink-0">
+                                        <div className={`flex items-center justify-center min-w-12 h-10 px-3 rounded-full font-bold text-base ${
+                                            user.strikes >= 100 ? 'bg-red-100 text-red-600' :
+                                            user.strikes >= 50 ? 'bg-orange-100 text-orange-600' :
+                                            user.strikes > 0 ? 'bg-yellow-100 text-yellow-600' :
                                             'bg-green-100 text-green-600'
                                         }`}>
                                             {user.strikes}
                                         </div>
-                                        <span className="text-neutral-400 font-medium">/ 3</span>
+                                        <span className="text-neutral-400 font-medium whitespace-nowrap">/ 100 pts</span>
                                     </div>
                                 </div>
 

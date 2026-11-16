@@ -3,17 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Slide;
 use App\Models\Pride;
+use App\Models\Slide;
 use App\Models\Teacher;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-
 use App\Traits\OptimizesImages;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class LandingConfigController extends Controller
 {
     use OptimizesImages;
+
     public function index()
     {
         $slides = Slide::where('section', 'LIKE', 'slider-index')->orWhereNull('section')->orderBy('position', 'asc')->get();
@@ -44,6 +46,7 @@ class LandingConfigController extends Controller
     public function deleteSlide(Slide $slide)
     {
         $slide->delete();
+
         return redirect()->back()->with('success', 'Slide eliminado.');
     }
 
@@ -96,6 +99,7 @@ class LandingConfigController extends Controller
     public function deletePride(Pride $pride)
     {
         $pride->delete();
+
         return redirect()->back()->with('success', 'Orgullo Sapius eliminado.');
     }
 
@@ -144,6 +148,20 @@ class LandingConfigController extends Controller
     public function deleteTeacher(Teacher $teacher)
     {
         $teacher->delete();
+
         return redirect()->back()->with('success', 'Profesor eliminado.');
+    }
+
+    public function triggerOverdueReminders()
+    {
+        try {
+            Artisan::call('reminders:overdue-lessons');
+
+            return redirect()->back()->with('success', 'Recordatorios de lecciones atrasadas ejecutados correctamente.');
+        } catch (\Throwable $e) {
+            Log::error('Error ejecutando reminders:overdue-lessons: '.$e->getMessage());
+
+            return redirect()->back()->with('error', 'Error al ejecutar los recordatorios de lecciones atrasadas.');
+        }
     }
 }

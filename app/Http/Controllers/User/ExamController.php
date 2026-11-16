@@ -3,262 +3,402 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Answer;
+use App\Models\Exam;
+use App\Models\Lesson;
+use App\Models\Question;
+use App\Services\EnrollmentAccessService;
+use App\Services\ExamCriteriaService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
-use App\Models\Quiz;
-use App\Models\Exam;
-use App\Models\Question;
-use App\Models\Answer;
-use App\Models\Enrollment;
-use Carbon\Carbon;
 
 class ExamController extends Controller
 {
+    public function __construct(
+        protected EnrollmentAccessService $accessService
+    ) {}
+
     /**
-     * Muestra la vista previa del examen (intentos restantes, información, etc)
+     * Muestra la vista previa del examen (intentos restantes, información, etc.).
      */
-    public function preview($quiz_id, $enrollment_id = null)
+    public function preview(Request $request, $quiz_id, $enrollment_id = null)
     {
-        $quiz = Quiz::with('lesson.module.course')->findOrFail($quiz_id);
         $user = Auth::user();
+        $preferredEnrollmentId = $enrollment_id ?: $request->query('enrollment_id');
 
-        // Encontrar la inscripción del usuario
-        $enrollment = Enrollment::where('user_id', $user->id)
-            ->whereHas('scheduledCourse.course.modules.lessons.quizzes', function($q) use ($quiz_id) {
-                $q->where('pruebas.id', $quiz_id);
-            })
-            ->first();
+        $access = $this->accessService->requireQuizAccess(
+            $user,
+            (int) $quiz_id,
+            $preferredEnrollmentId ? (int) $preferredEnrollmentId : null
+        );
 
-        if (!$enrollment) {
-            return redirect()->route('alumno.home')->with('error', 'No estás inscrito en el curso asociado a este examen.');
+        $quiz = $access['quiz'];
+        $enrollment = $access['enrollment'];
+
+        $quiz->loadCount(['questions' => fn ($q) => $q->where('activo', 'si')]);
+
+        $isScheduleAvailable = true;
+        if ($quiz->leccion_id) {
+            $lesson = Lesson::withoutGlobalScopes()->find($quiz->leccion_id);
+            if ($lesson) {
+                $isModule = empty($lesson->leccion_id) || (int) $lesson->leccion_id === 0;
+                $schedule = $this->accessService->evaluateSchedule(
+                    (int) $enrollment->curso_programado_id,
+                    (int) $user->id,
+                    (int) $lesson->id,
+                    $isModule ? null : (int) $lesson->leccion_id
+                );
+                $isScheduleAvailable = (bool) ($schedule['is_available'] ?? true);
+            }
         }
 
-        $attemptsCount = Exam::where('inscripcion_id', $enrollment->id)
-            ->where('prueba_id', $quiz_id)
-            ->where('finalizado', 'si')
-            ->count();
-
-        // Obtener el historial de exámenes
-        $exams = Exam::where('inscripcion_id', $enrollment->id)
-            ->where('prueba_id', $quiz_id)
+        $finishedExams = Exam::with('quiz')
+            ->where('inscripcion_id', $enrollment->id)
+            ->where('prueba_id', $quiz->id)
             ->where('finalizado', 'si')
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $attemptsCount = $finishedExams->count();
+
+        $hasActiveAttempt = Exam::where('inscripcion_id', $enrollment->id)
+            ->where('prueba_id', $quiz->id)
+            ->where('finalizado', 'no')
+            ->exists();
+
+        $timeLimitSeconds = $this->parseDurationSeconds($quiz->tiempo ?? $quiz->time_limit);
+
+        $mappedExams = $finishedExams->map(function (Exam $ex) {
+            $availability = $this->evaluateFeedbackAvailability($ex);
+
+            return [
+                'id' => $ex->id,
+                'quiz_id' => $ex->prueba_id,
+                'enrollment_id' => $ex->inscripcion_id,
+                'score' => (float) ($ex->score_total ?? 0),
+                'score_total' => (float) ($ex->score_total ?? 0),
+                'total_correctas' => (int) ($ex->total_correctas ?? 0),
+                'total_preguntas' => (int) ($ex->total_preguntas ?? 0),
+                'finalizado' => $ex->finalizado,
+                'retro_visualizado' => $ex->retro_visualizado ?? 'no',
+                'is_late' => (bool) ($ex->is_late ?? false),
+                'finished_at' => $ex->updated_at?->toIso8601String(),
+                'updated_at' => $ex->updated_at?->toIso8601String(),
+                'feedback_available' => $availability['available'],
+                'feedback_status' => $availability['status'],
+                'feedback_time_left' => $availability['time_left'],
+            ];
+        })->values();
+
         return Inertia::render('User/Exams/Preview', [
-            'quiz' => $quiz,
+            'quiz' => [
+                'id' => $quiz->id,
+                'course_id' => $quiz->curso_id,
+                'lesson_id' => $quiz->leccion_id,
+                'title' => $quiz->titulo ?? $quiz->title,
+                'description' => $quiz->descripcion ?? $quiz->description,
+                'type' => $quiz->tipo ?? $quiz->type,
+                'time_limit' => $quiz->tiempo ?? $quiz->time_limit,
+                'time_limit_seconds' => $timeLimitSeconds,
+                'time_limit_formatted' => $timeLimitSeconds > 0 ? $this->formatSecondsToHms($timeLimitSeconds) : null,
+                'attempts_allowed' => (int) ($quiz->oportunidades ?? $quiz->attempts_allowed ?? 1),
+                'questions_count' => (int) ($quiz->questions_count ?? 0),
+            ],
             'enrollment_id' => $enrollment->id,
+            'scheduled_course_id' => $enrollment->curso_programado_id,
             'attemptsCount' => $attemptsCount,
-            'exams' => $exams,
+            'hasActiveAttempt' => $hasActiveAttempt,
+            'isScheduleAvailable' => $isScheduleAvailable,
+            'exams' => $mappedExams,
         ]);
     }
 
     /**
-     * Inicia o retoma el examen y envía los datos al frontend
+     * Inicia o retoma el examen y envía únicamente campos seguros al frontend.
      */
     public function take($quiz_id, $enrollment_id)
     {
-        $quiz = Quiz::withCount(['questions' => function($q) {
-            $q->where('activo', 'si');
-        }])->findOrFail($quiz_id);
+        $user = Auth::user();
+        $access = $this->accessService->requireQuizAccess($user, (int) $quiz_id, (int) $enrollment_id);
 
-        $enrollment = Enrollment::findOrFail($enrollment_id);
+        $quiz = $access['quiz'];
+        $enrollment = $access['enrollment'];
 
-        if ($enrollment->user_id !== Auth::id()) {
-            abort(403);
-        }
+        $quiz->loadCount(['questions' => fn ($q) => $q->where('activo', 'si')]);
 
-        // Verificar si hay un examen iniciado pero no finalizado
         $exam = Exam::where('inscripcion_id', $enrollment->id)
-            ->where('prueba_id', $quiz_id)
+            ->where('prueba_id', $quiz->id)
             ->where('finalizado', 'no')
             ->first();
 
-        // Validar intentos si se va a crear uno nuevo
-        $attemptsCount = Exam::where('inscripcion_id', $enrollment->id)
-            ->where('prueba_id', $quiz_id)
-            ->where('finalizado', 'si')
-            ->count();
+        $timeLimitSeconds = $this->parseDurationSeconds($quiz->tiempo ?? $quiz->time_limit);
 
-        if (!$exam && $attemptsCount >= $quiz->attempts_allowed) {
-            return redirect()->route('alumno.exam.preview', ['quiz_id' => $quiz_id])->with('error', 'Has agotado tus intentos.');
+        // Si existe intento abierto y expiró su tiempo límite en servidor, calificar y cerrar inmediatamente
+        if ($exam && $timeLimitSeconds > 0) {
+            $elapsedSeconds = max(0, (int) Carbon::parse($exam->created_at)->diffInSeconds(now(), false));
+            $remaining = $timeLimitSeconds - $elapsedSeconds;
+
+            if ($remaining <= 0) {
+                $this->gradeExam($exam);
+
+                return redirect()
+                    ->route('alumno.exam.preview', ['quiz_id' => $quiz->id, 'enrollment_id' => $enrollment->id])
+                    ->with('error', 'El tiempo límite de tu examen ha expirado y tu intento fue calificado automáticamente.');
+            }
         }
 
-        if (!$exam) {
-            $exam = new Exam();
+        if (! $exam) {
+            if ($quiz->leccion_id) {
+                $lesson = Lesson::withoutGlobalScopes()->find($quiz->leccion_id);
+                if ($lesson) {
+                    $isModule = empty($lesson->leccion_id) || (int) $lesson->leccion_id === 0;
+                    $schedule = $this->accessService->evaluateSchedule(
+                        (int) $enrollment->curso_programado_id,
+                        (int) $user->id,
+                        (int) $lesson->id,
+                        $isModule ? null : (int) $lesson->leccion_id
+                    );
+                    if (! ($schedule['is_available'] ?? true)) {
+                        return redirect()
+                            ->route('alumno.exam.preview', ['quiz_id' => $quiz->id, 'enrollment_id' => $enrollment->id])
+                            ->with('error', 'Esta evaluación no se encuentra disponible según el calendario programado.');
+                    }
+                }
+            }
+
+            $attemptsCount = Exam::where('inscripcion_id', $enrollment->id)
+                ->where('prueba_id', $quiz->id)
+                ->where('finalizado', 'si')
+                ->count();
+
+            $attemptsAllowed = (int) ($quiz->oportunidades ?? $quiz->attempts_allowed ?? 1);
+            if ($attemptsAllowed > 0 && $attemptsCount >= $attemptsAllowed) {
+                return redirect()
+                    ->route('alumno.exam.preview', ['quiz_id' => $quiz->id])
+                    ->with('error', 'Has agotado tus intentos.');
+            }
+
+            $exam = new Exam;
             $exam->inscripcion_id = $enrollment->id;
-            $exam->prueba_id = $quiz_id;
-            $exam->total_preguntas = $quiz->questions_count;
+            $exam->prueba_id = $quiz->id;
+            $exam->total_preguntas = (int) ($quiz->questions_count ?? 0);
             $exam->finalizado = 'no';
             $exam->retro_visualizado = 'no';
             $exam->save();
         }
 
-        // Obtener todas las preguntas activas
-        $questions = Question::with(['answers' => function($q) {
-                $q->where('activo', 'si');
-            }])
-            ->where('prueba_id', $quiz_id)
+        // Agrupar preguntas seriadas por slug (GrupoPreguntas), mezclar grupos determinísticamente por Auth::id()
+        // y mantener el orden interno de viñetas (id asc).
+        $allQuestions = Question::with(['answers' => function ($q) {
+            $q->where('activo', 'si')
+                ->orderBy('posicion', 'asc')
+                ->orderBy('id', 'asc');
+        }])
+            ->where('prueba_id', $quiz->id)
             ->where('activo', 'si')
-            ->inRandomOrder(Auth::id())
+            ->orderBy('id', 'asc')
             ->get();
 
-        $savedAnswers = $exam->answers_snapshot ? json_decode($exam->answers_snapshot, true) : [];
+        $groups = $allQuestions->groupBy(function (Question $q) {
+            $slug = trim((string) ($q->slug ?? ''));
 
-        // Calcular el tiempo real restante para evitar trampas al recargar la página
-        $timeLimitSeconds = 0;
-        if ($quiz->time_limit) {
-            $timeParts = explode(':', $quiz->time_limit);
-            if (count($timeParts) === 3) {
-                $timeLimitSeconds = ($timeParts[0] * 3600) + ($timeParts[1] * 60) + $timeParts[2];
-            } else {
-                $timeLimitSeconds = (int)$quiz->time_limit * 60; // Fallback legacy
+            return $slug !== '' ? $slug : '__single_'.$q->id;
+        });
+
+        $sortedGroupKeys = $groups->keys()
+            ->sortBy(fn (string $groupKey) => md5($user->id.'|'.$quiz->id.'|'.$groupKey))
+            ->values();
+
+        $projectedQuestions = collect();
+        foreach ($sortedGroupKeys as $groupKey) {
+            foreach ($groups->get($groupKey, collect()) as $question) {
+                $projectedQuestions->push([
+                    'id' => $question->id,
+                    'slug' => $question->slug,
+                    'text' => $question->pregunta ?? $question->text,
+                    'image' => $question->imagen ?? $question->image,
+                    'answers' => $question->answers->map(function (Answer $ans) {
+                        return [
+                            'id' => $ans->id,
+                            'question_id' => $ans->pregunta_id ?? $ans->question_id,
+                            'text' => $ans->respuesta ?? $ans->text,
+                            'image' => $ans->imagen ?? $ans->image,
+                            'position' => (int) ($ans->posicion ?? $ans->position ?? 1),
+                        ];
+                    })->values()->all(),
+                ]);
             }
         }
 
+        $savedAnswers = $this->decodeAnswersSnapshot($exam);
+
         if ($timeLimitSeconds > 0) {
-            $elapsedSeconds = max(0, (int) \Carbon\Carbon::parse($exam->created_at)->diffInSeconds(\Carbon\Carbon::now(), false));
+            $elapsedSeconds = max(0, (int) Carbon::parse($exam->created_at)->diffInSeconds(now(), false));
             $timeLeft = max(0, $timeLimitSeconds - $elapsedSeconds);
         } else {
-            $timeLeft = 0; // Ilimitado o sin límite
+            // Exámenes sin límite usan null (nunca 0)
+            $timeLeft = null;
         }
 
         return Inertia::render('User/Exams/Take', [
-            'quiz' => $quiz,
-            'exam' => $exam,
-            'questions' => $questions,
+            'quiz' => [
+                'id' => $quiz->id,
+                'course_id' => $quiz->curso_id,
+                'lesson_id' => $quiz->leccion_id,
+                'title' => $quiz->titulo ?? $quiz->title,
+                'description' => $quiz->descripcion ?? $quiz->description,
+                'type' => $quiz->tipo ?? $quiz->type,
+                'time_limit' => $quiz->tiempo ?? $quiz->time_limit,
+                'attempts_allowed' => (int) ($quiz->oportunidades ?? $quiz->attempts_allowed ?? 1),
+            ],
+            'exam' => [
+                'id' => $exam->id,
+                'quiz_id' => $exam->prueba_id,
+                'enrollment_id' => $exam->inscripcion_id,
+                'total_preguntas' => (int) ($exam->total_preguntas ?? $projectedQuestions->count()),
+                'finalizado' => $exam->finalizado,
+                'started_at' => $exam->created_at?->toIso8601String(),
+            ],
+            'questions' => $projectedQuestions->values()->all(),
             'savedAnswers' => $savedAnswers,
-            'timeLeft' => $timeLeft
+            'timeLeft' => $timeLeft,
+            'scheduled_course_id' => $enrollment->curso_programado_id,
         ]);
     }
 
     /**
-     * Guarda una respuesta de manera asíncrona (auto-save)
+     * Guarda respuestas de manera asíncrona (auto-save) validando propiedad y tiempo límite + 15s.
      */
     public function saveAnswer(Request $request, $exam_id)
     {
-        $exam = Exam::findOrFail($exam_id);
+        $exam = $this->accessService->requireExamOwnership($request->user(), (int) $exam_id);
 
         if ($exam->finalizado === 'si') {
-            return response()->json(['success' => false, 'message' => 'Examen finalizado.']);
+            return response()->json(['success' => false, 'message' => 'Examen finalizado.'], 409);
         }
 
-        // respuestas: [{'name': question_id, 'value': answer_id}, ...]
+        if ($this->isTimeExpired($exam, 15)) {
+            return response()->json([
+                'success' => false,
+                'expired' => true,
+                'message' => 'El tiempo límite del examen ha expirado; no se aceptan nuevas respuestas.',
+            ], 422);
+        }
+
         $newAnswers = $request->input('answers', []);
-        
-        $currentAnswers = $exam->answers_snapshot ? json_decode($exam->answers_snapshot, true) : [];
-
-        // Combinar o actualizar respuestas
-        $answersMap = [];
-        foreach ($currentAnswers as $ans) {
-            $answersMap[$ans['name']] = $ans['value'];
-        }
-        
-        foreach ($newAnswers as $ans) {
-            $answersMap[$ans['name']] = $ans['value'];
+        if (is_string($newAnswers)) {
+            $newAnswers = json_decode($newAnswers, true) ?: [];
         }
 
-        $mergedAnswers = [];
-        foreach ($answersMap as $q_id => $ans_val) {
-            $mergedAnswers[] = ['name' => $q_id, 'value' => $ans_val];
-        }
-
-        $exam->answers_snapshot = json_encode($mergedAnswers);
+        $mergedAnswers = $this->mergeAndDeduplicateAnswers($exam, is_array($newAnswers) ? $newAnswers : []);
+        $exam->respuestas_json = json_encode($mergedAnswers);
         $exam->save();
 
         return response()->json(['success' => true]);
     }
 
     /**
-     * Finaliza y califica el examen
+     * Finaliza y califica el examen.
      */
     public function finish(Request $request, $exam_id)
     {
-        $exam = Exam::with('quiz')->findOrFail($exam_id);
+        $exam = $this->accessService->requireExamOwnership($request->user(), (int) $exam_id);
 
         if ($exam->finalizado === 'si') {
             return redirect()->route('alumno.exam.preview', ['quiz_id' => $exam->prueba_id]);
         }
 
-        // Actualizar respuestas finales enviadas por el alumno
-        if ($request->has('answers')) {
-            $exam->answers_snapshot = json_encode($request->input('answers'));
-        }
-
-        $answers = $exam->answers_snapshot ? collect(json_decode($exam->answers_snapshot)) : collect([]);
-
-        $exam->total_correctas = 0;
-        $exam->score_total = ($exam->quiz->type === 'ENARM') ? 0 : 700; // Legacy logic
-
-        // Obtener respuestas correctas de la base de datos
-        $correctAnswers = Answer::with('question')
-            ->whereHas('question', function($q) use ($exam) {
-                $q->where('prueba_id', $exam->prueba_id);
-            })
-            ->where('correcto', 1)
-            ->where('activo', 'si')
-            ->get()
-            ->keyBy(function ($item) {
-                return $item->pregunta_id . '-' . $item->id;
-            });
-
-        foreach ($answers as $ans) {
-            $key = $ans->name . '-' . $ans->value;
-            if ($correctAnswers->has($key)) {
-                $correct = $correctAnswers->get($key);
-                $exam->total_correctas++;
-                if (isset($correct->question->score)) {
-                    $exam->score_total += $correct->question->score;
-                }
+        if ($request->has('answers') && ! $this->isTimeExpired($exam, 15)) {
+            $incoming = $request->input('answers', []);
+            if (is_string($incoming)) {
+                $incoming = json_decode($incoming, true) ?: [];
+            }
+            if (is_array($incoming)) {
+                $merged = $this->mergeAndDeduplicateAnswers($exam, $incoming);
+                $exam->respuestas_json = json_encode($merged);
             }
         }
 
-        // (Opcional) Lógica de entrega tardía
-        $isLate = false;
-        // Aquí se puede agregar la lógica de isLate comparando con el ContenidoProgramado
+        $this->gradeExam($exam);
 
-        $exam->finalizado = 'si';
-        $exam->is_late = $isLate;
-        $exam->save();
+        if ($exam->retro_visualizado === 'si') {
+            return redirect()
+                ->route('alumno.exam.preview', ['quiz_id' => $exam->prueba_id])
+                ->with('success', 'Examen enviado exitosamente.');
+        }
 
-        return redirect()->route('alumno.exam.feedback', ['exam_id' => $exam->id])
+        return redirect()
+            ->route('alumno.exam.feedback', ['exam_id' => $exam->id])
             ->with('success', 'Examen enviado exitosamente.');
     }
 
     /**
-     * Muestra la retroalimentación del examen
+     * Muestra la retroalimentación del examen validando finalizado, vigencia y bloqueo retro_visualizado.
      */
-    public function feedback($exam_id)
+    public function feedback(Request $request, $exam_id)
     {
-        $exam = Exam::with(['quiz', 'enrollment'])->findOrFail($exam_id);
-        $user = Auth::user();
+        $exam = $this->accessService->requireExamOwnership($request->user(), (int) $exam_id);
+        $scheduledCourseId = $exam->enrollment?->curso_programado_id;
 
-        // Verificar que el examen pertenece al usuario a través de la inscripción
-        if ($exam->enrollment->user_id !== $user->id) {
-            abort(403);
+        if ($exam->finalizado !== 'si') {
+            return redirect()
+                ->route('alumno.exam.take', [
+                    'quiz_id' => $exam->prueba_id,
+                    'enrollment_id' => $exam->inscripcion_id,
+                ])
+                ->with('error', 'Debes finalizar el examen antes de consultar la retroalimentación.');
         }
 
-        if ($exam->retro_visualizado === 'no') {
-            $exam->retro_visualizado = 'si';
-            $exam->save();
+        $availability = $this->evaluateFeedbackAvailability($exam);
+
+        if (! $availability['available']) {
+            $message = $availability['status'] === 'expired'
+                ? 'El tiempo de visualización de la retroalimentación ha concluido.'
+                : 'La retroalimentación de este examen ya fue visualizada o se encuentra bloqueada.';
+
+            if ($scheduledCourseId) {
+                return redirect()
+                    ->route('cursos.detallado', ['id' => $scheduledCourseId])
+                    ->with('error', $message);
+            }
+
+            return redirect()
+                ->route('alumno.exam.preview', ['quiz_id' => $exam->prueba_id])
+                ->with('error', $message);
         }
 
-        $answers = $exam->answers_snapshot ? collect(json_decode($exam->answers_snapshot)) : collect([]);
+        // Consumir bloqueo de retroalimentación preservando updated_at original del cierre del examen
+        $exam->timestamps = false;
+        $exam->retro_visualizado = 'si';
+        $exam->save();
+        $exam->timestamps = true;
+
+        $answers = collect($this->decodeAnswersSnapshot($exam));
 
         $correctAnswersDb = Answer::with('question')
-            ->whereHas('question', function($q) use ($exam) {
-                $q->where('prueba_id', $exam->prueba_id);
-            })
+            ->whereHas('question', fn ($q) => $q->where('prueba_id', $exam->prueba_id)->where('activo', 'si'))
             ->where('correcto', 1)
             ->where('activo', 'si')
-            ->get();
+            ->get()
+            ->each(fn (Answer $ans) => $ans->makeVisible(['correcto', 'is_correct']));
 
-        $correctAnswersById = $correctAnswersDb->keyBy(function($r) { return $r->pregunta_id . '-' . $r->id; });
+        $correctAnswersById = $correctAnswersDb->keyBy(fn (Answer $r) => $r->pregunta_id.'-'.$r->id);
         $correctAnswersByQuestion = $correctAnswersDb->keyBy('pregunta_id');
         $userAnswersByQuestion = $answers->keyBy('name');
 
-        $questions = Question::with(['answers' => function($q){$q->where('activo','si');}])->where('prueba_id', $exam->prueba_id)->get();
+        $questions = Question::with(['answers' => function ($q) {
+            $q->where('activo', 'si')->orderBy('posicion', 'asc')->orderBy('id', 'asc');
+        }])
+            ->where('prueba_id', $exam->prueba_id)
+            ->where('activo', 'si')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $questions->each(function (Question $question) {
+            $question->answers->each(fn (Answer $ans) => $ans->makeVisible(['correcto', 'is_correct']));
+        });
 
         $feedback = [];
 
@@ -266,50 +406,26 @@ class ExamController extends Controller
             $correctAnswer = $correctAnswersByQuestion->get($question->id);
             $userAnswerData = $userAnswersByQuestion->get($question->id);
 
-            if (!$userAnswerData) {
+            if (! $userAnswerData) {
                 $feedback[] = [
                     'status' => 'unanswered',
                     'user_answer' => ['name' => $question->id, 'value' => null],
-                    'correct_answer' => $correctAnswer
+                    'correct_answer' => $correctAnswer,
                 ];
             } else {
-                $key = $userAnswerData->name . '-' . $userAnswerData->value;
+                $key = $userAnswerData['name'].'-'.$userAnswerData['value'];
                 if ($correctAnswersById->has($key)) {
                     $feedback[] = [
                         'status' => 'correct',
                         'user_answer' => $userAnswerData,
-                        'correct_answer' => $correctAnswer
+                        'correct_answer' => $correctAnswer,
                     ];
                 } else {
                     $feedback[] = [
                         'status' => 'incorrect',
                         'user_answer' => $userAnswerData,
-                        'correct_answer' => $correctAnswer
+                        'correct_answer' => $correctAnswer,
                     ];
-                }
-            }
-        }
-
-        // Calcular tiempo de vigencia de la retroalimentación
-        $feedbackTimeLeft = 0;
-        if ($exam->quiz && $exam->quiz->tiempo_vigencia) {
-            $timeParts = explode(':', $exam->quiz->tiempo_vigencia);
-            if (count($timeParts) === 3) {
-                $vigenciaSeconds = ((int)$timeParts[0] * 3600) + ((int)$timeParts[1] * 60) + (int)$timeParts[2];
-            } else {
-                $vigenciaSeconds = (int)$exam->quiz->tiempo_vigencia * 60;
-            }
-            
-            if ($vigenciaSeconds > 0) {
-                // Ticking from the moment the exam was finished (updated_at is updated when finalizado='si' is saved)
-                $elapsedSeconds = max(0, (int) \Carbon\Carbon::parse($exam->updated_at)->diffInSeconds(\Carbon\Carbon::now(), false));
-                $feedbackTimeLeft = max(0, $vigenciaSeconds - $elapsedSeconds);
-                
-                // Si el tiempo expiró, redirigir
-                if ($feedbackTimeLeft <= 0) {
-                    $redirectId = $exam->enrollment->curso_programado_id ?? $exam->enrollment->curso_id;
-                    return redirect()->route('cursos.detallado', ['id' => $redirectId])
-                        ->with('error', 'El tiempo de visualización de la retroalimentación ha concluido.');
                 }
             }
         }
@@ -318,70 +434,301 @@ class ExamController extends Controller
             'exam' => $exam,
             'feedback' => $feedback,
             'questions' => $questions,
-            'timeLeft' => $feedbackTimeLeft,
-            'examCriteria' => \App\Services\ExamCriteriaService::getAll(),
+            'timeLeft' => $availability['time_left'] ?? 0,
+            'scheduled_course_id' => $scheduledCourseId,
+            'examCriteria' => ExamCriteriaService::getAll(),
         ]);
     }
 
     /**
-     * Registra un evento anti-trampas (ej. cambio de pestaña)
+     * Registra un evento anti-trampas (cambio de pestaña, pérdida de foco, etc.).
      */
     public function registrarEvento(Request $request, $exam_id)
     {
-        $exam = Exam::findOrFail($exam_id);
+        $exam = $this->accessService->requireExamOwnership($request->user(), (int) $exam_id);
 
         if ($exam->finalizado === 'si') {
             return response()->json(['success' => false, 'message' => 'Examen finalizado.']);
         }
 
-        $array = $exam->eventos ?? [];
-        $array[] = [
-            "fecha_hora" => date('Y-m-d H:i:s'),
-            "observacion" => $request->input('observacion', 'Cambio de pestaña o pérdida de foco'),
-            "tecla" => $request->input('tecla', ''),
-            "lugar" => $request->input('lugar', 'Navegador Web')
+        $events = is_array($exam->eventos) ? $exam->eventos : [];
+        $events[] = [
+            'fecha_hora' => now()->format('Y-m-d H:i:s'),
+            'observacion' => mb_substr((string) $request->input('observacion', 'Cambio de pestaña o pérdida de foco'), 0, 255),
+            'tecla' => mb_substr((string) $request->input('tecla', ''), 0, 100),
+            'lugar' => mb_substr((string) $request->input('lugar', 'Navegador Web'), 0, 100),
         ];
-        
-        $exam->eventos = $array;
+
+        $exam->eventos = $events;
         $exam->save();
 
         return response()->json(['success' => true]);
     }
 
     /**
-     * Finaliza abruptamente si el navegador se cierra o el tiempo expira
+     * Finaliza por imprevisto o infracción, calificando respuestas guardadas y evaluando is_late.
      */
     public function finalizarImprevisto(Request $request, $exam_id)
     {
-        $exam = Exam::findOrFail($exam_id);
+        $exam = $this->accessService->requireExamOwnership($request->user(), (int) $exam_id);
 
         if ($exam->finalizado === 'si') {
-            return response()->json(['success' => false]);
+            return response()->json(['success' => false, 'message' => 'Examen finalizado.']);
         }
 
-        // Se marcan eventos si es cierre forzoso
-        $array = $exam->eventos ?? [];
-        $array[] = [
-            "fecha_hora" => date('Y-m-d H:i:s'),
-            "observacion" => 'Finalización por imprevisto (tiempo expirado o navegador cerrado)',
-            "tecla" => '',
-            "lugar" => 'Navegador Web'
+        $observacion = (string) $request->input('observacion', 'Finalización por imprevisto (tiempo expirado o cierre forzoso)');
+        $tecla = (string) $request->input('tecla', '');
+
+        $events = is_array($exam->eventos) ? $exam->eventos : [];
+        $events[] = [
+            'fecha_hora' => now()->format('Y-m-d H:i:s'),
+            'observacion' => mb_substr($observacion, 0, 255),
+            'tecla' => mb_substr($tecla, 0, 100),
+            'lugar' => mb_substr((string) $request->input('lugar', 'Navegador Web'), 0, 100),
         ];
-        
-        $exam->eventos = $array;
+        $exam->eventos = $events;
 
-        // Se guardan las últimas respuestas recibidas
-        if ($request->has('answers')) {
-            $answersInput = $request->input('answers');
+        if ($request->has('answers') && ! $this->isTimeExpired($exam, 15)) {
+            $answersInput = $request->input('answers', []);
             if (is_string($answersInput)) {
-                $answersInput = json_decode($answersInput, true);
+                $answersInput = json_decode($answersInput, true) ?: [];
             }
-            $exam->answers_snapshot = json_encode($answersInput);
+            if (is_array($answersInput)) {
+                $merged = $this->mergeAndDeduplicateAnswers($exam, $answersInput);
+                $exam->respuestas_json = json_encode($merged);
+            }
         }
 
+        $user = $request->user();
+        $obsLower = mb_strtolower($observacion);
+        $isInfraction = $request->boolean('infraction')
+            || $request->boolean('infraccion')
+            || $request->boolean('is_infraction')
+            || $tecla !== ''
+            || (bool) $user->is_blocked
+            || (int) ($user->strikes ?? 0) >= 100
+            || str_contains($obsLower, 'infracc')
+            || str_contains($obsLower, 'normas')
+            || str_contains($obsLower, 'strike')
+            || str_contains($obsLower, 'bloque');
+
+        if ($isInfraction) {
+            $exam->retro_visualizado = 'si';
+        }
+
+        $this->gradeExam($exam);
+
+        return response()->json([
+            'success' => true,
+            'score' => (float) $exam->score_total,
+            'total_correctas' => (int) $exam->total_correctas,
+        ]);
+    }
+
+    /**
+     * Califica un examen de manera centralizada (reutilizado por finish y finalizarImprevisto).
+     */
+    protected function gradeExam(Exam $exam): Exam
+    {
+        $exam->loadMissing(['quiz', 'enrollment']);
+
+        $answers = collect($this->decodeAnswersSnapshot($exam))->keyBy('name');
+
+        $quizType = strtoupper((string) ($exam->quiz?->tipo ?? $exam->quiz?->type ?? 'EXANI'));
+        $score = str_contains($quizType, 'ENARM') ? 0.0 : 700.0;
+        $correctCount = 0;
+
+        $correctAnswers = Answer::with('question')
+            ->whereHas('question', fn ($q) => $q->where('prueba_id', $exam->prueba_id)->where('activo', 'si'))
+            ->where('correcto', 1)
+            ->where('activo', 'si')
+            ->get()
+            ->keyBy(fn (Answer $item) => $item->pregunta_id.'-'.$item->id);
+
+        foreach ($answers as $qId => $ans) {
+            $key = $qId.'-'.$ans['value'];
+            if ($correctAnswers->has($key)) {
+                $correct = $correctAnswers->get($key);
+                $correctCount++;
+                $score += (float) ($correct->question?->score ?? 0);
+            }
+        }
+
+        $isLate = false;
+        if ($exam->enrollment && $exam->quiz && $exam->quiz->leccion_id) {
+            $lesson = Lesson::withoutGlobalScopes()->find($exam->quiz->leccion_id);
+            if ($lesson) {
+                $isModule = empty($lesson->leccion_id) || (int) $lesson->leccion_id === 0;
+                $schedule = $this->accessService->evaluateSchedule(
+                    (int) $exam->enrollment->curso_programado_id,
+                    (int) $exam->enrollment->user_id,
+                    (int) $lesson->id,
+                    $isModule ? null : (int) $lesson->leccion_id,
+                    null,
+                    $exam->created_at ? Carbon::parse($exam->created_at) : now()
+                );
+                $isLate = (bool) ($schedule['is_late'] ?? false);
+            }
+        }
+
+        $exam->total_preguntas = Question::where('prueba_id', $exam->prueba_id)
+            ->where('activo', 'si')
+            ->count();
+        $exam->total_correctas = $correctCount;
+        $exam->score_total = $score;
         $exam->finalizado = 'si';
+        $exam->is_late = $isLate ? 1 : 0;
         $exam->save();
 
-        return response()->json(['success' => true]);
+        return $exam;
+    }
+
+    protected function parseDurationSeconds($raw): int
+    {
+        if ($raw === null || $raw === '' || $raw === 0 || $raw === '0') {
+            return 0;
+        }
+
+        $value = trim((string) $raw);
+        if (str_contains($value, ':')) {
+            $parts = explode(':', $value);
+            if (count($parts) === 3) {
+                return max(0, ((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2]);
+            }
+            if (count($parts) === 2) {
+                return max(0, ((int) $parts[0] * 3600) + ((int) $parts[1] * 60));
+            }
+        }
+
+        if (is_numeric($value)) {
+            return max(0, (int) $value * 60);
+        }
+
+        return 0;
+    }
+
+    protected function formatSecondsToHms(int $seconds): string
+    {
+        $valid = max(0, $seconds);
+        $h = (int) floor($valid / 3600);
+        $m = (int) floor(($valid % 3600) / 60);
+        $s = $valid % 60;
+
+        return sprintf('%02d:%02d:%02d', $h, $m, $s);
+    }
+
+    protected function isTimeExpired(Exam $exam, int $graceSeconds = 15): bool
+    {
+        $exam->loadMissing('quiz');
+        $timeLimitSeconds = $this->parseDurationSeconds($exam->quiz?->tiempo ?? $exam->quiz?->time_limit);
+        if ($timeLimitSeconds <= 0 || ! $exam->created_at) {
+            return false;
+        }
+
+        $deadline = Carbon::parse($exam->created_at)->addSeconds($timeLimitSeconds + $graceSeconds);
+
+        return now()->gt($deadline);
+    }
+
+    protected function decodeAnswersSnapshot(Exam $exam): array
+    {
+        $raw = $exam->respuestas_json;
+        $decoded = is_string($raw) ? json_decode($raw, true) : (is_array($raw) ? $raw : []);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return collect($decoded)
+            ->filter(fn ($item) => is_array($item) && isset($item['name'], $item['value']))
+            ->keyBy(fn ($item) => (int) $item['name'])
+            ->map(fn ($item, $qId) => [
+                'name' => (int) $qId,
+                'value' => (int) $item['value'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function mergeAndDeduplicateAnswers(Exam $exam, array $newAnswers): array
+    {
+        $validAnswersById = Answer::whereHas('question', fn ($q) => $q->where('prueba_id', $exam->prueba_id)->where('activo', 'si'))
+            ->where('activo', 'si')
+            ->get(['id', 'pregunta_id'])
+            ->keyBy('id');
+
+        $existingMap = collect($this->decodeAnswersSnapshot($exam))->keyBy('name');
+
+        $incomingMap = collect($newAnswers)
+            ->filter(function ($item) use ($validAnswersById) {
+                if (! is_array($item) || ! isset($item['name'], $item['value'])) {
+                    return false;
+                }
+                $qId = (int) $item['name'];
+                $ansId = (int) $item['value'];
+                $answerRow = $validAnswersById->get($ansId);
+
+                return $answerRow && (int) $answerRow->pregunta_id === $qId;
+            })
+            ->keyBy(fn ($item) => (int) $item['name'])
+            ->map(fn ($item) => [
+                'name' => (int) $item['name'],
+                'value' => (int) $item['value'],
+            ]);
+
+        return $existingMap->replace($incomingMap)->values()->all();
+    }
+
+    /**
+     * Evalúa disponibilidad y vigencia de retroalimentación según finalizado, retro_visualizado y tiempo_caducidad.
+     *
+     * @return array{available: bool, status: string, time_left: ?int}
+     */
+    protected function evaluateFeedbackAvailability(Exam $exam): array
+    {
+        if ($exam->finalizado !== 'si') {
+            return ['available' => false, 'status' => 'unfinished', 'time_left' => null];
+        }
+
+        if ($exam->retro_visualizado === 'si') {
+            return ['available' => false, 'status' => 'consumed', 'time_left' => 0];
+        }
+
+        $exam->loadMissing('quiz');
+        $caducidadRaw = $exam->quiz?->tiempo_caducidad ?? $exam->quiz?->tiempo_vigencia;
+
+        if ($caducidadRaw !== null && trim((string) $caducidadRaw) !== '') {
+            $caducidadStr = trim((string) $caducidadRaw);
+
+            if (preg_match('/^\d{4}-\d{2}-\d{2}/', $caducidadStr)) {
+                try {
+                    $expiresAt = Carbon::parse($caducidadStr);
+                    $timeLeft = max(0, (int) now()->diffInSeconds($expiresAt, false));
+
+                    if ($timeLeft <= 0) {
+                        return ['available' => false, 'status' => 'expired', 'time_left' => 0];
+                    }
+
+                    return ['available' => true, 'status' => 'available', 'time_left' => $timeLeft];
+                } catch (\Throwable $e) {
+                    // Fallback to duration parsing below
+                }
+            }
+
+            $vigenciaSeconds = $this->parseDurationSeconds($caducidadStr);
+            if ($vigenciaSeconds > 0) {
+                $finishedAt = $exam->updated_at ?? $exam->created_at ?? now();
+                $elapsedSeconds = max(0, (int) Carbon::parse($finishedAt)->diffInSeconds(now(), false));
+                $timeLeft = max(0, $vigenciaSeconds - $elapsedSeconds);
+
+                if ($timeLeft <= 0) {
+                    return ['available' => false, 'status' => 'expired', 'time_left' => 0];
+                }
+
+                return ['available' => true, 'status' => 'available', 'time_left' => $timeLeft];
+            }
+        }
+
+        return ['available' => true, 'status' => 'available', 'time_left' => null];
     }
 }

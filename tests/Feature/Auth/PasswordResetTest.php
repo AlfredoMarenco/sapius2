@@ -4,8 +4,13 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
+use Tests\Concerns\CreatesLegacySchema;
+
+uses(CreatesLegacySchema::class);
 
 beforeEach(function () {
+    $this->setUpLegacySchema();
+    $this->seedLegacyRoles();
     $this->skipUnlessFortifyHas(Features::resetPasswords());
 });
 

@@ -1,12 +1,23 @@
 import { Head, Link } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import React from 'react';
-import FaqAccordion, { type FaqItem } from '@/components/public/FaqAccordion';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import FaqAccordion from '@/components/public/FaqAccordion';
+import type {FaqItem} from '@/components/public/FaqAccordion';
 import { openMiniTest } from '@/components/public/MiniTestModal';
 import PlusGridPattern from '@/components/public/PlusGridPattern';
-import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
+import {
+    WHATSAPP_PHONE
+    
+} from '@/components/public/PricingCard';
+import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
 import { SapiusIsotype } from '@/components/public/SapiusLogo';
 import LandingLayout from '@/layouts/LandingLayout';
+
+export interface SlideRecord {
+    id: number | string;
+    img: string;
+}
 
 export interface TeacherRecord {
     id: number | string;
@@ -33,7 +44,7 @@ export interface ReviewRecord {
 }
 
 export interface WelcomeProps {
-    slides?: unknown[];
+    slides?: SlideRecord[];
     prides?: PrideRecord[];
     teachers?: TeacherRecord[];
     reviews?: ReviewRecord[];
@@ -188,22 +199,22 @@ const PLACEHOLDER_PRIDES: PrideRecord[] = [
     {
         id: 'pride-1',
         name: 'Premio CENEVAL al Desempeño de Excelencia',
-        text: 'El acompañamiento semanal y los simuladores del Método SUMA me permitieron llegar con total seguridad el día de mi examen EGEL Nutrición.',
-        text2: 'EGEL Plus Nutrición · Sobresaliente',
+        text: 'EGEL Plus Nutrición · Sobresaliente',
+        text2: 'El acompañamiento semanal y los simuladores del Método SUMA me permitieron llegar con total seguridad el día de mi examen EGEL Nutrición.',
         img: null,
     },
     {
         id: 'pride-2',
         name: 'Testimonio de Desempeño Sobresaliente',
-        text: 'Estudiar con videoclases concretas y exámenes diarios transformó por completo mi organización durante las 10 semanas de preparación.',
-        text2: 'EGEL Plus Medicina · Sobresaliente',
+        text: 'EGEL Plus Medicina · Sobresaliente',
+        text2: 'Estudiar con videoclases concretas y exámenes diarios transformó por completo mi organización durante las 10 semanas de preparación.',
         img: null,
     },
     {
         id: 'pride-3',
         name: 'Aprobación en Primera Aplicación',
-        text: 'La guía digital e impresa resume exactamente lo que necesitas dominar sin perder tiempo buscando bibliografía dispersa.',
-        text2: 'EGEL Plus Nutrición · Aprobado',
+        text: 'EGEL Plus Nutrición · Aprobado',
+        text2: 'La guía digital e impresa resume exactamente lo que necesitas dominar sin perder tiempo buscando bibliografía dispersa.',
         img: null,
     },
 ];
@@ -253,11 +264,32 @@ const HOME_FAQS: FaqItem[] = [
 ];
 
 export default function Welcome({
+    slides = [],
     prides = [],
     teachers = [],
     reviews = [],
     scheduledCourses,
 }: WelcomeProps) {
+    const activeSlides = Array.isArray(slides)
+        ? slides.filter((slide) => Boolean(slide?.img))
+        : [];
+    const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+
+    useEffect(() => {
+        if (activeSlides.length <= 1) {
+return;
+}
+
+        const interval = window.setInterval(() => {
+            setActiveSlideIndex((prev) => (prev + 1) % activeSlides.length);
+        }, 6000);
+
+        return () => window.clearInterval(interval);
+    }, [activeSlides.length]);
+
+    const currentSlideIdx =
+        activeSlides.length > 0 ? activeSlideIndex % activeSlides.length : 0;
+
     const displayedExperts =
         Array.isArray(teachers) && teachers.length > 0
             ? teachers.slice(0, 6)
@@ -274,8 +306,22 @@ export default function Welcome({
             : PLACEHOLDER_REVIEWS;
 
     const resolveTeacherImg = (img?: string | null) => {
-        if (!img) return '/img/brand2026/expert-placeholder.png';
-        if (img.startsWith('http') || img.startsWith('/')) return img;
+        if (!img) {
+return '/img/brand2026/expert-placeholder.png';
+}
+
+        if (img.startsWith('http') || img.startsWith('/')) {
+return img;
+}
+
+        return `/media/stream/${img}`;
+    };
+
+    const resolveSlideImg = (img: string) => {
+        if (img.startsWith('http') || img.startsWith('/')) {
+return img;
+}
+
         return `/media/stream/${img}`;
     };
 
@@ -483,6 +529,91 @@ export default function Welcome({
                     </div>
                 </div>
             </section>
+
+            {/* =========================================================
+                SECCIÓN 2.5: SLIDES ADMINISTRABLES DE BD (cuando existan)
+               ========================================================= */}
+            {activeSlides.length > 0 && (
+                <section
+                    aria-label="Avisos y convocatorias Sapius"
+                    className="bg-white pt-14 pb-2 sm:pt-18"
+                >
+                    <div className="mx-auto max-w-6xl px-5 sm:px-8">
+                        <div className="relative overflow-hidden rounded-[26px] border border-[#FF6B52]/45 bg-white p-2 shadow-[0_18px_40px_-14px_rgba(16,30,51,0.16)] sm:p-3">
+                            <div className="relative aspect-[16/6] min-h-[190px] w-full overflow-hidden rounded-[20px] bg-[#CFE4FF]/30">
+                                <img
+                                    src={resolveSlideImg(
+                                        activeSlides[currentSlideIdx].img,
+                                    )}
+                                    alt={`Convocatoria Sapius ${currentSlideIdx + 1}`}
+                                    onError={(e) => {
+                                        (
+                                            e.currentTarget as HTMLImageElement
+                                        ).src =
+                                            '/img/brand2026/card-simuladores.png';
+                                    }}
+                                    className="h-full w-full object-cover transition-opacity duration-300"
+                                />
+
+                                {activeSlides.length > 1 && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            aria-label="Slide anterior"
+                                            onClick={() =>
+                                                setActiveSlideIndex(
+                                                    (prev) =>
+                                                        (prev -
+                                                            1 +
+                                                            activeSlides.length) %
+                                                        activeSlides.length,
+                                                )
+                                            }
+                                            className="absolute top-1/2 left-3 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#101E33]/80 text-white shadow-md transition-colors hover:bg-[#FF6B52]"
+                                        >
+                                            <ChevronLeft className="h-5 w-5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label="Siguiente slide"
+                                            onClick={() =>
+                                                setActiveSlideIndex(
+                                                    (prev) =>
+                                                        (prev + 1) %
+                                                        activeSlides.length,
+                                                )
+                                            }
+                                            className="absolute top-1/2 right-3 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#101E33]/80 text-white shadow-md transition-colors hover:bg-[#FF6B52]"
+                                        >
+                                            <ChevronRight className="h-5 w-5" />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+
+                            {activeSlides.length > 1 && (
+                                <div className="mt-3 mb-1 flex items-center justify-center gap-2">
+                                    {activeSlides.map((slide, idx) => (
+                                        <button
+                                            key={slide.id}
+                                            type="button"
+                                            aria-label={`Ir al slide ${idx + 1}`}
+                                            onClick={() =>
+                                                setActiveSlideIndex(idx)
+                                            }
+                                            className={`h-2.5 rounded-full transition-all ${
+                                                idx === currentSlideIdx
+                                                    ? 'w-7 bg-[#FF6B52]'
+                                                    : 'w-2.5 bg-[#101E33]/25 hover:bg-[#101E33]/50'
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* =========================================================
                 SECCIÓN 3: NUESTRA EXPERIENCIA (page1_s2_y1050.png)
@@ -753,7 +884,7 @@ export default function Welcome({
                                     opciones adaptadas a ti.
                                 </p>
                                 <a
-                                    href="https://api.whatsapp.com/send?phone=529992988744&text=Hola%20Sapius%2C%20quiero%20conocer%20las%20opciones%20de%20estudio%20adaptadas%20a%20m%C3%AD."
+                                    href={`https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=Hola%20Sapius%2C%20quiero%20conocer%20las%20opciones%20de%20estudio%20adaptadas%20a%20m%C3%AD.`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="mt-4 inline-flex items-center justify-center rounded-full bg-[#06C156] px-8 py-3.5 text-base font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#05A84B]"
@@ -937,7 +1068,7 @@ export default function Welcome({
                             opciones adaptadas a ti.
                         </p>
                         <a
-                            href="https://api.whatsapp.com/send?phone=521234567890&text=Hola%20Sapius%2C%20quiero%20conocer%20las%20opciones%20de%20estudio%20adaptadas%20a%20m%C3%AD."
+                            href={`https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=Hola%20Sapius%2C%20quiero%20conocer%20las%20opciones%20de%20estudio%20adaptadas%20a%20m%C3%AD.`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-4 inline-flex items-center justify-center rounded-full bg-[#06C156] px-8 py-3.5 text-base font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#05A84B]"
@@ -1021,6 +1152,12 @@ export default function Welcome({
                                     <img
                                         src={resolveTeacherImg(expert.img)}
                                         alt={expert.name}
+                                        onError={(e) => {
+                                            (
+                                                e.currentTarget as HTMLImageElement
+                                            ).src =
+                                                '/img/brand2026/expert-placeholder.png';
+                                        }}
                                         className="h-58 w-auto object-contain object-bottom"
                                     />
                                 </div>
@@ -1081,16 +1218,16 @@ export default function Welcome({
                                             <h3 className="font-display text-base font-extrabold text-white leading-snug">
                                                 {item.name}
                                             </h3>
-                                            {item.text2 && (
+                                            {item.text && (
                                                 <p className="text-xs font-bold text-[#FF6B52] mt-0.5">
-                                                    {item.text2}
+                                                    {item.text}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
-                                    {item.text && (
+                                    {item.text2 && (
                                         <p className="mt-4 text-sm leading-relaxed text-white/85">
-                                            “{item.text}”
+                                            “{item.text2}”
                                         </p>
                                     )}
                                 </div>
@@ -1109,6 +1246,7 @@ export default function Welcome({
                                     const author = rev.user_name || rev.name || 'Alumno Sapius';
                                     const body = rev.content || rev.comment || '';
                                     const stars = Math.min(5, Math.max(1, Number(rev.rating ?? 5)));
+
                                     return (
                                         <div
                                             key={rev.id}

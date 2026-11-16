@@ -2,41 +2,62 @@
 
 namespace App\Http\Controllers\Api;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use App\Models\User;
+use App\Models\UserStrikeHistory;
+use App\Services\StrikeService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
     /**
      * Authenticate user from Electron app.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function login(Request $request)
     {
         $request->validate([
-            'username' => 'required',
-            'password' => 'required',
+            'username' => 'required|string',
+            'password' => 'required|string',
         ]);
 
         $user = User::where('username', $request->username)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Credenciales inválidas.'
+                'message' => 'Credenciales inválidas.',
             ], 401);
         }
 
+        if ($user->activo !== 'si') {
+            return response()->json([
+                'message' => 'Tu cuenta se encuentra desactivada. Por favor contacta a soporte.',
+            ], 403);
+        }
+
+        if (! Schema::hasColumn('users', 'api_token')) {
+            return response()->json([
+                'message' => 'Autenticación de escritorio no disponible en este entorno de pruebas.',
+            ], 503);
+        }
+
         // Destroy existing web session if any to enforce single active session
-        $previous_session = $user->session_id;
-        if ($previous_session) {
-            \Illuminate\Support\Facades\Session::getHandler()->destroy($previous_session);
-            $user->session_id = null;
+        if (Schema::hasColumn('users', 'session_id')) {
+            $previous_session = $user->session_id;
+            if ($previous_session) {
+                try {
+                    Session::getHandler()->destroy($previous_session);
+                } catch (\Throwable $e) {
+                    // Ignore if session handler store is not persistent (e.g. array driver in tests)
+                }
+                $user->session_id = null;
+            }
         }
 
         // Generate a new API token every time a new login occurs from Electron to invalidate previous Electron instances
@@ -48,7 +69,7 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'nombre' => $user->nombre,
                 'email' => $user->email,
-                'rol' => $user->rol, // Roles handled by Shinobi
+                'rol' => $user->rol, // Roles handled via User::getRolAttribute()
             ],
             'api_token' => $user->api_token,
         ]);
@@ -57,167 +78,148 @@ class AuthController extends Controller
     /**
      * Validate or link MAC address.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function validateMac(Request $request)
     {
         $request->validate([
-            'mac_address' => 'required',
+            'mac_address' => 'required|string',
         ]);
 
         $user = $request->user();
 
-        if ($user->is_blocked) {
+        if ((bool) $user->is_blocked || ($user->strikes ?? 0) >= 100) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tu cuenta ha sido bloqueada temporalmente por políticas de seguridad.',
-                'is_blocked' => true
+                'is_blocked' => true,
             ], 403);
         }
 
         // Check if user has "alumno" role
-        if (!$user->hasRole('alumno')) {
-             return response()->json([
+        if (! $user->hasRole('alumno')) {
+            return response()->json([
                 'success' => true,
-                'message' => 'Acceso libre para administradores/soporte.'
+                'message' => 'Acceso libre para administradores/soporte.',
             ]);
         }
 
-        if (!$user->mac_address) {
+        $normalizedMac = strtolower(trim((string) $request->mac_address));
+        if ($normalizedMac === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dirección MAC inválida.',
+                'is_blocked' => false,
+            ], 422);
+        }
+
+        if (! Schema::hasColumn('users', 'mac_address')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Control de dirección MAC no disponible en este entorno de pruebas.',
+                'is_blocked' => false,
+            ], 503);
+        }
+
+        if (! $user->mac_address) {
             // Link MAC address for the first time
-            $user->mac_address = $request->mac_address;
+            $user->mac_address = $normalizedMac;
             $user->save();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Dirección MAC vinculada con éxito.'
+                'message' => 'Dirección MAC vinculada con éxito.',
             ]);
         }
 
-        $macs = array_map('trim', explode(',', $user->mac_address));
-        if (!in_array($request->mac_address, $macs)) {
+        $macs = array_filter(array_map(fn ($mac) => strtolower(trim($mac)), explode(',', (string) $user->mac_address)));
+        if (! in_array($normalizedMac, $macs, true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Este dispositivo no está autorizado para esta cuenta. Por favor contacta a soporte.',
                 'pending_request' => true,
-                'is_blocked' => false
+                'is_blocked' => false,
             ], 403);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Dispositivo validado.'
+            'message' => 'Dispositivo validado.',
         ]);
     }
 
     /**
      * Request authorization for a new MAC address.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function requestMacAuth(Request $request)
     {
         $request->validate([
-            'mac_address' => 'required',
+            'mac_address' => 'required|string',
         ]);
 
         $user = $request->user();
-        if ($user->hasRole('alumno')) {
-            $user->pending_mac_address = $request->mac_address;
+        if ((bool) $user->is_blocked || ($user->strikes ?? 0) >= 100) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tu cuenta ha sido bloqueada temporalmente por políticas de seguridad.',
+                'is_blocked' => true,
+            ], 403);
+        }
+
+        $normalizedMac = strtolower(trim((string) $request->mac_address));
+        if ($user->hasRole('alumno') && Schema::hasColumn('users', 'pending_mac_address')) {
+            $user->pending_mac_address = $normalizedMac;
             $user->save();
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Solicitud de autorización enviada al administrador.'
+            'message' => 'Solicitud de autorización enviada al administrador.',
         ]);
     }
 
     /**
      * Register a security strike for the authenticated user from Electron.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function registerStrike(Request $request)
     {
         $user = $request->user();
-        if ($user) {
-            $action = $request->input('action', 'Unknown');
-            $details = $request->input('details', 'Electron App');
-            $points = 10; // Default
-
-            $isFeedbackMode = ($details === 'Feedback Mode');
-
-            // Map actions to severity points (Threshold = 100)
-            if (in_array($action, ['Copy', 'Cut', 'Paste', 'PrintScreen', 'Save', 'View Source', 'Snipping Tool', 'Mac Screenshot'])) {
-                $points = 34;
-            }
-            elseif (in_array($action, ['DevTools', 'F12'])) {
-                $points = 50;
-            }
-            elseif ($action === 'Right Click') {
-                $points = 20;
-            }
-            elseif (in_array($action, ['Shift', 'Restricted Key / Modifier'])) {
-                $points = 5;
-            }
-            elseif (strpos($action, 'Volume') !== false) {
-                $points = 0;
-            }
-
-            if ($isFeedbackMode && $points > 0) {
-                $points = 100;
-                $details = "se tocaron teclas prohibidas en la retro y es un bloqueo grabe";
-            }
-
-            $user->strikes += $points;
-
-            $status = 'warning';
-            if ($user->strikes >= 100) {
-                $user->is_blocked = true;
-                $status = 'blocked';
-            }
-
-            $user->save();
-
-            \App\Models\UserStrikeHistory::create([
-                'user_id' => $user->id,
-                'action' => $action,
-                'details' => $details,
-            ]);
-
-            return response()->json([
-                'status' => $status,
-                'strikes' => $user->strikes,
-                'max_strikes' => 100,
-                'points_added' => $points
-            ]);
+        if (! $user) {
+            return response()->json(['status' => 'error'], 401);
         }
-        return response()->json(['status' => 'error'], 400);
+
+        $action = (string) $request->input('action', 'Unknown');
+        $details = (string) $request->input('details', 'Electron App');
+
+        $result = app(StrikeService::class)->register($user, $action, $details);
+
+        return response()->json(array_merge($result, [
+            'is_blocked' => $result['blocked'],
+        ]));
     }
 
     /**
      * Get recent strikes and severity metrics for the locked view.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function getLockedDetails(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'No autorizado.'], 401);
         }
 
-        $history = \App\Models\UserStrikeHistory::where('user_id', $user->id)
+        $history = UserStrikeHistory::where('user_id', $user->id)
             ->latest()
             ->take(5)
             ->get();
 
-        $recentHistory = \App\Models\UserStrikeHistory::where('user_id', $user->id)
+        $recentHistory = UserStrikeHistory::where('user_id', $user->id)
             ->latest()
             ->take(10)
             ->get();
@@ -263,7 +265,7 @@ class AuthController extends Controller
             ],
             'avg_severity' => $avgSeverity,
             'is_grave_block' => $isGraveBlock,
-            'history' => $history
+            'history' => $history,
         ]);
     }
 }

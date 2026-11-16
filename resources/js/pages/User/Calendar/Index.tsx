@@ -1,14 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { useState, useMemo } from 'react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Calendar as CalendarIcon,
     Clock,
-    BookOpen,
     ChevronLeft,
     ChevronRight,
     CheckCircle2,
-    Circle,
     PlayCircle,
     LayoutGrid,
     List,
@@ -16,10 +12,21 @@ import {
     ArrowRight,
     X,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
+import AppLayout from '@/layouts/app-layout';
+import type { Auth } from '@/types';
 
 interface LessonItem {
     id: number;
@@ -79,8 +86,18 @@ interface CalendarProps {
 }
 
 const MONTH_NAMES = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
 ];
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -90,28 +107,50 @@ export default function CalendarIndex({
     courses = [],
     weeklyCalendars = [],
 }: CalendarProps) {
+    const { auth } = usePage<{ auth?: Auth }>().props;
+    const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+        enabled: true,
+        watermarkText: userEmail,
+        allowTextInputs: true,
+    });
+
     const [viewMode, setViewMode] = useState<'agenda' | 'month'>('agenda');
     const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
-    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(events[0] || null);
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+        events[0] || null,
+    );
     const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     const initialDate = useMemo(() => {
         const firstIso = events.find((e) => e.start_iso)?.start_iso;
+
         if (firstIso) {
             const parts = firstIso.split('-').map(Number);
+
             if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1])) {
                 return new Date(parts[0], parts[1] - 1, 1);
             }
         }
+
         const now = new Date();
+
         return new Date(now.getFullYear(), now.getMonth(), 1);
     }, [events]);
 
     const [currentMonth, setCurrentMonth] = useState<Date>(initialDate);
 
     const filteredEvents = useMemo(() => {
-        if (selectedCourseFilter === 'all') return events;
-        return events.filter((ev) => String(ev.scheduled_id) === selectedCourseFilter || ev.course_title === selectedCourseFilter);
+        if (selectedCourseFilter === 'all') {
+return events;
+}
+
+        return events.filter(
+            (ev) =>
+                String(ev.scheduled_id) === selectedCourseFilter ||
+                ev.course_title === selectedCourseFilter,
+        );
     }, [events, selectedCourseFilter]);
 
     const calendarDays = useMemo(() => {
@@ -120,16 +159,25 @@ export default function CalendarIndex({
         const firstDayOfMonth = new Date(year, month, 1);
         const lastDayOfMonth = new Date(year, month + 1, 0);
 
-        // Monday = 0 ... Sunday = 6
         const startOffset = (firstDayOfMonth.getDay() + 6) % 7;
         const totalDays = lastDayOfMonth.getDate();
 
-        const cells: Array<{ dateStr: string; dayNumber: number; isCurrentMonth: boolean; dayEvents: CalendarEvent[] }> = [];
+        const cells: Array<{
+            dateStr: string;
+            dayNumber: number;
+            isCurrentMonth: boolean;
+            dayEvents: CalendarEvent[];
+        }> = [];
 
         for (let i = 0; i < startOffset; i++) {
             const d = new Date(year, month, -startOffset + i + 1);
             const iso = d.toISOString().slice(0, 10);
-            cells.push({ dateStr: iso, dayNumber: d.getDate(), isCurrentMonth: false, dayEvents: [] });
+            cells.push({
+                dateStr: iso,
+                dayNumber: d.getDate(),
+                isCurrentMonth: false,
+                dayEvents: [],
+            });
         }
 
         for (let day = 1; day <= totalDays; day++) {
@@ -139,16 +187,27 @@ export default function CalendarIndex({
             const dayEvents = filteredEvents.filter((ev) => {
                 const s = ev.start_iso || '';
                 const e = ev.end_iso || s;
+
                 return s && iso >= s && iso <= e;
             });
-            cells.push({ dateStr: iso, dayNumber: day, isCurrentMonth: true, dayEvents });
+            cells.push({
+                dateStr: iso,
+                dayNumber: day,
+                isCurrentMonth: true,
+                dayEvents,
+            });
         }
 
         while (cells.length % 7 !== 0) {
             const nextIdx = cells.length - (startOffset + totalDays) + 1;
             const d = new Date(year, month + 1, nextIdx);
             const iso = d.toISOString().slice(0, 10);
-            cells.push({ dateStr: iso, dayNumber: d.getDate(), isCurrentMonth: false, dayEvents: [] });
+            cells.push({
+                dateStr: iso,
+                dayNumber: d.getDate(),
+                isCurrentMonth: false,
+                dayEvents: [],
+            });
         }
 
         return cells;
@@ -157,17 +216,24 @@ export default function CalendarIndex({
     return (
         <>
             <Head title="Calendario de Actividades" />
+            <StrikeAlert />
+            <Watermark />
 
-            <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+            <div
+                className={`mx-auto max-w-7xl space-y-8 px-4 py-8 select-none sm:px-6 lg:px-8 ${
+                    isBlurred ? 'pointer-events-none blur-xl' : ''
+                }`}
+            >
                 {/* Header & Controls */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2.5">
-                            <CalendarIcon className="w-8 h-8 text-blue-600" />
+                        <h1 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                            <CalendarIcon className="h-8 w-8 text-blue-600" />
                             Calendario de Actividades
                         </h1>
-                        <p className="text-neutral-500 text-sm mt-1">
-                            Consulta la programación, fechas de inicio/cierre y avance de lecciones de todos tus cursos inscritos.
+                        <p className="mt-1 text-sm text-neutral-500">
+                            Consulta la programación, fechas de inicio/cierre y avance de
+                            lecciones de todos tus cursos inscritos.
                         </p>
                     </div>
 
@@ -176,35 +242,49 @@ export default function CalendarIndex({
                             <select
                                 value={selectedCourseFilter}
                                 onChange={(e) => setSelectedCourseFilter(e.target.value)}
-                                className="h-9 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200"
+                                className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
                             >
-                                <option value="all">Todos mis cursos ({courses.length})</option>
+                                <option value="all">
+                                    Todos mis cursos ({courses.length})
+                                </option>
                                 {courses.map((c) => (
-                                    <option key={c.scheduled_id} value={String(c.scheduled_id)}>
+                                    <option
+                                        key={c.scheduled_id}
+                                        value={String(c.scheduled_id)}
+                                    >
                                         {c.title} {c.identifier ? `(${c.identifier})` : ''}
                                     </option>
                                 ))}
                             </select>
                         )}
 
-                        <div className="inline-flex rounded-xl bg-neutral-100 dark:bg-neutral-800 p-1">
+                        <div className="inline-flex rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
                             <Button
                                 type="button"
                                 size="sm"
                                 variant={viewMode === 'agenda' ? 'default' : 'ghost'}
                                 onClick={() => setViewMode('agenda')}
-                                className={viewMode === 'agenda' ? 'bg-blue-600 text-white h-8 px-3 text-xs' : 'h-8 px-3 text-xs'}
+                                className={
+                                    viewMode === 'agenda'
+                                        ? 'h-8 bg-blue-600 px-3 text-xs text-white'
+                                        : 'h-8 px-3 text-xs'
+                                }
                             >
-                                <List className="w-3.5 h-3.5 mr-1.5" /> Módulos y Clases
+                                <List className="mr-1.5 h-3.5 w-3.5" /> Módulos y Clases
                             </Button>
                             <Button
                                 type="button"
                                 size="sm"
                                 variant={viewMode === 'month' ? 'default' : 'ghost'}
                                 onClick={() => setViewMode('month')}
-                                className={viewMode === 'month' ? 'bg-blue-600 text-white h-8 px-3 text-xs' : 'h-8 px-3 text-xs'}
+                                className={
+                                    viewMode === 'month'
+                                        ? 'h-8 bg-blue-600 px-3 text-xs text-white'
+                                        : 'h-8 px-3 text-xs'
+                                }
                             >
-                                <LayoutGrid className="w-3.5 h-3.5 mr-1.5" /> Calendario Mensual
+                                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Calendario
+                                Mensual
                             </Button>
                         </div>
                     </div>
@@ -212,38 +292,61 @@ export default function CalendarIndex({
 
                 {/* Resumen de Cursos Inscritos */}
                 {courses.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {courses.map((course) => (
-                            <Card key={course.scheduled_id} className="border-neutral-200/80 dark:border-neutral-800 shadow-xs">
-                                <CardContent className="p-4 space-y-3">
+                            <Card
+                                key={course.scheduled_id}
+                                className="border-neutral-200/80 shadow-xs dark:border-neutral-800"
+                            >
+                                <CardContent className="space-y-3 p-4">
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
                                             {course.identifier && (
-                                                <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200 mb-1">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="mb-1 border-blue-200 text-[10px] text-blue-600"
+                                                >
                                                     {course.identifier}
                                                 </Badge>
                                             )}
-                                            <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 line-clamp-1">
+                                            <h3 className="line-clamp-1 text-sm font-bold text-neutral-900 dark:text-neutral-100">
                                                 {course.title}
                                             </h3>
-                                            <p className="text-xs text-neutral-500">Instructor: {course.instructor}</p>
+                                            <p className="text-xs text-neutral-500">
+                                                Instructor: {course.instructor}
+                                            </p>
                                         </div>
-                                        <Button asChild size="sm" variant="outline" className="h-7 px-2.5 text-xs shrink-0">
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 shrink-0 px-2.5 text-xs"
+                                        >
                                             <Link href={course.course_url}>
-                                                Ir al curso <ArrowRight className="w-3 h-3 ml-1" />
+                                                Ir al curso{' '}
+                                                <ArrowRight className="ml-1 h-3 w-3" />
                                             </Link>
                                         </Button>
                                     </div>
                                     <div className="space-y-1">
                                         <div className="flex justify-between text-[11px] text-neutral-500">
-                                            <span>Avance: {course.completed_lessons}/{course.total_lessons} lecciones</span>
-                                            <span className="font-bold text-blue-600">{course.progress}%</span>
+                                            <span>
+                                                Avance: {course.completed_lessons}/
+                                                {course.total_lessons} lecciones
+                                            </span>
+                                            <span className="font-bold text-blue-600">
+                                                {course.progress}%
+                                            </span>
                                         </div>
                                         <Progress value={course.progress} className="h-1.5" />
                                     </div>
-                                    <div className="flex items-center justify-between text-xs text-neutral-500 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                                        <span>Inicio: <strong>{course.start_date}</strong></span>
-                                        <span>Cierre: <strong>{course.end_date}</strong></span>
+                                    <div className="flex items-center justify-between border-t border-neutral-100 pt-2 text-xs text-neutral-500 dark:border-neutral-800">
+                                        <span>
+                                            Inicio: <strong>{course.start_date}</strong>
+                                        </span>
+                                        <span>
+                                            Cierre: <strong>{course.end_date}</strong>
+                                        </span>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -251,56 +354,78 @@ export default function CalendarIndex({
                     </div>
                 )}
 
-                {/* Vista Principal: Agenda interactiva con Detalle de Lecciones o Cuadrícula Mensual */}
+                {/* Vista Principal */}
                 {filteredEvents.length === 0 ? (
                     <Card className="p-12 text-center text-neutral-400">
-                        <CalendarIcon className="w-12 h-12 mx-auto mb-3 text-neutral-300" />
-                        <h3 className="font-semibold text-neutral-700 dark:text-neutral-300">No hay fechas programadas</h3>
-                        <p className="text-xs text-neutral-400 mt-1">Tus cursos activos aparecerán aquí en cuanto tengan módulos asignados.</p>
+                        <CalendarIcon className="mx-auto mb-3 h-12 w-12 text-neutral-300" />
+                        <h3 className="font-semibold text-neutral-700 dark:text-neutral-300">
+                            No hay fechas programadas
+                        </h3>
+                        <p className="mt-1 text-xs text-neutral-400">
+                            Tus cursos activos aparecerán aquí en cuanto tengan módulos
+                            asignados.
+                        </p>
                     </Card>
                 ) : viewMode === 'agenda' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
                         {/* Lista de Módulos */}
-                        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-7">
                             {filteredEvents.map((event) => {
                                 const isSelected = selectedEvent?.id === event.id;
+
                                 return (
                                     <Card
                                         key={event.id}
                                         onClick={() => setSelectedEvent(event)}
-                                        className={`p-5 cursor-pointer transition-all ${
+                                        className={`cursor-pointer p-5 transition-all ${
                                             isSelected
-                                                ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/20 dark:bg-blue-950/20'
-                                                : 'border-neutral-200/80 dark:border-neutral-800 hover:border-blue-300'
+                                                ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 dark:bg-blue-950/20'
+                                                : 'border-neutral-200/80 hover:border-blue-300 dark:border-neutral-800'
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
-                                            <div className="space-y-1 min-w-0">
-                                                <Badge variant="outline" className="text-blue-600 border-blue-200 text-[11px] truncate max-w-full">
+                                            <div className="min-w-0 space-y-1">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="max-w-full truncate border-blue-200 text-[11px] text-blue-600"
+                                                >
                                                     {event.course_title}
                                                 </Badge>
-                                                <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+                                                <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
                                                     {event.module_title}
                                                 </h3>
                                             </div>
-                                            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 shrink-0">
-                                                <Clock className="w-5 h-5" />
+                                            <div className="shrink-0 rounded-xl bg-blue-50 p-2.5 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
+                                                <Clock className="h-5 w-5" />
                                             </div>
                                         </div>
 
-                                        {typeof event.total_lessons === 'number' && event.total_lessons > 0 && (
-                                            <div className="mt-3 space-y-1">
-                                                <div className="flex justify-between text-[11px] text-neutral-500">
-                                                    <span>{event.completed_lessons || 0} de {event.total_lessons} clases</span>
-                                                    <span className="font-semibold text-blue-600">{event.progress || 0}%</span>
+                                        {typeof event.total_lessons === 'number' &&
+                                            event.total_lessons > 0 && (
+                                                <div className="mt-3 space-y-1">
+                                                    <div className="flex justify-between text-[11px] text-neutral-500">
+                                                        <span>
+                                                            {event.completed_lessons || 0}{' '}
+                                                            de {event.total_lessons} clases
+                                                        </span>
+                                                        <span className="font-semibold text-blue-600">
+                                                            {event.progress || 0}%
+                                                        </span>
+                                                    </div>
+                                                    <Progress
+                                                        value={event.progress || 0}
+                                                        className="h-1.5"
+                                                    />
                                                 </div>
-                                                <Progress value={event.progress || 0} className="h-1.5" />
-                                            </div>
-                                        )}
+                                            )}
 
-                                        <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400">
-                                            <span>Inicio: <strong>{event.start}</strong></span>
-                                            <span>Cierre: <strong>{event.end}</strong></span>
+                                        <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+                                            <span>
+                                                Inicio: <strong>{event.start}</strong>
+                                            </span>
+                                            <span>
+                                                Cierre: <strong>{event.end}</strong>
+                                            </span>
                                         </div>
                                     </Card>
                                 );
@@ -308,26 +433,27 @@ export default function CalendarIndex({
                         </div>
 
                         {/* Panel Lateral: Detalle de Lecciones del Módulo Seleccionado */}
-                        <div className="lg:col-span-5 sticky top-6">
+                        <div className="sticky top-6 lg:col-span-5">
                             {selectedEvent ? (
-                                <Card className="border-neutral-200 dark:border-neutral-800 shadow-md overflow-hidden">
+                                <Card className="overflow-hidden border-neutral-200 shadow-md dark:border-neutral-800">
                                     <CardHeader className="bg-gradient-to-r from-slate-900 to-blue-950 text-white">
-                                        <Badge className="w-fit bg-blue-500/20 text-blue-200 border border-blue-400/30 text-[10px]">
+                                        <Badge className="w-fit border border-blue-400/30 bg-blue-500/20 text-[10px] text-blue-200">
                                             {selectedEvent.course_title}
                                         </Badge>
-                                        <CardTitle className="text-lg font-bold text-white mt-1">
+                                        <CardTitle className="mt-1 text-lg font-bold text-white">
                                             {selectedEvent.module_title}
                                         </CardTitle>
-                                        <CardDescription className="text-blue-200 text-xs flex items-center gap-3 pt-1">
+                                        <CardDescription className="flex items-center gap-3 pt-1 text-xs text-blue-200">
                                             <span>Inicio: {selectedEvent.start}</span>
                                             <span>•</span>
                                             <span>Cierre: {selectedEvent.end}</span>
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardContent className="p-5 space-y-4">
+                                    <CardContent className="space-y-4 p-5">
                                         <div className="flex items-center justify-between">
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                                                Lecciones del Módulo ({selectedEvent.lessons?.length || 0})
+                                            <h4 className="text-xs font-bold tracking-wider text-neutral-500 uppercase">
+                                                Lecciones del Módulo (
+                                                {selectedEvent.lessons?.length || 0})
                                             </h4>
                                             {selectedEvent.course_url && (
                                                 <Link
@@ -339,29 +465,30 @@ export default function CalendarIndex({
                                             )}
                                         </div>
 
-                                        {!selectedEvent.lessons || selectedEvent.lessons.length === 0 ? (
-                                            <p className="text-sm text-neutral-400 italic py-4 text-center">
+                                        {!selectedEvent.lessons ||
+                                        selectedEvent.lessons.length === 0 ? (
+                                            <p className="py-4 text-center text-sm text-neutral-400 italic">
                                                 Este módulo aún no tiene clases publicadas.
                                             </p>
                                         ) : (
-                                            <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                                            <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
                                                 {selectedEvent.lessons.map((lesson, idx) => (
                                                     <Link
                                                         key={lesson.id}
                                                         href={lesson.url}
-                                                        className="flex items-center justify-between p-3 rounded-xl border border-neutral-200/70 dark:border-neutral-800 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-all group"
+                                                        className="group flex items-center justify-between rounded-xl border border-neutral-200/70 p-3 transition-all hover:border-blue-300 hover:bg-blue-50/40 dark:border-neutral-800 dark:hover:bg-blue-950/20"
                                                     >
-                                                        <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="flex min-w-0 items-center gap-3">
                                                             {lesson.is_completed ? (
-                                                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                                                                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                                                             ) : (
-                                                                <PlayCircle className="w-4 h-4 text-blue-500 shrink-0" />
+                                                                <PlayCircle className="h-4 w-4 shrink-0 text-blue-500" />
                                                             )}
-                                                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate group-hover:text-blue-600">
+                                                            <span className="truncate text-sm font-medium text-neutral-800 group-hover:text-blue-600 dark:text-neutral-200">
                                                                 {idx + 1}. {lesson.title}
                                                             </span>
                                                         </div>
-                                                        <span className="text-[11px] font-semibold text-blue-600 shrink-0 ml-2">
+                                                        <span className="ml-2 shrink-0 text-[11px] font-semibold text-blue-600">
                                                             Abrir →
                                                         </span>
                                                     </Link>
@@ -372,17 +499,19 @@ export default function CalendarIndex({
                                 </Card>
                             ) : (
                                 <Card className="p-8 text-center text-neutral-400">
-                                    Selecciona un módulo para ver el detalle de sus lecciones.
+                                    Selecciona un módulo para ver el detalle de sus
+                                    lecciones.
                                 </Card>
                             )}
                         </div>
                     </div>
                 ) : (
                     /* Vista de Cuadrícula Mensual Interactiva */
-                    <Card className="border-neutral-200/80 dark:border-neutral-800 shadow-sm overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between border-b border-neutral-100 dark:border-neutral-800 py-4">
+                    <Card className="overflow-hidden border-neutral-200/80 shadow-sm dark:border-neutral-800">
+                        <CardHeader className="flex flex-row items-center justify-between border-b border-neutral-100 py-4 dark:border-neutral-800">
                             <CardTitle className="text-lg font-bold">
-                                {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                                {MONTH_NAMES[currentMonth.getMonth()]}{' '}
+                                {currentMonth.getFullYear()}
                             </CardTitle>
                             <div className="flex items-center gap-2">
                                 <Button
@@ -390,9 +519,17 @@ export default function CalendarIndex({
                                     variant="outline"
                                     size="icon"
                                     className="h-8 w-8"
-                                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+                                    onClick={() =>
+                                        setCurrentMonth(
+                                            new Date(
+                                                currentMonth.getFullYear(),
+                                                currentMonth.getMonth() - 1,
+                                                1,
+                                            ),
+                                        )
+                                    }
                                 >
-                                    <ChevronLeft className="w-4 h-4" />
+                                    <ChevronLeft className="h-4 w-4" />
                                 </Button>
                                 <Button
                                     type="button"
@@ -401,7 +538,9 @@ export default function CalendarIndex({
                                     className="h-8 text-xs"
                                     onClick={() => {
                                         const now = new Date();
-                                        setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                                        setCurrentMonth(
+                                            new Date(now.getFullYear(), now.getMonth(), 1),
+                                        );
                                     }}
                                 >
                                     Hoy
@@ -411,16 +550,27 @@ export default function CalendarIndex({
                                     variant="outline"
                                     size="icon"
                                     className="h-8 w-8"
-                                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+                                    onClick={() =>
+                                        setCurrentMonth(
+                                            new Date(
+                                                currentMonth.getFullYear(),
+                                                currentMonth.getMonth() + 1,
+                                                1,
+                                            ),
+                                        )
+                                    }
                                 >
-                                    <ChevronRight className="w-4 h-4" />
+                                    <ChevronRight className="h-4 w-4" />
                                 </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="grid grid-cols-7 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
+                            <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
                                 {WEEKDAYS.map((day) => (
-                                    <div key={day} className="py-2.5 text-center text-xs font-bold uppercase tracking-wider text-neutral-500">
+                                    <div
+                                        key={day}
+                                        className="py-2.5 text-center text-xs font-bold tracking-wider text-neutral-500 uppercase"
+                                    >
                                         {day}
                                     </div>
                                 ))}
@@ -430,10 +580,14 @@ export default function CalendarIndex({
                                     <div
                                         key={cell.dateStr}
                                         className={`min-h-[100px] p-2 transition-colors ${
-                                            cell.isCurrentMonth ? 'bg-white dark:bg-neutral-950' : 'bg-neutral-50/60 dark:bg-neutral-900/40 text-neutral-400'
+                                            cell.isCurrentMonth
+                                                ? 'bg-white dark:bg-neutral-950'
+                                                : 'bg-neutral-50/60 text-neutral-400 dark:bg-neutral-900/40'
                                         }`}
                                     >
-                                        <div className="text-xs font-semibold mb-1">{cell.dayNumber}</div>
+                                        <div className="mb-1 text-xs font-semibold">
+                                            {cell.dayNumber}
+                                        </div>
                                         <div className="space-y-1">
                                             {cell.dayEvents.slice(0, 3).map((ev) => (
                                                 <button
@@ -443,14 +597,14 @@ export default function CalendarIndex({
                                                         setSelectedEvent(ev);
                                                         setViewMode('agenda');
                                                     }}
-                                                    className="w-full text-left truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60"
+                                                    className="w-full truncate rounded border border-blue-200/60 bg-blue-50 px-1.5 py-0.5 text-left text-[10px] font-medium text-blue-700 hover:bg-blue-100"
                                                     title={`${ev.course_title} — ${ev.module_title} (${ev.start} al ${ev.end})`}
                                                 >
                                                     {ev.module_title}
                                                 </button>
                                             ))}
                                             {cell.dayEvents.length > 3 && (
-                                                <div className="text-[10px] text-neutral-400 pl-1">
+                                                <div className="pl-1 text-[10px] text-neutral-400">
                                                     +{cell.dayEvents.length - 3} más
                                                 </div>
                                             )}
@@ -462,17 +616,20 @@ export default function CalendarIndex({
                     </Card>
                 )}
 
-                {/* Calendarios Semanales Gráficos (si el curso tiene imágenes subidas) */}
+                {/* Calendarios Semanales Gráficos (Protegidos contra clic derecho, arrastre y descarga) */}
                 {weeklyCalendars.length > 0 && (
                     <div className="space-y-4 pt-4">
-                        <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                            <ImageIcon className="w-5 h-5 text-blue-600" />
+                        <h2 className="flex items-center gap-2 text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                            <ImageIcon className="h-5 w-5 text-blue-600" />
                             Calendarios Semanales Oficiales
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                             {weeklyCalendars.map((cal) => (
-                                <Card key={cal.id} className="overflow-hidden border-neutral-200/80 dark:border-neutral-800">
-                                    <CardHeader className="py-3 px-4 bg-neutral-50 dark:bg-neutral-900 border-b">
+                                <Card
+                                    key={cal.id}
+                                    className="overflow-hidden border-neutral-200/80 dark:border-neutral-800"
+                                >
+                                    <CardHeader className="border-b bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
                                         <CardTitle className="text-sm font-bold">
                                             {cal.group_name || 'Calendario Semanal'}
                                         </CardTitle>
@@ -483,12 +640,33 @@ export default function CalendarIndex({
                                         )}
                                     </CardHeader>
                                     <CardContent className="p-4 text-center">
-                                        <img
-                                            src={cal.image_url}
-                                            alt={cal.group_name || 'Calendario Semanal'}
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={() => setPreviewImage(cal.image_url)}
-                                            className="w-full h-auto rounded-lg cursor-zoom-in hover:opacity-95 transition-opacity"
-                                        />
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    setPreviewImage(cal.image_url);
+                                                }
+                                            }}
+                                            onContextMenu={(e) => e.preventDefault()}
+                                            onDragStart={(e) => e.preventDefault()}
+                                            className="relative cursor-zoom-in overflow-hidden rounded-lg select-none"
+                                        >
+                                            <img
+                                                src={cal.image_url}
+                                                alt={cal.group_name || 'Calendario Semanal'}
+                                                draggable={false}
+                                                onContextMenu={(e) => e.preventDefault()}
+                                                onDragStart={(e) => e.preventDefault()}
+                                                className="pointer-events-none h-auto w-full rounded-lg transition-opacity select-none hover:opacity-95"
+                                            />
+                                            {/* Capa protectora invisible contra clic derecho / guardar imagen */}
+                                            <div
+                                                className="absolute inset-0 z-10"
+                                                onContextMenu={(e) => e.preventDefault()}
+                                            />
+                                        </div>
                                     </CardContent>
                                 </Card>
                             ))}
@@ -498,18 +676,37 @@ export default function CalendarIndex({
 
                 {previewImage && (
                     <div
-                        className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 select-none"
                         onClick={() => setPreviewImage(null)}
+                        onContextMenu={(e) => e.preventDefault()}
                     >
-                        <div className="relative max-w-5xl w-full">
+                        <div
+                            className="relative w-full max-w-5xl"
+                            onClick={(e) => e.stopPropagation()}
+                            onContextMenu={(e) => e.preventDefault()}
+                        >
                             <button
                                 type="button"
                                 onClick={() => setPreviewImage(null)}
                                 className="absolute -top-10 right-0 text-white hover:text-gray-300"
+                                aria-label="Cerrar vista ampliada"
                             >
-                                <X className="w-7 h-7" />
+                                <X className="h-7 w-7" />
                             </button>
-                            <img src={previewImage} alt="Calendario Semanal" className="w-full h-auto rounded-xl shadow-2xl" />
+                            <div className="relative overflow-hidden rounded-xl shadow-2xl">
+                                <img
+                                    src={previewImage}
+                                    alt="Calendario Semanal"
+                                    draggable={false}
+                                    onContextMenu={(e) => e.preventDefault()}
+                                    onDragStart={(e) => e.preventDefault()}
+                                    className="pointer-events-none h-auto w-full rounded-xl select-none"
+                                />
+                                <div
+                                    className="absolute inset-0 z-10"
+                                    onContextMenu={(e) => e.preventDefault()}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -518,11 +715,13 @@ export default function CalendarIndex({
     );
 }
 
-CalendarIndex.layout = (page: any) => (
-    <AppLayout breadcrumbs={[
-        { title: 'Panel de Alumno', href: '/alumno' },
-        { title: 'Calendario', href: '#' },
-    ]}>
+CalendarIndex.layout = (page: ReactNode) => (
+    <AppLayout
+        breadcrumbs={[
+            { title: 'Panel de Alumno', href: '/alumno' },
+            { title: 'Calendario', href: '#' },
+        ]}
+    >
         {page}
     </AppLayout>
 );

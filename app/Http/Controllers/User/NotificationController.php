@@ -10,21 +10,21 @@ class NotificationController extends Controller
     public function getNotifications(Request $request)
     {
         $user = $request->user();
-        
+
         $notifications = $user->notifications()->take(50)->get()->map(function ($notif) {
             return [
                 'id' => $notif->id,
                 'type' => $notif->type,
                 'data' => $notif->data,
                 'read_at' => $notif->read_at,
-                'created_at' => $notif->created_at->toIso8651String(),
+                'created_at' => $notif->created_at?->toIso8601String(),
             ];
         });
 
         return response()->json([
             'success' => true,
             'data' => $notifications,
-            'unread_count' => $user->unreadNotifications->count()
+            'unread_count' => $user->unreadNotifications->count(),
         ]);
     }
 
@@ -35,6 +35,7 @@ class NotificationController extends Controller
 
         if ($notification) {
             $notification->markAsRead();
+
             return response()->json(['success' => true]);
         }
 
@@ -45,6 +46,28 @@ class NotificationController extends Controller
     {
         $user = $request->user();
         $user->unreadNotifications->markAsRead();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function deleteNotification(Request $request, $id)
+    {
+        $user = $request->user();
+        $notification = $user->notifications()->find($id);
+
+        if ($notification) {
+            $notification->delete();
+
+            return response()->json(['success' => true]);
+        }
+
+        return response()->json(['success' => false], 404);
+    }
+
+    public function deleteAllNotifications(Request $request)
+    {
+        $user = $request->user();
+        $user->notifications()->delete();
 
         return response()->json(['success' => true]);
     }

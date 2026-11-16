@@ -3,32 +3,51 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Mail\AutoAceptacionEmail;
-use App\Mail\OxxoEmail;
-use App\Mail\TarjetaEmail;
+use App\Models\Discount;
 use App\Models\Enrollment;
 use App\Models\ScheduledCourse;
 use App\Models\User;
+use App\Services\EnrollmentFulfillmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use RuntimeException;
+use Throwable;
 
 class OpenPayWebhookController extends Controller
 {
+    private const TRANSACTION_ID_PATTERN = '/^[a-zA-Z0-9_-]{6,64}$/';
+
+    private EnrollmentFulfillmentService $fulfillmentService;
+
+    public function __construct(?EnrollmentFulfillmentService $fulfillmentService = null)
+    {
+        $this->fulfillmentService = $fulfillmentService ?? app(EnrollmentFulfillmentService::class);
+    }
+
     /**
      * Handle incoming OpenPay webhook notifications.
      */
     public function handleWebhook(Request $request): JsonResponse
     {
-        // 1. Basic Auth validation (if configured in .env / config)
-        $configuredUser = config('openpay.webhook_user');
-        $configuredPass = config('openpay.webhook_password');
+        // 1. Fail-closed Basic Auth validation
+        $configuredUser = (string) config('openpay.webhook_user', '');
+        $configuredPass = (string) config('openpay.webhook_password', '');
 
-        if (! empty($configuredUser) && ! empty($configuredPass)) {
-            if ($request->getUser() !== $configuredUser || $request->getPassword() !== $configuredPass) {
+        if ($configuredUser === '' || $configuredPass === '') {
+            if (! app()->environment('testing')) {
+                Log::critical('OpenPay Webhook: Credenciales webhook_user / webhook_password no configuradas en entorno no-testing.');
+
+                return response()->json(['error' => 'Webhook authentication not configured'], 500);
+            }
+        } else {
+            $providedUser = (string) ($request->getUser() ?? '');
+            $providedPass = (string) ($request->getPassword() ?? '');
+
+            if (! hash_equals($configuredUser, $providedUser) || ! hash_equals($configuredPass, $providedPass)) {
                 Log::warning('OpenPay Webhook: Intento de acceso no autorizado (Basic Auth inválido).');
 
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -58,11 +77,11 @@ class OpenPayWebhookController extends Controller
         }
 
         // 3. Process completed charge events
-        if (in_array($eventType, ['charge.succeeded', 'payout.succeeded', 'spei.received'])) {
+        if (in_array($eventType, ['charge.succeeded', 'payout.succeeded', 'spei.received'], true)) {
             return $this->processSuccessfulCharge($payload);
         }
 
-        // 4. Charge refunded or failed
+        // 4. Charge refunded or cancelled
         if ($eventType === 'charge.refunded') {
             return $this->processRefundedCharge($payload);
         }
@@ -75,27 +94,56 @@ class OpenPayWebhookController extends Controller
     }
 
     /**
-     * Process a completed payment (Card, OXXO Pay, SPEI).
+     * Process a completed payment (Card, OXXO Pay, SPEI) using exclusively S2S-verified OpenPay data.
      */
     protected function processSuccessfulCharge(array $payload): JsonResponse
     {
-        $transaction = $payload['transaction'] ?? [];
-        $transactionId = $transaction['id'] ?? null;
-        $orderId = $transaction['order_id'] ?? '';
-        $amount = (float) ($transaction['amount'] ?? 0);
-        $method = $transaction['method'] ?? 'card';
+        $transactionId = $payload['transaction']['id'] ?? null;
 
-        if (! $transactionId) {
-            Log::error('OpenPay Webhook: Transacción sin ID.', $payload);
+        if (! $this->isValidTransactionId($transactionId)) {
+            Log::warning('OpenPay Webhook: Transacción sin ID válido.');
 
-            return response()->json(['error' => 'Missing transaction id'], 400);
+            return response()->json(['error' => 'Invalid or missing transaction id'], 400);
         }
 
-        // Server-to-server verification with OpenPay API (OWASP Anti-Spoofing)
-        if (! $this->verifyTransactionWithOpenPay($transactionId)) {
+        try {
+            $verified = $this->verifyTransactionWithOpenPay($transactionId);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => 'Payment gateway verification temporarily unavailable'], 503);
+        }
+
+        if ($verified === null) {
+            if (empty(config('openpay.merchant_id')) || empty(config('openpay.private_key'))) {
+                return response()->json(['error' => 'OpenPay verification credentials not configured'], 500);
+            }
+
             Log::warning("OpenPay Webhook: Falló la verificación server-to-server para la transacción {$transactionId}.");
 
             return response()->json(['error' => 'Transaction verification failed'], 400);
+        }
+
+        // Use exclusively S2S-verified attributes from OpenPay API
+        $verifiedId = (string) ($verified['id'] ?? '');
+        $verifiedStatus = strtolower((string) ($verified['status'] ?? ''));
+        $orderId = (string) ($verified['order_id'] ?? '');
+        $amount = (float) ($verified['amount'] ?? 0);
+        $currency = strtoupper((string) ($verified['currency'] ?? ''));
+        $method = strtolower((string) ($verified['method'] ?? 'card'));
+
+        if ($verifiedId !== $transactionId || ! in_array($verifiedStatus, ['completed', 'paid', 'success'], true)) {
+            Log::warning("OpenPay Webhook: Estado o ID verificado inválido para {$transactionId}.", [
+                'verified_id' => $verifiedId,
+                'verified_status' => $verifiedStatus,
+            ]);
+
+            return response()->json(['error' => 'Verified transaction status is not completed'], 400);
+        }
+
+        $expectedCurrency = strtoupper((string) config('openpay.currency', 'MXN'));
+        if ($currency !== $expectedCurrency) {
+            Log::warning("OpenPay Webhook: Moneda inválida ({$currency}) para transacción {$transactionId}.");
+
+            return response()->json(['error' => 'Transaction currency mismatch'], 400);
         }
 
         // Parse order_id to resolve user_id and curso_programado_id
@@ -103,9 +151,9 @@ class OpenPayWebhookController extends Controller
         $userId = $parsed['user_id'];
         $cursoProgramadoId = $parsed['curso_programado_id'];
 
-        // Fallback: If userId is null, resolve from customer email
-        if (! $userId && isset($transaction['customer']['email'])) {
-            $userByEmail = User::where('email', $transaction['customer']['email'])->first();
+        // Fallback: If userId is null, resolve from verified customer email
+        if (! $userId && ! empty($verified['customer']['email'])) {
+            $userByEmail = User::where('email', $verified['customer']['email'])->first();
             if ($userByEmail) {
                 $userId = $userByEmail->id;
             }
@@ -142,6 +190,58 @@ class OpenPayWebhookController extends Controller
             return response()->json(['error' => 'Entities not found'], 404);
         }
 
+        // Uniqueness check for referencia across other enrollments
+        $existingByReference = Enrollment::where('referencia', $transactionId)->first();
+        if ($existingByReference && (
+            (int) $existingByReference->user_id !== (int) $user->id ||
+            (int) $existingByReference->curso_programado_id !== (int) $scheduledCourse->id
+        )) {
+            Log::warning("OpenPay Webhook: Referencia duplicada {$transactionId} ya asignada a inscripción {$existingByReference->id}.");
+
+            return response()->json(['error' => 'Transaction reference already assigned to another enrollment'], 409);
+        }
+
+        // Verify verified amount against ScheduledCourse->precio (accounting for associated coupon if present)
+        $existingEnrollment = Enrollment::where('user_id', $user->id)
+            ->where('curso_programado_id', $scheduledCourse->id)
+            ->first();
+
+        $originalPrice = round((float) $scheduledCourse->precio, 2);
+        $expectedAmount = $originalPrice;
+        $couponCode = null;
+
+        $candidateCoupon = $verified['metadata']['cupon']
+            ?? $verified['metadata']['coupon']
+            ?? $verified['metadata']['clave']
+            ?? $existingEnrollment?->clave
+            ?? ($orderId !== '' ? Cache::get("openpay_order_coupon:{$orderId}") : null);
+
+        if (is_string($candidateCoupon) && trim($candidateCoupon) !== '') {
+            $normalizedCoupon = strtoupper(trim($candidateCoupon));
+            $discount = Discount::where('clave', $normalizedCoupon)
+                ->where('curso_programado_id', $scheduledCourse->id)
+                ->first();
+
+            $alreadyRegisteredWithSameRef = $existingEnrollment && $existingEnrollment->referencia === $transactionId;
+
+            if ($discount && ($alreadyRegisteredWithSameRef || ($discount->activo === 'si' && (int) $discount->limite > 0))) {
+                $percent = max(0, min(100, (float) $discount->descuento));
+                $discountAmount = round($originalPrice * ($percent / 100), 2);
+                $expectedAmount = round(max(0, $originalPrice - $discountAmount), 2);
+                $couponCode = $discount->clave;
+            }
+        }
+
+        if ($amount <= 0 || round($amount, 2) !== round($expectedAmount, 2)) {
+            Log::warning("OpenPay Webhook: Discrepancia de monto para transacción {$transactionId}.", [
+                'verified_amount' => $amount,
+                'expected_amount' => $expectedAmount,
+                'order_id' => $orderId,
+            ]);
+
+            return response()->json(['error' => 'Verified amount mismatch'], 400);
+        }
+
         // Map OpenPay payment method to legacy tipo_pago
         $tipoPago = match ($method) {
             'store' => 'tienda',
@@ -149,105 +249,76 @@ class OpenPayWebhookController extends Controller
             default => 'tarjeta',
         };
 
-        // Atomic Enrollment Activation (Pessimistic locking to prevent race conditions)
-        $activated = false;
-        $enrollment = null;
-
-        DB::transaction(function () use (
-            $userId,
-            $cursoProgramadoId,
+        $enrollment = $this->fulfillmentService->fulfill(
+            $user,
+            $scheduledCourse,
             $transactionId,
             $tipoPago,
-            &$activated,
-            &$enrollment
-        ) {
-            $enrollment = Enrollment::where('user_id', $userId)
-                ->where('curso_programado_id', $cursoProgramadoId)
-                ->lockForUpdate()
-                ->first();
+            $amount,
+            $couponCode
+        );
 
-            if (! $enrollment) {
-                $enrollment = new Enrollment;
-                $enrollment->user_id = $userId;
-                $enrollment->curso_programado_id = $cursoProgramadoId;
-            }
-
-            // Idempotency: If already accepted, do not re-process
-            if ($enrollment->aceptado === 'si') {
-                Log::info("OpenPay Webhook: La inscripción {$enrollment->id} ya estaba previamente aceptada.");
-                $activated = false;
-
-                return;
-            }
-
-            $enrollment->aceptado = 'si';
-            $enrollment->referencia = $transactionId;
-            $enrollment->tipo_pago = $tipoPago;
-            $enrollment->save();
-
-            $activated = true;
-        });
-
-        if ($activated && $enrollment) {
-            Log::info("OpenPay Webhook: Inscripción activada exitosamente (ID: {$enrollment->id}, Usuario: {$user->email}, Curso: {$scheduledCourse->identificador})");
-
-            // Dispatch notification emails
-            try {
-                // 1. Send Auto-Acceptance email
-                Mail::to($user->email)
-                    ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                    ->send(new AutoAceptacionEmail($enrollment));
-
-                // 2. Send Payment Receipt email
-                if ($tipoPago === 'tienda') {
-                    $datosOxxo = [
-                        'name_alumno' => $user->name,
-                        'identificador' => $scheduledCourse->identificador,
-                        'precio' => $amount,
-                        'referencia' => $transaction['payment_method']['reference'] ?? $transactionId,
-                    ];
-                    Mail::to($user->email)
-                        ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                        ->send(new OxxoEmail($datosOxxo));
-                } else {
-                    $datosTarjeta = [
-                        'name_alumno' => $user->name,
-                        'identificador' => $scheduledCourse->identificador,
-                        'precio' => $amount,
-                        'id_carge' => $transactionId,
-                    ];
-                    Mail::to($user->email)
-                        ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                        ->send(new TarjetaEmail($datosTarjeta));
-                }
-            } catch (\Exception $e) {
-                Log::error("OpenPay Webhook: Error al despachar correos para inscripción {$enrollment->id}: ".$e->getMessage());
-            }
-        }
+        Log::info("OpenPay Webhook: Inscripción procesada (ID: {$enrollment->id}, Usuario: {$user->email}, Curso: {$scheduledCourse->identificador}, aceptado: {$enrollment->aceptado})");
 
         return response()->json([
             'status' => 'success',
             'message' => 'Payment processed successfully',
-            'enrollment_id' => $enrollment ? $enrollment->id : null,
+            'enrollment_id' => $enrollment->id,
         ], 200);
     }
 
     /**
-     * Handle refund notifications by revoking course access.
+     * Handle refund notifications by verifying S2S against OpenPay before revoking course access.
      */
     protected function processRefundedCharge(array $payload): JsonResponse
     {
-        $transaction = $payload['transaction'] ?? [];
-        $transactionId = $transaction['id'] ?? null;
+        $transactionId = $payload['transaction']['id'] ?? null;
 
-        if ($transactionId) {
-            $enrollment = Enrollment::where('referencia', $transactionId)->first();
+        if (
+            ! $this->isValidTransactionId($transactionId)
+            || in_array($transactionId, ['Cupon de descuento', 'Inscripción manual por Administrador', 'Inscripción agregada por administrador'], true)
+        ) {
+            Log::warning('OpenPay Webhook: Evento de reembolso ignorado por referencia no-transaccional o inválida.');
+
+            return response()->json([
+                'status' => 'ignored',
+                'message' => 'Non-transaction reference ignored',
+            ], 200);
+        }
+
+        try {
+            $verified = $this->verifyTransactionWithOpenPay($transactionId);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => 'Payment gateway verification temporarily unavailable'], 503);
+        }
+
+        if ($verified === null) {
+            if (empty(config('openpay.merchant_id')) || empty(config('openpay.private_key'))) {
+                return response()->json(['error' => 'OpenPay verification credentials not configured'], 500);
+            }
+
+            return response()->json(['error' => 'Transaction verification failed'], 400);
+        }
+
+        $verifiedStatus = strtolower((string) ($verified['status'] ?? ''));
+
+        if (! in_array($verifiedStatus, ['refunded', 'cancelled', 'canceled'], true)) {
+            Log::warning("OpenPay Webhook: Reembolso rechazado porque OpenPay reporta estado '{$verifiedStatus}' para {$transactionId}.");
+
+            return response()->json(['error' => 'Charge is not refunded or cancelled in OpenPay'], 400);
+        }
+
+        DB::transaction(function () use ($transactionId): void {
+            $enrollment = Enrollment::where('referencia', $transactionId)
+                ->lockForUpdate()
+                ->first();
+
             if ($enrollment) {
                 $enrollment->aceptado = 'no';
                 $enrollment->save();
-                Log::warning("OpenPay Webhook: Reembolso detectado. Inscripción {$enrollment->id} revocada (aceptado = 'no').");
+                Log::warning("OpenPay Webhook: Reembolso verificado. Inscripción {$enrollment->id} revocada (aceptado = 'no').");
             }
-        }
+        });
 
         return response()->json([
             'status' => 'success',
@@ -256,42 +327,74 @@ class OpenPayWebhookController extends Controller
     }
 
     /**
-     * Perform server-to-server query against OpenPay API to confirm transaction validity.
+     * Perform server-to-server query against OpenPay API and return the verified charge payload.
+     *
+     * Returns null when credentials are missing or OpenPay rejects the request (4xx).
+     * Throws RuntimeException (code 503) on transient HTTP/5xx failures so OpenPay can retry.
      */
-    protected function verifyTransactionWithOpenPay(string $transactionId): bool
+    protected function verifyTransactionWithOpenPay(string $transactionId): ?array
     {
-        $merchantId = config('openpay.merchant_id');
-        $privateKey = config('openpay.private_key');
-        $sandbox = config('openpay.sandbox', true);
-
-        if (empty($merchantId) || empty($privateKey)) {
-            Log::warning('OpenPay Webhook: Credenciales de OpenPay no configuradas; omitiendo verificación directa.');
-
-            return true;
+        if (! $this->isValidTransactionId($transactionId)) {
+            return null;
         }
 
-        try {
-            $baseUrl = $sandbox
-                ? "https://sandbox-api.openpay.mx/v1/{$merchantId}/charges/{$transactionId}"
-                : "https://api.openpay.mx/v1/{$merchantId}/charges/{$transactionId}";
+        $merchantId = (string) config('openpay.merchant_id', '');
+        $privateKey = (string) config('openpay.private_key', '');
+        $sandbox = filter_var(config('openpay.sandbox', true), FILTER_VALIDATE_BOOLEAN);
 
+        if ($merchantId === '' || $privateKey === '') {
+            Log::error('OpenPay Webhook: Credenciales de OpenPay no configuradas; verificación fail-closed.');
+
+            return null;
+        }
+
+        $domain = match (strtoupper((string) config('openpay.country', 'MX'))) {
+            'CO' => 'openpay.co',
+            'PE' => 'openpay.pe',
+            default => 'openpay.mx',
+        };
+
+        $baseUrl = $sandbox
+            ? "https://sandbox-api.{$domain}/v1/{$merchantId}/charges/{$transactionId}"
+            : "https://api.{$domain}/v1/{$merchantId}/charges/{$transactionId}";
+
+        try {
             $response = Http::withBasicAuth($privateKey, '')->timeout(10)->get($baseUrl);
 
             if ($response->successful()) {
                 $data = $response->json();
 
-                return in_array(strtolower($data['status'] ?? ''), ['completed', 'paid', 'success']);
+                if (! is_array($data)) {
+                    return null;
+                }
+
+                if (isset($data['id']) && (string) $data['id'] !== $transactionId) {
+                    return null;
+                }
+
+                return $data;
             }
 
-            Log::error("OpenPay API verify error HTTP {$response->status()}: ".$response->body());
+            if ($response->serverError() || $response->status() === 429) {
+                Log::error("OpenPay API verify transient HTTP {$response->status()}");
+                throw new RuntimeException('OpenPay API transient error', 503);
+            }
 
-            return false;
-        } catch (\Exception $e) {
-            Log::error('OpenPay API verify exception: '.$e->getMessage());
+            Log::error("OpenPay API verify rejected HTTP {$response->status()}");
 
-            // Fallback to true if network glitch so OpenPay doesn't keep retrying excessively, but log error
-            return true;
+            return null;
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('OpenPay API verify exception: '.str_replace($privateKey, '[REDACTED]', $e->getMessage()));
+
+            throw new RuntimeException('OpenPay API connection error', 503, $e);
         }
+    }
+
+    protected function isValidTransactionId(mixed $transactionId): bool
+    {
+        return is_string($transactionId) && preg_match(self::TRANSACTION_ID_PATTERN, $transactionId) === 1;
     }
 
     /**

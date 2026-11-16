@@ -5,15 +5,19 @@ namespace App\Traits;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Encoders\WebpEncoder;
+use Intervention\Image\ImageManager;
 
 trait OptimizesImages
 {
     /**
      * Optimiza y guarda una imagen subida en formato WebP (o almacenamiento estándar seguro como fallback).
      *
-     * @param UploadedFile $file El archivo subido
-     * @param string $folder La carpeta de destino dentro del disco publico (ej. 'courses')
-     * @param int $quality Nivel de calidad para WebP (0-100)
+     * @param  UploadedFile  $file  El archivo subido
+     * @param  string  $folder  La carpeta de destino dentro del disco publico (ej. 'courses')
+     * @param  int  $quality  Nivel de calidad para WebP (0-100)
      * @return string La ruta donde se guardó la imagen
      */
     protected function optimizeAndStoreImage(UploadedFile $file, string $folder, int $quality = 80): string
@@ -21,12 +25,12 @@ trait OptimizesImages
         $folderPath = trim($folder, '/');
 
         // Si la librería Intervention Image está instalada y disponible en el entorno
-        if (class_exists(\Intervention\Image\ImageManager::class)) {
+        if (class_exists(ImageManager::class)) {
             try {
-                if (class_exists(\Intervention\Image\Drivers\Gd\Driver::class)) {
-                    $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
+                if (class_exists(Driver::class)) {
+                    $manager = new ImageManager(new Driver);
                 } else {
-                    $manager = new \Intervention\Image\ImageManager();
+                    $manager = new ImageManager;
                 }
 
                 if (method_exists($manager, 'decode')) {
@@ -43,14 +47,14 @@ trait OptimizesImages
 
                 if (method_exists($image, 'toWebp')) {
                     $encoded = $image->toWebp($quality);
-                } elseif (class_exists(\Intervention\Image\Encoders\WebpEncoder::class)) {
-                    $encoded = $image->encode(new \Intervention\Image\Encoders\WebpEncoder(quality: $quality));
+                } elseif (class_exists(WebpEncoder::class)) {
+                    $encoded = $image->encode(new WebpEncoder(quality: $quality));
                 } else {
                     $encoded = $image->encode('webp', $quality);
                 }
 
-                $filename = Str::random(40) . '.webp';
-                $path = $folderPath . '/' . $filename;
+                $filename = Str::random(40).'.webp';
+                $path = $folderPath.'/'.$filename;
                 Storage::disk('public')->put($path, (string) $encoded);
 
                 return $path;
@@ -90,9 +94,10 @@ trait OptimizesImages
                     imagedestroy($src);
 
                     if ($webpData) {
-                        $filename = Str::random(40) . '.webp';
-                        $path = $folderPath . '/' . $filename;
+                        $filename = Str::random(40).'.webp';
+                        $path = $folderPath.'/'.$filename;
                         Storage::disk('public')->put($path, $webpData);
+
                         return $path;
                     }
                 }
@@ -102,9 +107,26 @@ trait OptimizesImages
         }
 
         // Último fallback estándar de Laravel si GD no procesa la imagen
-        $extension = $file->getClientOriginalExtension() ?: 'png';
-        $filename = Str::random(40) . '.' . $extension;
-        $path = $folderPath . '/' . $filename;
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+        $guessedExtension = strtolower((string) $file->guessExtension());
+        $clientExtension = strtolower((string) $file->getClientOriginalExtension());
+
+        if ($guessedExtension !== '' && ! in_array($guessedExtension, $allowedExtensions, true)) {
+            throw ValidationException::withMessages([
+                'image' => ['El archivo debe ser una imagen válida (jpg, jpeg, png o webp).'],
+            ]);
+        }
+
+        $extension = $guessedExtension !== '' ? $guessedExtension : $clientExtension;
+
+        if (! in_array($extension, $allowedExtensions, true)) {
+            throw ValidationException::withMessages([
+                'image' => ['El archivo debe ser una imagen válida (jpg, jpeg, png o webp).'],
+            ]);
+        }
+
+        $filename = Str::random(40).'.'.$extension;
+        $path = $folderPath.'/'.$filename;
         Storage::disk('public')->putFileAs($folderPath, $file, $filename);
 
         return $path;

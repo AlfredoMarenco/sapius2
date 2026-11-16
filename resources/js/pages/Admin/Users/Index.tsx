@@ -1,26 +1,48 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { 
-    Users, 
-    CheckCircle, 
-    XCircle, 
-    Eye, 
-    ShieldAlert, 
-    Check, 
-    X, 
-    Search, 
-    FileCheck, 
-    Unlock, 
-    Laptop, 
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    CheckCircle,
+    XCircle,
+    Eye,
+    Search,
+    FileCheck,
+    Unlock,
+    Laptop,
     AlertTriangle,
-    Edit3
+    Edit3,
+    UserPlus,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useState } from 'react';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 
 interface UserRecord {
     id: number;
@@ -37,6 +59,12 @@ interface UserRecord {
     created_at: string | null;
 }
 
+interface RoleOption {
+    id: number;
+    name: string;
+    slug?: string;
+}
+
 interface UsersProps {
     users: {
         data: UserRecord[];
@@ -51,10 +79,28 @@ interface UsersProps {
     };
     activeFilter: string;
     searchTerm: string;
+    roles?: RoleOption[];
 }
 
-export default function UsersIndex({ users, activeFilter = 'enable', searchTerm = '' }: UsersProps) {
+export default function UsersIndex({
+    users,
+    activeFilter = 'enable',
+    searchTerm = '',
+    roles = [],
+}: UsersProps) {
     const [search, setSearch] = useState(searchTerm);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    const createForm = useForm({
+        nombre: '',
+        apellido: '',
+        username: '',
+        email: '',
+        password: '',
+        password_confirmation: '',
+        rol_id: roles.length > 0 ? String(roles[0].id) : '',
+        role: 'alumno',
+    });
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -74,7 +120,11 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
     };
 
     const handleUnlock = (id: number) => {
-        if (confirm('¿Desbloquear la cuenta de este usuario y reiniciar sus infracciones a 0?')) {
+        if (
+            confirm(
+                '¿Desbloquear la cuenta de este usuario y reiniciar sus infracciones a 0?',
+            )
+        ) {
             router.post(`/admin/users/${id}/unlock`);
         }
     };
@@ -85,54 +135,87 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
         }
     };
 
+    const handleCreateUserSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        createForm.post('/admin/users/store', {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Usuario registrado correctamente');
+                setIsCreateModalOpen(false);
+                createForm.reset();
+            },
+            onError: () => {
+                toast.error('No se pudo crear el usuario. Revisa los datos.');
+            },
+        });
+    };
+
     return (
         <>
             <Head title="Gestión de Usuarios" />
 
-            <div className="p-6 max-w-8xl mx-auto space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="max-w-8xl mx-auto space-y-6 p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
                             Administración de Usuarios
                         </h1>
-                        <p className="text-sm text-neutral-500 mt-1">
-                            Control de cuentas ({users.total} en total), validación de expedientes y seguridad de hardware.
+                        <p className="mt-1 text-sm text-neutral-500">
+                            Control de cuentas ({users.total} en total), validación de
+                            expedientes y seguridad de hardware.
                         </p>
                     </div>
 
-                    {/* Filter Tabs */}
-                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl self-start">
+                    <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+                        {/* Filter Tabs */}
+                        <div className="flex items-center gap-2 rounded-xl bg-neutral-100 p-1.5 dark:bg-neutral-800">
+                            <Button
+                                asChild
+                                variant={activeFilter === 'enable' ? 'default' : 'ghost'}
+                                size="sm"
+                                className={
+                                    activeFilter === 'enable' ? 'bg-blue-600 text-white' : ''
+                                }
+                            >
+                                <Link href="/admin/users/enable">Activos</Link>
+                            </Button>
+                            <Button
+                                asChild
+                                variant={activeFilter === 'disable' ? 'default' : 'ghost'}
+                                size="sm"
+                                className={
+                                    activeFilter === 'disable' ? 'bg-blue-600 text-white' : ''
+                                }
+                            >
+                                <Link href="/admin/users/disable">Inactivos</Link>
+                            </Button>
+                            <Button
+                                asChild
+                                variant={activeFilter === 'blocked' ? 'default' : 'ghost'}
+                                size="sm"
+                                className={
+                                    activeFilter === 'blocked' ? 'bg-blue-600 text-white' : ''
+                                }
+                            >
+                                <Link href="/admin/users/blocked">Bloqueados</Link>
+                            </Button>
+                        </div>
+
                         <Button
-                            asChild
-                            variant={activeFilter === 'enable' ? 'default' : 'ghost'}
-                            size="sm"
-                            className={activeFilter === 'enable' ? 'bg-blue-600 text-white' : ''}
+                            type="button"
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="gap-2 bg-brand-navy text-white hover:bg-brand-blue"
                         >
-                            <Link href="/admin/users/enable">Activos</Link>
-                        </Button>
-                        <Button
-                            asChild
-                            variant={activeFilter === 'disable' ? 'default' : 'ghost'}
-                            size="sm"
-                            className={activeFilter === 'disable' ? 'bg-blue-600 text-white' : ''}
-                        >
-                            <Link href="/admin/users/disable">Inactivos</Link>
-                        </Button>
-                        <Button
-                            asChild
-                            variant={activeFilter === 'blocked' ? 'default' : 'ghost'}
-                            size="sm"
-                            className={activeFilter === 'blocked' ? 'bg-blue-600 text-white' : ''}
-                        >
-                            <Link href="/admin/users/blocked">Bloqueados</Link>
+                            <UserPlus className="h-4 w-4" />
+                            Nuevo Usuario
                         </Button>
                     </div>
                 </div>
 
                 {/* Search Bar */}
-                <form onSubmit={handleSearchSubmit} className="flex gap-2 max-w-md">
+                <form onSubmit={handleSearchSubmit} className="flex max-w-md gap-2">
                     <div className="relative flex-1">
-                        <Search className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
+                        <Search className="absolute top-3 left-3 h-4 w-4 text-neutral-400" />
                         <Input
                             placeholder="Buscar por nombre, correo, usuario o folio..."
                             className="pl-9"
@@ -157,7 +240,7 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                     )}
                 </form>
 
-                <Card className="border-neutral-200/80 dark:border-neutral-800 shadow-sm overflow-hidden">
+                <Card className="overflow-hidden border-neutral-200/80 shadow-sm dark:border-neutral-800">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-neutral-50/50 dark:bg-neutral-900/50">
@@ -174,19 +257,35 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                         <TableBody>
                             {users.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center py-12 text-neutral-400">
-                                        No se encontraron usuarios con los criterios especificados.
+                                    <TableCell
+                                        colSpan={8}
+                                        className="py-12 text-center text-neutral-400"
+                                    >
+                                        No se encontraron usuarios con los criterios
+                                        especificados.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 users.data.map((user) => (
-                                    <TableRow key={user.id} className={user.is_blocked ? 'bg-red-50/30 dark:bg-red-950/10' : ''}>
-                                        <TableCell className="font-mono text-xs text-neutral-500">{user.id}</TableCell>
+                                    <TableRow
+                                        key={user.id}
+                                        className={
+                                            user.is_blocked
+                                                ? 'bg-red-50/30 dark:bg-red-950/10'
+                                                : ''
+                                        }
+                                    >
+                                        <TableCell className="font-mono text-xs text-neutral-500">
+                                            {user.id}
+                                        </TableCell>
                                         <TableCell>
-                                            <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                            <div className="flex items-center gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
                                                 {user.name}
                                                 {user.is_blocked && (
-                                                    <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0">
+                                                    <Badge
+                                                        variant="destructive"
+                                                        className="h-4 px-1 py-0 text-[10px]"
+                                                    >
                                                         Bloqueado ({user.strikes} pts)
                                                     </Badge>
                                                 )}
@@ -199,17 +298,29 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                                             {user.email}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="capitalize text-xs font-semibold">
+                                            <Badge
+                                                variant="outline"
+                                                className="text-xs font-semibold capitalize"
+                                            >
                                                 {user.role}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
                                             {user.is_validated ? (
-                                                <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-xs">
+                                                <Badge
+                                                    className="cursor-pointer bg-emerald-600 text-xs text-white hover:bg-emerald-700"
+                                                    onClick={() => handleUnapprove(user.id)}
+                                                    title="Clic para revocar validación"
+                                                >
                                                     Validado
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 text-xs">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="cursor-pointer bg-amber-100 text-xs text-amber-800 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
+                                                    onClick={() => handleApprove(user.id)}
+                                                    title="Clic para aprobar"
+                                                >
                                                     Pendiente
                                                 </Badge>
                                             )}
@@ -217,23 +328,38 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                                         <TableCell>
                                             {user.pending_mac_address ? (
                                                 <Link href={`/admin/users/${user.id}/verify`}>
-                                                    <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs cursor-pointer gap-1">
-                                                        <AlertTriangle className="w-3 h-3" /> Cambio Pendiente
+                                                    <Badge className="cursor-pointer gap-1 bg-amber-500 text-xs text-white hover:bg-amber-600">
+                                                        <AlertTriangle className="h-3 w-3" />{' '}
+                                                        Cambio Pendiente
                                                     </Badge>
                                                 </Link>
                                             ) : user.mac_address ? (
                                                 <div className="flex items-center gap-1.5 font-mono text-xs text-neutral-600 dark:text-neutral-400">
-                                                    <Laptop className="w-3.5 h-3.5 text-neutral-400" />
-                                                    <span className="truncate max-w-[110px]" title={user.mac_address}>
+                                                    <Laptop className="h-3.5 w-3.5 text-neutral-400" />
+                                                    <span
+                                                        className="max-w-[110px] truncate"
+                                                        title={user.mac_address}
+                                                    >
                                                         {user.mac_address}
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-neutral-400 italic">Libre</span>
+                                                <span className="text-xs text-neutral-400 italic">
+                                                    Libre
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={user.is_active ? "outline" : "destructive"} className={user.is_active ? "border-emerald-300 text-emerald-700 dark:text-emerald-400" : ""}>
+                                            <Badge
+                                                variant={
+                                                    user.is_active ? 'outline' : 'destructive'
+                                                }
+                                                className={
+                                                    user.is_active
+                                                        ? 'border-emerald-300 text-emerald-700 dark:text-emerald-400'
+                                                        : ''
+                                                }
+                                            >
                                                 {user.is_active ? 'Activo' : 'Inactivo'}
                                             </Badge>
                                         </TableCell>
@@ -243,12 +369,14 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-8 px-2.5 gap-1.5 text-amber-600 hover:text-amber-700 border-amber-200 hover:bg-amber-50"
+                                                        className="h-8 gap-1.5 border-amber-200 px-2.5 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
                                                         onClick={() => handleUnlock(user.id)}
                                                         title="Desbloquear alumno y resetear strikes"
                                                     >
-                                                        <Unlock className="w-3.5 h-3.5" />
-                                                        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Desbloquear</span>
+                                                        <Unlock className="h-3.5 w-3.5" />
+                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                            Desbloquear
+                                                        </span>
                                                     </Button>
                                                 )}
 
@@ -256,19 +384,31 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-8 px-2.5 gap-1.5 text-neutral-500 hover:text-red-600 border-neutral-200 hover:bg-red-50"
+                                                        className="h-8 gap-1.5 border-neutral-200 px-2.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
                                                         onClick={() => handleClearMac(user.id)}
                                                         title="Desvincular MAC address"
                                                     >
-                                                        <Laptop className="w-3.5 h-3.5" />
-                                                        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Reset MAC</span>
+                                                        <Laptop className="h-3.5 w-3.5" />
+                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                            Reset MAC
+                                                        </span>
                                                     </Button>
                                                 )}
-                                                
-                                                <Button asChild size="sm" variant="outline" className="h-8 px-2.5 gap-1.5 text-orange-600 hover:text-orange-700 border-orange-200 hover:bg-orange-50">
-                                                    <Link href={`/admin/users/${user.id}/edit`} title="Editar Usuario">
-                                                        <Edit3 className="w-3.5 h-3.5" />
-                                                        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Editar</span>
+
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 gap-1.5 border-orange-200 px-2.5 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                                                >
+                                                    <Link
+                                                        href={`/admin/users/${user.id}/edit`}
+                                                        title="Editar Usuario"
+                                                    >
+                                                        <Edit3 className="h-3.5 w-3.5" />
+                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                            Editar
+                                                        </span>
                                                     </Link>
                                                 </Button>
 
@@ -276,33 +416,60 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 px-2.5 gap-1.5 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
+                                                    className="h-8 gap-1.5 border-blue-200 px-2.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                                                     title="Verificar Expediente y Documentación"
                                                 >
                                                     <Link href={`/admin/users/${user.id}/verify`}>
-                                                        <FileCheck className="w-3.5 h-3.5" />
-                                                        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Validar</span>
+                                                        <FileCheck className="h-3.5 w-3.5" />
+                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                            Validar
+                                                        </span>
                                                     </Link>
                                                 </Button>
 
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className={`h-8 px-2.5 gap-1.5 ${user.is_active ? 'text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50' : 'text-emerald-600 hover:text-emerald-700 border-emerald-200 hover:bg-emerald-50'}`}
+                                                    className={`h-8 gap-1.5 px-2.5 ${
+                                                        user.is_active
+                                                            ? 'border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700'
+                                                            : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'
+                                                    }`}
                                                     onClick={() => handleToggleActive(user.id)}
-                                                    title={user.is_active ? "Desactivar usuario" : "Activar usuario"}
+                                                    title={
+                                                        user.is_active
+                                                            ? 'Desactivar usuario'
+                                                            : 'Activar usuario'
+                                                    }
                                                 >
                                                     {user.is_active ? (
-                                                        <><XCircle className="w-3.5 h-3.5" /> <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Desactivar</span></>
+                                                        <>
+                                                            <XCircle className="h-3.5 w-3.5" />{' '}
+                                                            <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                                Desactivar
+                                                            </span>
+                                                        </>
                                                     ) : (
-                                                        <><CheckCircle className="w-3.5 h-3.5" /> <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Activar</span></>
+                                                        <>
+                                                            <CheckCircle className="h-3.5 w-3.5" />{' '}
+                                                            <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                                Activar
+                                                            </span>
+                                                        </>
                                                     )}
                                                 </Button>
 
-                                                <Button asChild size="sm" variant="outline" className="h-8 px-2.5 gap-1.5 text-slate-600 hover:text-slate-700 border-slate-200 hover:bg-slate-50">
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 gap-1.5 border-slate-200 px-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+                                                >
                                                     <Link href={`/admin/users/${user.id}/view`}>
-                                                        <Eye className="w-3.5 h-3.5" />
-                                                        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-widest">Detalles</span>
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
+                                                            Detalles
+                                                        </span>
                                                     </Link>
                                                 </Button>
                                             </div>
@@ -315,7 +482,7 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
 
                     {/* Pagination */}
                     {users.links && users.links.length > 3 && (
-                        <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50">
+                        <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50/50 px-6 py-4 dark:border-neutral-800 dark:bg-neutral-900/50">
                             <span className="text-xs text-neutral-500">
                                 Mostrando página {users.current_page} de {users.last_page}
                             </span>
@@ -330,12 +497,14 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                                         className="h-8 px-3 text-xs"
                                     >
                                         {link.url ? (
-                                            <Link 
-                                                href={link.url} 
-                                                dangerouslySetInnerHTML={{ __html: link.label }} 
+                                            <Link
+                                                href={link.url}
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
                                             />
                                         ) : (
-                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                            <span
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                            />
                                         )}
                                     </Button>
                                 ))}
@@ -344,15 +513,207 @@ export default function UsersIndex({ users, activeFilter = 'enable', searchTerm 
                     )}
                 </Card>
             </div>
+
+            {/* Modal de Alta Manual de Usuario */}
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+                <DialogContent className="sm:max-w-[520px]">
+                    <DialogHeader>
+                        <DialogTitle>Alta Manual de Usuario</DialogTitle>
+                        <DialogDescription>
+                            Crea una nueva cuenta de alumno, instructor o administrador.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new_nombre">Nombre(s) *</Label>
+                                <Input
+                                    id="new_nombre"
+                                    required
+                                    value={createForm.data.nombre}
+                                    onChange={(e) =>
+                                        createForm.setData('nombre', e.target.value)
+                                    }
+                                />
+                                {createForm.errors.nombre && (
+                                    <p className="text-xs text-red-500">
+                                        {createForm.errors.nombre}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new_apellido">Apellidos *</Label>
+                                <Input
+                                    id="new_apellido"
+                                    required
+                                    value={createForm.data.apellido}
+                                    onChange={(e) =>
+                                        createForm.setData('apellido', e.target.value)
+                                    }
+                                />
+                                {createForm.errors.apellido && (
+                                    <p className="text-xs text-red-500">
+                                        {createForm.errors.apellido}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new_username">Nombre de usuario *</Label>
+                                <Input
+                                    id="new_username"
+                                    required
+                                    value={createForm.data.username}
+                                    onChange={(e) =>
+                                        createForm.setData('username', e.target.value)
+                                    }
+                                />
+                                {createForm.errors.username && (
+                                    <p className="text-xs text-red-500">
+                                        {createForm.errors.username}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new_email">Correo electrónico *</Label>
+                                <Input
+                                    id="new_email"
+                                    type="email"
+                                    required
+                                    value={createForm.data.email}
+                                    onChange={(e) =>
+                                        createForm.setData('email', e.target.value)
+                                    }
+                                />
+                                {createForm.errors.email && (
+                                    <p className="text-xs text-red-500">
+                                        {createForm.errors.email}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Rol asignado *</Label>
+                            {roles.length > 0 ? (
+                                <Select
+                                    value={createForm.data.rol_id}
+                                    onValueChange={(val) => {
+                                        const found = roles.find(
+                                            (r) => String(r.id) === val,
+                                        );
+                                        createForm.setData((prev) => ({
+                                            ...prev,
+                                            rol_id: val,
+                                            role: found?.slug || found?.name || 'alumno',
+                                        }));
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecciona un rol" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roles.map((r) => (
+                                            <SelectItem key={r.id} value={String(r.id)}>
+                                                <span className="capitalize">{r.name}</span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Select
+                                    value={createForm.data.role}
+                                    onValueChange={(val) =>
+                                        createForm.setData('role', val)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecciona un rol" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="alumno">Alumno</SelectItem>
+                                        <SelectItem value="instructor">Instructor</SelectItem>
+                                        <SelectItem value="admin">Administrador</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}
+                            {(createForm.errors.rol_id || createForm.errors.role) && (
+                                <p className="text-xs text-red-500">
+                                    {createForm.errors.rol_id || createForm.errors.role}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new_password">Contraseña *</Label>
+                                <Input
+                                    id="new_password"
+                                    type="password"
+                                    required
+                                    value={createForm.data.password}
+                                    onChange={(e) =>
+                                        createForm.setData('password', e.target.value)
+                                    }
+                                />
+                                {createForm.errors.password && (
+                                    <p className="text-xs text-red-500">
+                                        {createForm.errors.password}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new_password_confirmation">
+                                    Confirmar contraseña *
+                                </Label>
+                                <Input
+                                    id="new_password_confirmation"
+                                    type="password"
+                                    required
+                                    value={createForm.data.password_confirmation}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'password_confirmation',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="pt-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setIsCreateModalOpen(false)}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={createForm.processing}
+                                className="bg-brand-navy text-white hover:bg-brand-blue"
+                            >
+                                {createForm.processing ? 'Creando...' : 'Registrar Usuario'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
 
-UsersIndex.layout = (page: any) => (
-    <AppLayout breadcrumbs={[
-        { title: 'Panel de Control', href: '/admin' },
-        { title: 'Usuarios', href: '/admin/users' },
-    ]}>
+UsersIndex.layout = (page: ReactNode) => (
+    <AppLayout
+        breadcrumbs={[
+            { title: 'Panel de Control', href: '/admin' },
+            { title: 'Usuarios', href: '/admin/users' },
+        ]}
+    >
         {page}
     </AppLayout>
 );

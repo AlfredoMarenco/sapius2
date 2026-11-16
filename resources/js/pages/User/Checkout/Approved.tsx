@@ -1,22 +1,26 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { CheckCircle2, ArrowRight, BookOpen, ShieldCheck } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { CheckCircle2, ArrowRight, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 
 interface ApprovedProps {
     enrollment: {
         id: number;
         course_title: string;
         reference: string;
+        status?: string;
         date: string;
     };
 }
 
 export default function Approved({ enrollment }: ApprovedProps) {
+    const isApproved = enrollment.status === 'si';
+
     return (
         <>
-            <Head title="¡Pago Aprobado!" />
+            <Head title={isApproved ? '¡Pago Aprobado!' : '¡Inscripción Registrada!'} />
 
             <div className="py-16 px-4 max-w-xl mx-auto">
                 <Card className="text-center border-neutral-200/80 dark:border-neutral-800 shadow-xl overflow-hidden">
@@ -25,10 +29,12 @@ export default function Approved({ enrollment }: ApprovedProps) {
                             <CheckCircle2 className="w-10 h-10" />
                         </div>
                         <h1 className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
-                            ¡Inscripción Exitosa!
+                            {isApproved ? '¡Inscripción Exitosa!' : '¡Inscripción Registrada!'}
                         </h1>
                         <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                            Tu pago ha sido confirmado y tu acceso ha sido habilitado.
+                            {isApproved
+                                ? 'Tu pago ha sido confirmado y tu acceso ha sido habilitado.'
+                                : 'Tu pago fue registrado y tu inscripción está en proceso de validación. Recibirás un correo en cuanto tu acceso sea habilitado.'}
                         </p>
                     </div>
 
@@ -41,6 +47,16 @@ export default function Approved({ enrollment }: ApprovedProps) {
                             <div className="flex justify-between py-1.5 border-b border-neutral-100 dark:border-neutral-800">
                                 <span className="text-neutral-500">Número de Referencia:</span>
                                 <span className="font-mono text-xs text-neutral-700 dark:text-neutral-300">{enrollment.reference}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                <span className="text-neutral-500">Estado:</span>
+                                {isApproved ? (
+                                    <Badge className="bg-emerald-600 text-white">Aprobado</Badge>
+                                ) : (
+                                    <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 gap-1">
+                                        <Clock className="w-3 h-3" /> En validación
+                                    </Badge>
+                                )}
                             </div>
                             <div className="flex justify-between py-1.5 border-b border-neutral-100 dark:border-neutral-800">
                                 <span className="text-neutral-500">Fecha y Hora:</span>
@@ -63,10 +79,12 @@ export default function Approved({ enrollment }: ApprovedProps) {
 }
 
 Approved.layout = (page: any) => (
-    <AppLayout breadcrumbs={[
-        { title: 'Inscripción', href: '#' },
-        { title: 'Aprobado', href: '#' },
-    ]}>
+    <AppLayout
+        breadcrumbs={[
+            { title: 'Inscripción', href: '#' },
+            { title: 'Confirmación', href: '#' },
+        ]}
+    >
         {page}
     </AppLayout>
 );

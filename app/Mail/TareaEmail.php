@@ -3,8 +3,8 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -15,12 +15,15 @@ class TareaEmail extends Mailable
 
     public $datos;
 
+    public ?string $filePath;
+
     /**
      * Create a new message instance.
      */
-    public function __construct($datos)
+    public function __construct($datos, ?string $filePath = null)
     {
         $this->datos = $datos;
+        $this->filePath = $filePath;
     }
 
     /**
@@ -41,7 +44,7 @@ class TareaEmail extends Mailable
         return new Content(
             markdown: 'emails.academic.tarea',
             with: [
-                'datos' => $this->datos
+                'datos' => $this->datos,
             ]
         );
     }
@@ -49,10 +52,16 @@ class TareaEmail extends Mailable
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {
+        if ($this->filePath && is_file($this->filePath)) {
+            return [
+                Attachment::fromPath($this->filePath),
+            ];
+        }
+
         return [];
     }
 }

@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-
 use App\Concerns\MapsLegacyAttributes;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
-#[Fillable(['quiz_id', 'text', 'image', 'points', 'explanation', 'is_active'])]
+#[Fillable(['quiz_id', 'slug', 'text', 'image', 'points', 'explanation', 'is_active'])]
 class Question extends Model
 {
     use MapsLegacyAttributes;
@@ -23,6 +23,13 @@ class Question extends Model
         'is_active' => 'activo',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
+
     protected static function booted()
     {
         static::creating(function ($question) {
@@ -30,7 +37,7 @@ class Question extends Model
                 $question->activo = 'si';
             }
             if (empty($question->slug)) {
-                $question->slug = \Illuminate\Support\Str::slug(\Illuminate\Support\Str::limit($question->pregunta ?? 'pregunta', 50)) . '-' . rand(1000, 9999);
+                $question->slug = Str::slug(Str::limit($question->pregunta ?? 'pregunta', 50)).'-'.rand(1000, 9999);
             }
         });
     }

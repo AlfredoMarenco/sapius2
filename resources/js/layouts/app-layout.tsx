@@ -1,4 +1,5 @@
 import { usePage } from '@inertiajs/react';
+import type { ReactNode } from 'react';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -7,10 +8,11 @@ export default function AppLayout({
     children,
 }: {
     breadcrumbs?: BreadcrumbItem[];
-    children: React.ReactNode;
+    children: ReactNode;
 }) {
     const { props } = usePage();
-    const resolvedBreadcrumbs = breadcrumbs || (props.breadcrumbs as BreadcrumbItem[]) || [];
+    const resolvedBreadcrumbs =
+        breadcrumbs || (props.breadcrumbs as BreadcrumbItem[]) || [];
 
     return (
         <AppLayoutTemplate breadcrumbs={resolvedBreadcrumbs}>

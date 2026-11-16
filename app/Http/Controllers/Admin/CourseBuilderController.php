@@ -3,18 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Course;
-use App\Models\Module;
-use App\Models\Lesson;
-use App\Models\Quiz;
-use App\Models\Question;
 use App\Models\Answer;
+use App\Models\Course;
+use App\Models\Lesson;
 use App\Models\Media;
-use App\Models\Homework;
+use App\Models\Module;
+use App\Models\Question;
+use App\Models\Quiz;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class CourseBuilderController extends Controller
 {
@@ -23,14 +26,87 @@ class CourseBuilderController extends Controller
      */
     public function show(Course $course)
     {
-        return Inertia::render('Admin/Courses/Builder', [
-            'course' => $course->load([
-                'category',
-                'modules.lessons.media',
-                'modules.lessons.quizzes.questions.answers',
-                'modules.lessons.homeworkAssignments'
-            ]),
+        $course->load([
+            'category',
+            'modules.lessons.media',
+            'modules.lessons.quizzes.questions.answers',
+            'modules.lessons.homeworkAssignments',
         ]);
+
+        $this->revealCorrectAnswers($course);
+
+        return Inertia::render('Admin/Courses/Builder', [
+            'course' => $course,
+            'routePrefix' => 'admin',
+        ]);
+    }
+
+    /**
+     * Reveal hidden correct answer flags for authorized Builder views.
+     */
+    protected function revealCorrectAnswers(Course $course): void
+    {
+        foreach ($course->modules ?? [] as $module) {
+            foreach ($module->lessons ?? [] as $lesson) {
+                foreach ($lesson->quizzes ?? [] as $quiz) {
+                    foreach ($quiz->questions ?? [] as $question) {
+                        if ($question->answers) {
+                            $question->answers->makeVisible(['correcto', 'is_correct']);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Sanitize HTML input to strip script tags, inline event handlers, and javascript: URIs.
+     */
+    protected function sanitizeHtml(?string $html): ?string
+    {
+        if ($html === null) {
+            return null;
+        }
+
+        $clean = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $html);
+        $clean = preg_replace('/<\s*\/?\s*script\b[^>]*>/is', '', (string) $clean);
+        $clean = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/is', '', (string) $clean);
+        $clean = preg_replace('/(?:javascript|vbscript)\s*:/i', '', (string) $clean);
+
+        return (string) $clean;
+    }
+
+    /**
+     * Store an uploaded question/answer image in storage/app/images/preguntas and return basename.
+     */
+    protected function storeQuestionImage(UploadedFile $file): string
+    {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        $guessed = strtolower((string) $file->guessExtension());
+        $client = strtolower((string) $file->getClientOriginalExtension());
+
+        if ($guessed !== '' && ! in_array($guessed, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'image' => ['Formato de imagen no válido. Solo se permiten archivos JPG, JPEG, PNG o WEBP.'],
+            ]);
+        }
+
+        $ext = $guessed !== '' ? $guessed : $client;
+        if (! in_array($ext, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'image' => ['Formato de imagen no válido. Solo se permiten archivos JPG, JPEG, PNG o WEBP.'],
+            ]);
+        }
+
+        $destDir = storage_path('app/images/preguntas');
+        if (! is_dir($destDir)) {
+            mkdir($destDir, 0750, true);
+        }
+
+        $filename = Str::random(40).'.'.$ext;
+        $file->move($destDir, $filename);
+
+        return basename($filename);
     }
 
     /**
@@ -41,17 +117,21 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'image' => 'nullable|string',
-            'position' => 'nullable|integer',
+            'position' => 'nullable|integer|min:0',
+            'posicion' => 'nullable|integer|min:0',
             'is_scheduled' => 'boolean',
             'available_at' => 'nullable|date',
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
+        $title = strip_tags($validated['title']);
+        $position = $validated['posicion'] ?? $validated['position'] ?? ($course->modules()->count() + 1);
+
         $course->modules()->create([
-            'title' => $validated['title'],
+            'title' => $title,
             'image' => $validated['image'] ?? null,
-            'slug' => Str::slug($validated['title']) . '-' . time(),
-            'position' => $validated['position'] ?? ($course->modules()->count() + 1),
+            'slug' => Str::slug($title).'-'.time(),
+            'position' => $position,
         ]);
 
         return back()->with('success', 'Módulo añadido correctamente');
@@ -65,19 +145,28 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'image' => 'nullable|string',
-            'position' => 'nullable|integer',
+            'position' => 'nullable|integer|min:0',
+            'posicion' => 'nullable|integer|min:0',
             'is_scheduled' => 'boolean',
             'available_at' => 'nullable|date',
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
-        $data = array_intersect_key($validated, array_flip(['title', 'image', 'position']));
+        $data = array_intersect_key($validated, array_flip(['title', 'image']));
 
-        if (isset($data['title']) && $data['title'] !== $module->title) {
-            $data['slug'] = Str::slug($data['title']) . '-' . time();
+        if (isset($data['title'])) {
+            $data['title'] = strip_tags($data['title']);
+            if ($data['title'] !== $module->title) {
+                $data['slug'] = Str::slug($data['title']).'-'.time();
+            }
         }
 
-        if (!empty($data)) {
+        $position = $validated['posicion'] ?? $validated['position'] ?? null;
+        if ($position !== null) {
+            $data['position'] = $position;
+        }
+
+        if (! empty($data)) {
             $module->update($data);
         }
 
@@ -94,6 +183,7 @@ class CourseBuilderController extends Controller
         }
 
         $module->delete();
+
         return back()->with('success', 'Módulo eliminado correctamente');
     }
 
@@ -104,17 +194,21 @@ class CourseBuilderController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'position' => 'nullable|integer',
+            'position' => 'nullable|integer|min:0',
+            'posicion' => 'nullable|integer|min:0',
             'is_scheduled' => 'boolean',
             'available_at' => 'nullable|date',
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
+        $title = strip_tags($validated['title']);
+        $position = $validated['posicion'] ?? $validated['position'] ?? ($module->lessons()->count() + 1);
+
         $module->lessons()->create([
             'course_id' => $module->curso_id,
-            'title' => $validated['title'],
-            'slug' => Str::slug($validated['title']) . '-' . time(),
-            'position' => $validated['position'] ?? ($module->lessons()->count() + 1),
+            'title' => $title,
+            'slug' => Str::slug($title).'-'.time(),
+            'position' => $position,
         ]);
 
         return back()->with('success', 'Lección añadida correctamente');
@@ -130,6 +224,7 @@ class CourseBuilderController extends Controller
         }
 
         $lesson->delete();
+
         return back()->with('success', 'Lección eliminada correctamente');
     }
 
@@ -141,18 +236,37 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'content' => 'nullable|string',
+            'summary' => 'nullable|string',
+            'position' => 'nullable|integer|min:0',
+            'posicion' => 'nullable|integer|min:0',
             'is_scheduled' => 'boolean',
             'available_at' => 'nullable|date',
             'expires_at' => 'nullable|date|after_or_equal:available_at',
         ]);
 
-        $data = array_intersect_key($validated, array_flip(['title', 'content']));
+        $data = array_intersect_key($validated, array_flip(['title', 'content', 'summary']));
 
-        if (isset($data['title']) && $data['title'] !== $lesson->title) {
-            $data['slug'] = Str::slug($data['title']) . '-' . time();
+        if (isset($data['title'])) {
+            $data['title'] = strip_tags($data['title']);
+            if ($data['title'] !== $lesson->title) {
+                $data['slug'] = Str::slug($data['title']).'-'.time();
+            }
         }
 
-        if (!empty($data)) {
+        if (array_key_exists('content', $data)) {
+            $data['content'] = $this->sanitizeHtml($data['content']);
+        }
+
+        if (array_key_exists('summary', $data)) {
+            $data['summary'] = $this->sanitizeHtml($data['summary']);
+        }
+
+        $position = $validated['posicion'] ?? $validated['position'] ?? null;
+        if ($position !== null) {
+            $data['position'] = $position;
+        }
+
+        if (! empty($data)) {
             $lesson->update($data);
         }
 
@@ -166,7 +280,7 @@ class CourseBuilderController extends Controller
     {
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
-            'file_type' => 'required|string', // video, image, document, link
+            'file_type' => 'required|string',
             'file_path' => 'required|string',
             'is_downloadable' => 'boolean',
         ]);
@@ -198,20 +312,37 @@ class CourseBuilderController extends Controller
     public function destroyMedia(Media $media)
     {
         $media->delete();
+
         return back()->with('success', 'Recurso eliminado');
     }
 
     /**
-     * Add/Update a quiz for a lesson.
+     * Add/Update a quiz for a lesson (supports multiple quizzes per lesson; updates only when quiz_id is provided).
      */
     public function storeQuiz(Request $request, Lesson $lesson)
     {
         $validated = $request->validate([
+            'quiz_id' => ['nullable', 'integer', Rule::exists(Quiz::class, 'id')],
             'title' => 'required|string|max:255',
-            'type' => 'required|in:EXANI I,EXANI II,EGEL,ENARM,ENQ,PRÁCTICA,EXAMEN',
-            'time_limit' => 'nullable|integer',
+            'description' => 'nullable|string',
+            'descripcion' => 'nullable|string',
+            'type' => 'required|in:EXANI,EXANI I,EXANI II,EGEL,ENARM,ENQ,PRÁCTICA,EXAMEN',
+            'time_limit' => ['nullable', function ($attribute, $value, $fail) {
+                if ($value === null || $value === '') {
+                    return;
+                }
+                if (is_numeric($value) && (int) $value >= 0) {
+                    return;
+                }
+                if (is_string($value) && preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $value)) {
+                    return;
+                }
+                $fail('El límite de tiempo debe ser minutos enteros o formato HH:MM:SS.');
+            }],
             'attempts_allowed' => 'required|integer|min:1',
-            'passing_score' => 'required|numeric|min:0|max:100',
+            'passing_score' => 'nullable|numeric|min:0|max:100',
+            'tiempo_caducidad' => 'nullable|string|max:50',
+            'tiempo_vigencia' => 'nullable|string|max:50',
             'is_scheduled' => 'boolean',
             'available_at' => 'nullable|date',
             'expires_at' => 'nullable|date|after_or_equal:available_at',
@@ -222,67 +353,139 @@ class CourseBuilderController extends Controller
             $tipo = 'EXANI';
         } elseif (str_starts_with($tipo, 'ENARM')) {
             $tipo = 'ENARM';
-        } elseif (!in_array($tipo, ['EXANI', 'EGEL', 'ENARM'])) {
+        } elseif (! in_array($tipo, ['EXANI', 'EGEL', 'ENARM'], true)) {
             $tipo = 'EGEL';
         }
 
         $timeLimit = $validated['time_limit'] ?? null;
         if (is_numeric($timeLimit)) {
-            $hours = floor($timeLimit / 60);
-            $mins = $timeLimit % 60;
+            $minsTotal = (int) $timeLimit;
+            $hours = intdiv($minsTotal, 60);
+            $mins = $minsTotal % 60;
             $timeString = sprintf('%02d:%02d:00', $hours, $mins);
-        } elseif (is_string($timeLimit) && str_contains($timeLimit, ':')) {
-            $timeString = $timeLimit;
+        } elseif (is_string($timeLimit) && preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $timeLimit)) {
+            $parts = explode(':', $timeLimit);
+            $timeString = count($parts) === 2
+                ? sprintf('%02d:%02d:00', (int) $parts[0], (int) $parts[1])
+                : sprintf('%02d:%02d:%02d', (int) $parts[0], (int) $parts[1], (int) $parts[2]);
         } else {
             $timeString = '01:00:00';
         }
 
+        $descripcion = $this->sanitizeHtml($validated['descripcion'] ?? $validated['description'] ?? null);
+
         $quizData = [
             'course_id' => $lesson->curso_id,
-            'title' => $validated['title'],
+            'title' => strip_tags($validated['title']),
             'type' => $tipo,
             'time_limit' => $timeString,
-            'attempts_allowed' => $validated['attempts_allowed'],
+            'attempts_allowed' => (int) $validated['attempts_allowed'],
         ];
 
-        $quiz = $lesson->quizzes()->first();
-        if ($quiz) {
-            $quiz->update($quizData);
-        } else {
-            $lesson->quizzes()->create($quizData);
+        if ($descripcion !== null) {
+            $quizData['description'] = $descripcion;
         }
 
-        return back()->with('success', 'Examen actualizado correctamente');
+        DB::transaction(function () use ($request, $validated, $lesson, $quizData) {
+            if (! empty($validated['quiz_id'])) {
+                $quiz = $lesson->quizzes()->where('id', (int) $validated['quiz_id'])->firstOrFail();
+                $quiz->fill($quizData);
+            } else {
+                $quiz = $lesson->quizzes()->make($quizData);
+            }
+
+            if ($request->has('tiempo_caducidad') && Schema::hasColumn('pruebas', 'tiempo_caducidad')) {
+                $quiz->tiempo_caducidad = $validated['tiempo_caducidad'];
+            }
+
+            if ($request->has('tiempo_vigencia') && Schema::hasColumn('pruebas', 'tiempo_vigencia')) {
+                $quiz->tiempo_vigencia = $validated['tiempo_vigencia'];
+            }
+
+            $quiz->save();
+        });
+
+        return back()->with('success', 'Examen guardado correctamente');
     }
 
     /**
-     * Store/Update a question and its answers.
+     * Delete a quiz and its questions/answers.
+     */
+    public function destroyQuiz(Quiz $quiz)
+    {
+        DB::transaction(function () use ($quiz) {
+            $quiz->load('questions');
+            foreach ($quiz->questions as $question) {
+                $question->answers()->delete();
+            }
+            $quiz->questions()->delete();
+            $quiz->delete();
+        });
+
+        return back()->with('success', 'Examen eliminado correctamente');
+    }
+
+    /**
+     * Store a new question and its answers.
      */
     public function storeQuestion(Request $request, Quiz $quiz)
     {
         $validated = $request->validate([
             'text' => 'required|string',
             'explanation' => 'nullable|string',
-            'points' => 'required|integer|min:0',
+            'points' => 'required|numeric|min:0',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
             'answers' => 'required|array|min:2',
             'answers.*.text' => 'required|string',
             'answers.*.is_correct' => 'required|boolean',
+            'answers.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'answers.*.imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
 
-        $question = $quiz->questions()->create([
-            'text' => $validated['text'],
-            'explanation' => $validated['explanation'],
-            'points' => $validated['points'],
-        ]);
-
-        foreach ($validated['answers'] as $index => $answerData) {
-            $question->answers()->create([
-                'text' => $answerData['text'],
-                'is_correct' => $answerData['is_correct'],
-                'position' => $index + 1,
-                'activo' => 'si',
+        $hasCorrect = collect($validated['answers'])->contains(
+            fn ($a) => filter_var($a['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN)
+        );
+        if (! $hasCorrect) {
+            throw ValidationException::withMessages([
+                'answers' => ['Debe marcar al menos una respuesta como correcta.'],
             ]);
         }
+
+        $questionImageFile = $request->file('image') ?? $request->file('imagen');
+        $questionImage = $questionImageFile ? $this->storeQuestionImage($questionImageFile) : null;
+
+        DB::transaction(function () use ($request, $validated, $quiz, $questionImage) {
+            $questionData = [
+                'text' => $this->sanitizeHtml($validated['text']),
+                'explanation' => $this->sanitizeHtml($validated['explanation'] ?? null),
+                'points' => (float) $validated['points'],
+            ];
+
+            if ($questionImage !== null) {
+                $questionData['image'] = $questionImage;
+            }
+
+            $question = $quiz->questions()->create($questionData);
+
+            foreach ($validated['answers'] as $index => $answerData) {
+                $answerImageFile = $request->file("answers.{$index}.image") ?? $request->file("answers.{$index}.imagen");
+                $answerImage = $answerImageFile ? $this->storeQuestionImage($answerImageFile) : null;
+
+                $createAnswer = [
+                    'text' => $this->sanitizeHtml($answerData['text']),
+                    'is_correct' => filter_var($answerData['is_correct'], FILTER_VALIDATE_BOOLEAN),
+                    'position' => $index + 1,
+                    'activo' => 'si',
+                ];
+
+                if ($answerImage !== null) {
+                    $createAnswer['image'] = $answerImage;
+                }
+
+                $question->answers()->create($createAnswer);
+            }
+        });
 
         return back()->with('success', 'Pregunta añadida correctamente');
     }
@@ -295,53 +498,86 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'text' => 'required|string',
             'explanation' => 'nullable|string',
-            'points' => 'required|integer|min:0',
+            'points' => 'required|numeric|min:0',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
             'answers' => 'required|array|min:2',
             'answers.*.id' => ['nullable', Rule::exists(Answer::class, 'id')],
             'answers.*.text' => 'required|string',
             'answers.*.is_correct' => 'required|boolean',
+            'answers.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'answers.*.imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
 
-        $question->update([
-            'text' => $validated['text'],
-            'explanation' => $validated['explanation'],
-            'points' => $validated['points'],
-        ]);
-
-        $existingAnswerIds = [];
-        foreach ($validated['answers'] as $index => $answerData) {
-            if (isset($answerData['id'])) {
-                $answer = $question->answers()->find($answerData['id']);
-                if ($answer) {
-                    $answer->update([
-                        'text' => $answerData['text'],
-                        'is_correct' => $answerData['is_correct'],
-                        'position' => $index + 1,
-                    ]);
-                    $existingAnswerIds[] = $answer->id;
-                }
-            } else {
-                $newAnswer = $question->answers()->create([
-                    'text' => $answerData['text'],
-                    'is_correct' => $answerData['is_correct'],
-                    'position' => $index + 1,
-                    'activo' => 'si',
-                ]);
-                $existingAnswerIds[] = $newAnswer->id;
-            }
+        $hasCorrect = collect($validated['answers'])->contains(
+            fn ($a) => filter_var($a['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN)
+        );
+        if (! $hasCorrect) {
+            throw ValidationException::withMessages([
+                'answers' => ['Debe marcar al menos una respuesta como correcta.'],
+            ]);
         }
-        
-        $question->answers()->whereNotIn('id', $existingAnswerIds)->delete();
+
+        $questionImageFile = $request->file('image') ?? $request->file('imagen');
+        $questionImage = $questionImageFile ? $this->storeQuestionImage($questionImageFile) : null;
+
+        DB::transaction(function () use ($request, $validated, $question, $questionImage) {
+            $updateQuestion = [
+                'text' => $this->sanitizeHtml($validated['text']),
+                'explanation' => $this->sanitizeHtml($validated['explanation'] ?? null),
+                'points' => (float) $validated['points'],
+            ];
+
+            if ($questionImage !== null) {
+                $updateQuestion['image'] = $questionImage;
+            }
+
+            $question->update($updateQuestion);
+
+            $existingAnswerIds = [];
+            foreach ($validated['answers'] as $index => $answerData) {
+                $answerImageFile = $request->file("answers.{$index}.image") ?? $request->file("answers.{$index}.imagen");
+                $answerImage = $answerImageFile ? $this->storeQuestionImage($answerImageFile) : null;
+
+                $payload = [
+                    'text' => $this->sanitizeHtml($answerData['text']),
+                    'is_correct' => filter_var($answerData['is_correct'], FILTER_VALIDATE_BOOLEAN),
+                    'position' => $index + 1,
+                ];
+
+                if ($answerImage !== null) {
+                    $payload['image'] = $answerImage;
+                }
+
+                if (isset($answerData['id'])) {
+                    $answer = $question->answers()->find($answerData['id']);
+                    if ($answer) {
+                        $answer->update($payload);
+                        $existingAnswerIds[] = $answer->id;
+                    }
+                } else {
+                    $payload['activo'] = 'si';
+                    $newAnswer = $question->answers()->create($payload);
+                    $existingAnswerIds[] = $newAnswer->id;
+                }
+            }
+
+            $question->answers()->whereNotIn('id', $existingAnswerIds)->delete();
+        });
 
         return back()->with('success', 'Pregunta actualizada correctamente');
     }
 
     /**
-     * Delete a question.
+     * Delete a question and its answers.
      */
     public function destroyQuestion(Question $question)
     {
-        $question->delete();
+        DB::transaction(function () use ($question) {
+            $question->answers()->delete();
+            $question->delete();
+        });
+
         return back()->with('success', 'Pregunta eliminada');
     }
 
@@ -350,22 +586,26 @@ class CourseBuilderController extends Controller
      */
     public function duplicateQuiz(Quiz $quiz)
     {
-        $newQuiz = $quiz->replicate();
-        $newQuiz->title = $quiz->title . ' (Copia)';
-        $newQuiz->save();
+        DB::transaction(function () use ($quiz) {
+            $quiz->load('questions.answers');
 
-        foreach ($quiz->questions as $question) {
-            $newQuestion = $question->replicate();
-            $newQuestion->quiz_id = $newQuiz->id;
-            $newQuestion->slug = Str::slug($newQuestion->pregunta ?? 'pregunta') . '-' . rand(1000, 9999);
-            $newQuestion->save();
+            $newQuiz = $quiz->replicate();
+            $newQuiz->title = $quiz->title.' (Copia)';
+            $newQuiz->save();
 
-            foreach ($question->answers as $answer) {
-                $newAnswer = $answer->replicate();
-                $newAnswer->question_id = $newQuestion->id;
-                $newAnswer->save();
+            foreach ($quiz->questions as $question) {
+                $newQuestion = $question->replicate();
+                $newQuestion->quiz_id = $newQuiz->id;
+                $newQuestion->slug = Str::slug($newQuestion->pregunta ?? 'pregunta').'-'.rand(1000, 9999);
+                $newQuestion->save();
+
+                foreach ($question->answers as $answer) {
+                    $newAnswer = $answer->replicate();
+                    $newAnswer->question_id = $newQuestion->id;
+                    $newAnswer->save();
+                }
             }
-        }
+        });
 
         return back()->with('success', 'Examen duplicado correctamente');
     }
@@ -378,12 +618,16 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'modules' => 'required|array',
             'modules.*.id' => ['required', Rule::exists(Module::class, 'id')],
-            'modules.*.position' => 'required|integer|min:0',
+            'modules.*.position' => 'required_without:modules.*.posicion|integer|min:0',
+            'modules.*.posicion' => 'required_without:modules.*.position|integer|min:0',
         ]);
 
-        foreach ($validated['modules'] as $moduleData) {
-            $course->modules()->where('id', $moduleData['id'])->update(['position' => $moduleData['position']]);
-        }
+        DB::transaction(function () use ($course, $validated) {
+            foreach ($validated['modules'] as $moduleData) {
+                $pos = $moduleData['posicion'] ?? $moduleData['position'];
+                $course->modules()->where('id', $moduleData['id'])->update(['posicion' => $pos]);
+            }
+        });
 
         return back()->with('success', 'Módulos reordenados');
     }
@@ -396,12 +640,16 @@ class CourseBuilderController extends Controller
         $validated = $request->validate([
             'lessons' => 'required|array',
             'lessons.*.id' => ['required', Rule::exists(Lesson::class, 'id')],
-            'lessons.*.position' => 'required|integer|min:0',
+            'lessons.*.position' => 'required_without:lessons.*.posicion|integer|min:0',
+            'lessons.*.posicion' => 'required_without:lessons.*.position|integer|min:0',
         ]);
 
-        foreach ($validated['lessons'] as $lessonData) {
-            $module->lessons()->where('id', $lessonData['id'])->update(['position' => $lessonData['position']]);
-        }
+        DB::transaction(function () use ($module, $validated) {
+            foreach ($validated['lessons'] as $lessonData) {
+                $pos = $lessonData['posicion'] ?? $lessonData['position'];
+                $module->lessons()->where('id', $lessonData['id'])->update(['posicion' => $pos]);
+            }
+        });
 
         return back()->with('success', 'Lecciones reordenadas');
     }
@@ -417,8 +665,10 @@ class CourseBuilderController extends Controller
             'points' => 'nullable|integer|min:0',
         ]);
 
+        $description = $this->sanitizeHtml($validated['description'] ?? strip_tags($validated['title']));
+
         $lesson->update([
-            'resumen' => $validated['description'] ?? $validated['title'],
+            'resumen' => $description,
         ]);
 
         return back()->with('success', 'Tarea actualizada correctamente');
@@ -429,51 +679,64 @@ class CourseBuilderController extends Controller
      */
     public function uploadChunk(Request $request)
     {
+        $validated = $request->validate([
+            'file' => 'required|file|max:10240',
+            'index' => 'required|integer|min:0|max:2000',
+            'total_chunks' => 'required|integer|min:1|max:2000',
+            'identifier' => ['required', 'string', 'max:100', 'regex:/^[a-zA-Z0-9_\-]+$/'],
+            'filename' => 'required|string|max:255',
+        ]);
+
         $chunk = $request->file('file');
-        $index = $request->input('index');
-        $totalChunks = $request->input('total_chunks');
-        $identifier = $request->input('identifier');
-        $originalName = $request->input('filename');
+        $index = (int) $validated['index'];
+        $totalChunks = (int) $validated['total_chunks'];
+        $identifier = preg_replace('/[^a-zA-Z0-9_\-]/', '', $validated['identifier']);
+        $originalName = basename($validated['filename']);
 
-        if (!$chunk || is_null($index) || is_null($totalChunks) || !$identifier) {
-            return response()->json(['error' => 'Datos de fragmento inválidos.'], 400);
+        if ($index >= $totalChunks || $identifier === '') {
+            return response()->json(['error' => 'Datos de fragmento inválidos.'], 422);
         }
 
-        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-        if (strtolower($extension) !== 'mp4') {
-            return response()->json(['error' => 'Solo se permiten archivos de video con extensión MP4.'], 400);
+        $extension = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+        if ($extension !== 'mp4') {
+            return response()->json(['error' => 'Solo se permiten archivos de video con extensión MP4.'], 422);
         }
 
-        $identifier = preg_replace('/[^a-zA-Z0-9_\-]/', '', $identifier);
-        $tempDir = storage_path('app/chunks/' . $identifier);
-
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0777, true);
+        $allowedMimes = ['video/mp4', 'video/quicktime', 'application/mp4', 'application/octet-stream'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $chunkMime = $finfo ? finfo_file($finfo, $chunk->getRealPath()) : null;
+        if ($finfo) {
+            finfo_close($finfo);
         }
 
-        $chunkName = 'chunk_' . $index;
+        if ($chunkMime && ! in_array($chunkMime, $allowedMimes, true)) {
+            return response()->json(['error' => 'Tipo MIME no permitido para video MP4.'], 422);
+        }
+
+        $tempDir = storage_path('app/chunks/'.$identifier);
+        if (! file_exists($tempDir)) {
+            mkdir($tempDir, 0750, true);
+        }
+
+        $chunkName = 'chunk_'.$index;
         $chunk->move($tempDir, $chunkName);
 
-        $uploadedCount = count(glob($tempDir . '/chunk_*'));
+        $uploadedCount = count(glob($tempDir.'/chunk_*'));
 
         if ($uploadedCount == $totalChunks) {
-            $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-            if (empty($extension)) {
-                $extension = 'mp4';
-            }
-            $finalFilename = $identifier . '.' . $extension;
-            
+            $finalFilename = $identifier.'.mp4';
+
             $finalDir = storage_path('app/uploads');
-            if (!file_exists($finalDir)) {
-                mkdir($finalDir, 0777, true);
+            if (! file_exists($finalDir)) {
+                mkdir($finalDir, 0750, true);
             }
-            
-            $finalPath = $finalDir . "/" . $finalFilename;
+
+            $finalPath = $finalDir.'/'.$finalFilename;
 
             $out = fopen($finalPath, 'wb');
             if ($out) {
                 for ($i = 0; $i < $totalChunks; $i++) {
-                    $chunkFile = $tempDir . '/chunk_' . $i;
+                    $chunkFile = $tempDir.'/chunk_'.$i;
                     if (file_exists($chunkFile)) {
                         $in = fopen($chunkFile, 'rb');
                         if ($in) {
@@ -489,18 +752,30 @@ class CourseBuilderController extends Controller
             }
 
             if (file_exists($tempDir)) {
-                rmdir($tempDir);
+                @rmdir($tempDir);
+            }
+
+            $finalFinfo = finfo_open(FILEINFO_MIME_TYPE);
+            $finalMime = ($finalFinfo && file_exists($finalPath)) ? finfo_file($finalFinfo, $finalPath) : null;
+            if ($finalFinfo) {
+                finfo_close($finalFinfo);
+            }
+
+            if ($finalMime && ! in_array($finalMime, $allowedMimes, true)) {
+                @unlink($finalPath);
+
+                return response()->json(['error' => 'El archivo ensamblado no corresponde a un video MP4 válido.'], 422);
             }
 
             return response()->json([
                 'completed' => true,
-                'filename' => $finalFilename
+                'filename' => $finalFilename,
             ]);
         }
 
         return response()->json([
             'completed' => false,
-            'progress' => round(($uploadedCount / $totalChunks) * 100, 2)
+            'progress' => round(($uploadedCount / $totalChunks) * 100, 2),
         ]);
     }
 }

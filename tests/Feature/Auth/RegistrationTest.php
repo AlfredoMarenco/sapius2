@@ -1,5 +1,15 @@
 <?php
+
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Tests\Concerns\CreatesLegacySchema;
+
+uses(CreatesLegacySchema::class);
+
+beforeEach(function () {
+    $this->setUpLegacySchema();
+    $this->seedLegacyRoles();
+});
 
 test('registration screen can be rendered', function () {
     $response = $this->get(route('register'));
@@ -7,7 +17,7 @@ test('registration screen can be rendered', function () {
 });
 
 test('new users can register with explicit username, first_name and last_name', function () {
-    $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
+    $this->withoutMiddleware(PreventRequestForgery::class);
 
     $response = $this->post(route('register.store'), [
         'first_name' => 'Carlos',
@@ -29,7 +39,7 @@ test('new users can register with explicit username, first_name and last_name', 
 });
 
 test('new users can also register with name field fallback', function () {
-    $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
+    $this->withoutMiddleware(PreventRequestForgery::class);
 
     $response = $this->post(route('register.store'), [
         'name' => 'Laura Martinez',

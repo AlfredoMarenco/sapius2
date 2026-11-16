@@ -1,6 +1,4 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { useState } from 'react';
 import { 
     Layers, 
     Plus, 
@@ -13,12 +11,14 @@ import {
     Save, 
     X 
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 
 interface ManageableItem {
     id: number;
@@ -109,7 +109,10 @@ export default function ManageableIndex({
 
     const handleEditSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingItem) return;
+
+        if (!editingItem) {
+return;
+}
 
         router.put('/admin/manageable/update', editingItem, {
             onSuccess: () => {
@@ -120,9 +123,12 @@ export default function ManageableIndex({
     };
 
     const handleDelete = (item: ManageableItem) => {
-        if (!confirm(`¿Eliminar la tarjeta "${item.titulo}"?`)) return;
+        if (!confirm(`¿Eliminar la tarjeta "${item.titulo}"?`)) {
+return;
+}
 
         let deleteUrl = '';
+
         if (item.type === 'simuladores') {
             deleteUrl = item.category === 'medicina'
                 ? `/admin/manageable/simulators/medicine/delete/${item.id}`
@@ -133,7 +139,7 @@ export default function ManageableIndex({
                 : `/admin/manageable/guides/nutrition/delete/${item.id}`;
         }
 
-        router.get(deleteUrl);
+        router.delete(deleteUrl, { preserveScroll: true });
     };
 
     const activeList = getActiveList();
@@ -154,20 +160,22 @@ export default function ManageableIndex({
                         </p>
                     </div>
 
-                    <Button
-                        onClick={() => {
-                            setCreateForm({
-                                titulo: '',
-                                descripcion: '',
-                                type: selectedType,
-                                category: selectedCategory,
-                            });
-                            setIsCreateOpen(true);
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm"
-                    >
-                        <Plus className="w-4 h-4" /> Nueva Tarjeta
-                    </Button>
+                    {selectedType !== 'criterios' && (
+                        <Button
+                            onClick={() => {
+                                setCreateForm({
+                                    titulo: '',
+                                    descripcion: '',
+                                    type: selectedType,
+                                    category: selectedCategory,
+                                });
+                                setIsCreateOpen(true);
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm"
+                        >
+                            <Plus className="w-4 h-4" /> Nueva Tarjeta
+                        </Button>
+                    )}
                 </div>
 
                 {/* Filters Row */}

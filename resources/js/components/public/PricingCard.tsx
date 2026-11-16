@@ -23,7 +23,170 @@ export interface PurchaseTargetResult {
     isExternal: boolean;
 }
 
-const WHATSAPP_PHONE = '521234567890';
+export const WHATSAPP_PHONE = '529992988744';
+
+const BLOCKED_TAGS = new Set([
+    'script',
+    'style',
+    'iframe',
+    'object',
+    'embed',
+    'form',
+    'input',
+    'textarea',
+    'select',
+    'button',
+    'svg',
+    'img',
+]);
+
+function isSafeHref(rawHref: string | null): boolean {
+    if (!rawHref) {
+return false;
+}
+
+    const trimmed = rawHref.trim().toLowerCase();
+
+    return (
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('mailto:') ||
+        trimmed.startsWith('tel:') ||
+        (trimmed.startsWith('/') && !trimmed.startsWith('//'))
+    );
+}
+
+function domNodeToReact(node: ChildNode, key: string): React.ReactNode {
+    if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+        return null;
+    }
+
+    const el = node as Element;
+    const tag = el.tagName.toLowerCase();
+
+    if (BLOCKED_TAGS.has(tag)) {
+        return null;
+    }
+
+    if (tag === 'br') {
+        return <br key={key} />;
+    }
+
+    const children = Array.from(el.childNodes).map((child, idx) =>
+        domNodeToReact(child, `${key}-${idx}`),
+    );
+
+    switch (tag) {
+        case 'p':
+            return (
+                <p key={key} className="mb-1.5 last:mb-0">
+                    {children}
+                </p>
+            );
+        case 'ul':
+            return (
+                <ul
+                    key={key}
+                    className="my-1.5 list-disc space-y-1 pl-4 marker:text-[#FF6B52]"
+                >
+                    {children}
+                </ul>
+            );
+        case 'ol':
+            return (
+                <ol
+                    key={key}
+                    className="my-1.5 list-decimal space-y-1 pl-4 marker:font-bold marker:text-[#FF6B52]"
+                >
+                    {children}
+                </ol>
+            );
+        case 'li':
+            return <li key={key}>{children}</li>;
+        case 'strong':
+        case 'b':
+            return (
+                <strong key={key} className="font-bold text-[#101E33]">
+                    {children}
+                </strong>
+            );
+        case 'em':
+        case 'i':
+            return <em key={key}>{children}</em>;
+        case 'u':
+            return <u key={key}>{children}</u>;
+        case 'a': {
+            const href = el.getAttribute('href');
+
+            if (!isSafeHref(href)) {
+                return <span key={key}>{children}</span>;
+            }
+
+            const external =
+                href!.trim().startsWith('http://') ||
+                href!.trim().startsWith('https://');
+
+            return (
+                <a
+                    key={key}
+                    href={href!.trim()}
+                    target={external ? '_blank' : undefined}
+                    rel={external ? 'noopener noreferrer' : undefined}
+                    className="font-semibold text-[#FF6B52] underline underline-offset-2 hover:text-[#F0563C]"
+                >
+                    {children}
+                </a>
+            );
+        }
+        default:
+            return <React.Fragment key={key}>{children}</React.Fragment>;
+    }
+}
+
+export function stripHtmlToText(html?: string | null): string {
+    if (!html) {
+return '';
+}
+
+    if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+    }
+
+    return html
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+export function SafeHtmlContent({
+    html,
+    className = '',
+}: {
+    html: string;
+    className?: string;
+}) {
+    if (!html.trim()) {
+return null;
+}
+
+    if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+        return <p className={className}>{stripHtmlToText(html)}</p>;
+    }
+
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const nodes = Array.from(doc.body.childNodes).map((child, idx) =>
+        domNodeToReact(child, `node-${idx}`),
+    );
+
+    return <div className={className}>{nodes}</div>;
+}
 
 /**
  * Resuelve dinámicamente el destino de compra / preventa / lista de espera
@@ -37,6 +200,7 @@ export function resolvePurchaseTarget(
 ): PurchaseTargetResult {
     if (mode === 'waitlist') {
         const message = `Hola equipo Sapius, me interesa anotarme en la lista de espera de: ${packageLabel}. ¿Me podrían avisar en cuanto esté disponible?`;
+
         return {
             href: `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(message)}`,
             isExternal: true,
@@ -45,6 +209,7 @@ export function resolvePurchaseTarget(
 
     if (mode === 'presale') {
         const message = `Hola equipo Sapius, me interesa adquirir en preventa: ${packageLabel}. ¿Me comparten información y pasos de inscripción?`;
+
         return {
             href: `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(message)}`,
             isExternal: true,
@@ -70,7 +235,10 @@ export function resolvePurchaseTarget(
                 item.activo === 'si' ||
                 item.activo === true ||
                 item.activo === 1;
-            if (!isActive) return false;
+
+            if (!isActive) {
+return false;
+}
 
             const haystack = `${item.identificador ?? ''} ${item.course_title ?? ''} ${item.course?.title ?? ''} ${item.course_slug ?? ''} ${item.course?.slug ?? ''}`
                 .toLowerCase()

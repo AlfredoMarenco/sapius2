@@ -1,27 +1,28 @@
 import { Link, usePage } from '@inertiajs/react';
-import { 
-    Home, 
-    Users, 
-    List, 
-    Plus, 
-    Copy, 
-    CalendarDays, 
-    Tv, 
-    LayoutTemplate, 
-    CheckCircle, 
-    UploadCloud, 
-    PieChart, 
-    Calendar, 
-    Flag, 
-    Info, 
-    MessageSquare, 
-    Settings 
+import {
+    Award,
+    Calendar,
+    CalendarDays,
+    CheckCircle,
+    Copy,
+    Flag,
+    Home,
+    Info,
+    LayoutTemplate,
+    List,
+    MessageSquare,
+    PieChart,
+    Plus,
+    Settings,
+    Tag,
+    Tv,
+    UploadCloud,
+    Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import { Award } from 'lucide-react';
 import {
     Sidebar,
     SidebarContent,
@@ -34,7 +35,7 @@ import {
 import type { NavItem, NavGroup, Auth } from '@/types';
 
 export function AppSidebar() {
-    const { auth } = usePage<Auth>().props;
+    const { auth } = usePage<{ auth: Auth }>().props;
     const userRole = auth.user?.role?.toLowerCase();
     const isAdmin = userRole === 'admin' || userRole === 'administrador';
     const isInstructor = userRole === 'instructor';
@@ -76,6 +77,11 @@ export function AppSidebar() {
                     title: 'Copiar',
                     href: '/admin/cursos/copy',
                     icon: Copy,
+                },
+                {
+                    title: 'Categorías',
+                    href: '/admin/categories',
+                    icon: Tag,
                 },
                 {
                     title: 'Programación',
@@ -145,11 +151,6 @@ export function AppSidebar() {
                     icon: List,
                 },
                 {
-                    title: 'Mis Alumnos',
-                    href: '/instructor/cursos',
-                    icon: Users,
-                },
-                {
                     title: 'Soporte Técnico',
                     href: '/instructor/soporte',
                     icon: Info,
@@ -187,7 +188,7 @@ export function AppSidebar() {
                     icon: Flag,
                 },
                 {
-                    title: 'Guias disponibles',
+                    title: 'Guías disponibles',
                     href: '/alumno/guias',
                     icon: Flag,
                 },
@@ -210,7 +211,11 @@ export function AppSidebar() {
         },
     ];
 
-    const groups = isAdmin ? adminGroups : (isInstructor ? instructorGroups : studentGroups);
+    const groups = isAdmin
+        ? adminGroups
+        : isInstructor
+          ? instructorGroups
+          : studentGroups;
 
     const footerNavItems: NavItem[] = [
         {
@@ -226,7 +231,16 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={isAdmin ? '/admin' : (isInstructor ? '/instructor' : '/alumno')} prefetch>
+                            <Link
+                                href={
+                                    isAdmin
+                                        ? '/admin'
+                                        : isInstructor
+                                          ? '/instructor'
+                                          : '/alumno'
+                                }
+                                prefetch
+                            >
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>

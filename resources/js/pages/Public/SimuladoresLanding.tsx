@@ -8,8 +8,11 @@ import { PlusGridPattern } from '@/components/public/PlusGridPattern';
 import {
     PricingCard,
     resolvePurchaseTarget,
-    type ScheduledCourseCandidate,
+    SafeHtmlContent,
+    stripHtmlToText
+    
 } from '@/components/public/PricingCard';
+import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
 import LandingLayout from '@/layouts/LandingLayout';
 
 export type ScheduledCourseRecord = ScheduledCourseCandidate;
@@ -352,11 +355,15 @@ export default function SimuladoresLanding({
                                     const title =
                                         item.course_title ||
                                         item.course?.title ||
-                                        item.identificador ||
                                         `Simulador ${areaDisplay}`;
                                     const priceNum = Number(
                                         item.precio ?? item.price ?? 0,
                                     );
+                                    const cleanDescription = stripHtmlToText(
+                                        item.course_description ||
+                                            item.course?.description,
+                                    );
+
                                     return (
                                         <PricingCard
                                             key={item.id}
@@ -364,14 +371,8 @@ export default function SimuladoresLanding({
                                             price={`$${priceNum.toLocaleString('es-MX')} MXN`}
                                             paymentNote="Un solo pago"
                                             description={
-                                                item.course_description ||
-                                                item.course?.description ||
+                                                cleanDescription ||
                                                 'Evaluación cronometrada tipo examen oficial con retroalimentación.'
-                                            }
-                                            footnote={
-                                                item.identificador
-                                                    ? `Código: ${item.identificador}`
-                                                    : undefined
                                             }
                                             ctaLabel="Comprar"
                                             href={`/checkout/${item.id}`}
@@ -422,9 +423,10 @@ export default function SimuladoresLanding({
                                                 `Instrumento ${areaDisplay}`}
                                         </h4>
                                         {card.descripcion && (
-                                            <p className="mt-1.5 text-xs leading-relaxed text-[#101E33]/80">
-                                                {card.descripcion}
-                                            </p>
+                                            <SafeHtmlContent
+                                                html={card.descripcion}
+                                                className="mt-1.5 text-xs leading-relaxed text-[#101E33]/80"
+                                            />
                                         )}
                                     </div>
                                 ))}

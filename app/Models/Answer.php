@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-
 use App\Concerns\MapsLegacyAttributes;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable(['question_id', 'text', 'is_correct', 'position', 'image', 'is_active'])]
+#[Hidden(['correcto', 'is_correct'])]
 class Answer extends Model
 {
     use MapsLegacyAttributes;
@@ -42,6 +43,7 @@ class Answer extends Model
     {
         return [
             'is_correct' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

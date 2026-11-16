@@ -1,7 +1,12 @@
 <?php
 
+use App\Http\Middleware\ApiTokenAuth;
+use App\Http\Middleware\AuthenticateWebOrElectron;
+use App\Http\Middleware\CheckRole;
+use App\Http\Middleware\CheckUserSession;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RestrictMobileAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,17 +28,22 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'is_touch_device']);
+
+        $middleware->throttleApi('60,1');
 
         $middleware->web(append: [
+            CheckUserSession::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->alias([
-            'api_token_auth' => \App\Http\Middleware\ApiTokenAuth::class,
-            'role' => \App\Http\Middleware\CheckRole::class,
+            'api_token_auth' => ApiTokenAuth::class,
+            'auth.media' => AuthenticateWebOrElectron::class,
+            'role' => CheckRole::class,
+            'restrict.mobile' => RestrictMobileAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

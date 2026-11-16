@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Course;
 use App\Models\ProgrammingCalendar;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -29,13 +29,13 @@ class CourseCalendarController extends Controller
             'calendars' => $calendars->map(function ($c) {
                 return [
                     'id' => $c->id,
-                    'image_url' => asset('storage/' . $c->image_path),
+                    'image_url' => asset('storage/'.$c->image_path),
                     'start_date' => $c->start_date ? $c->start_date->format('Y-m-d') : null,
                     'end_date' => $c->end_date ? $c->end_date->format('Y-m-d') : null,
                     'group_name' => $c->group_name,
                     'position' => $c->position,
                 ];
-            })
+            }),
         ]);
     }
 
@@ -46,7 +46,7 @@ class CourseCalendarController extends Controller
     {
         $request->validate([
             'images' => 'required|array',
-            'images.*' => 'file|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
+            'images.*' => 'file|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'group_name' => 'nullable|string|max:255',
@@ -69,7 +69,7 @@ class CourseCalendarController extends Controller
             }
         }
 
-        return redirect()->route('admin.courses.calendars.index', $course->id)
+        return redirect()->route('admin.courses.calendars', $course->id)
             ->with('success', 'Calendarios subidos y guardados correctamente.');
     }
 
@@ -100,7 +100,7 @@ class CourseCalendarController extends Controller
     {
         // Delete file from storage
         Storage::disk('public')->delete($calendar->image_path);
-        
+
         $calendar->delete();
 
         return redirect()->back()->with('success', 'Calendario eliminado correctamente.');

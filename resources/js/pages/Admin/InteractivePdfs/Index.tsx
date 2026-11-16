@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FileText, Plus, Trash2, Edit, Layout, ArrowLeft } from 'lucide-react';
+import { FileText, Plus, Trash2, Layout, ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -17,48 +17,72 @@ import {
 } from '@/components/ui/table';
 
 export default function Index({ lesson, materials }: any) {
+    const courseId = lesson?.course?.id || lesson?.curso_id;
+    const lessonTitle = lesson?.title || lesson?.titulo || 'Lección';
+
     const { data, setData, post, processing, errors, reset } = useForm({
         titulo: '',
         file: null as File | null,
         allow_download: false,
-        leccion_id: lesson.id
+        leccion_id: lesson.id,
     });
 
     const [isUploading, setIsUploading] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editAllowDownload, setEditAllowDownload] = useState(false);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         post('/admin/material-pdfs', {
+            forceFormData: true,
             onSuccess: () => {
                 reset();
                 setIsUploading(false);
             },
-            preserveScroll: true
+            preserveScroll: true,
         });
+    };
+
+    const startEdit = (pdf: any) => {
+        setEditingId(pdf.id);
+        setEditTitle(pdf.titulo || '');
+        setEditAllowDownload(Boolean(pdf.allow_download));
+    };
+
+    const saveEdit = (id: number) => {
+        router.put(
+            `/admin/material-pdfs/${id}`,
+            {
+                titulo: editTitle,
+                allow_download: editAllowDownload,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => setEditingId(null),
+            },
+        );
     };
 
     const handleDelete = (id: number) => {
         if (confirm('¿Estás seguro de eliminar este PDF interactivo? Todos los datos de los alumnos se perderán.')) {
             router.delete(`/admin/material-pdfs/${id}`, {
-                preserveScroll: true
+                preserveScroll: true,
             });
         }
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Panel de Control', href: '/admin' },
-            { title: 'Cursos', href: '/admin/cursos' },
-            { title: lesson.course.title, href: `/admin/curso/${lesson.course.id}` },
-            { title: `Módulo ${lesson.titulo}`, href: '#' },
-            { title: 'PDFs Interactivos', href: '#' },
-        ]}>
-            <Head title={`PDFs Interactivos - ${lesson.titulo}`} />
+        <>
+            <Head title={`PDFs Interactivos - ${lessonTitle}`} />
 
             <div className="p-6 max-w-7xl mx-auto space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <Link href={`/admin/curso/${lesson.course.id}`} className="inline-flex items-center text-sm font-medium text-neutral-500 hover:text-neutral-700 mb-4 transition-colors">
+                        <Link
+                            href={courseId ? `/admin/courses/${courseId}` : '/admin/courses'}
+                            className="inline-flex items-center text-sm font-medium text-neutral-500 hover:text-neutral-700 mb-4 transition-colors"
+                        >
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Volver al Curso
                         </Link>
@@ -67,7 +91,7 @@ export default function Index({ lesson, materials }: any) {
                             Materiales PDF Interactivos
                         </h1>
                         <p className="text-sm text-neutral-500 mt-1">
-                            Módulo: {lesson.titulo}
+                            Lección / Módulo: {lessonTitle}
                         </p>
                     </div>
                     <Button onClick={() => setIsUploading(!isUploading)} className="bg-brand-blue hover:bg-brand-blue/90">
@@ -88,7 +112,7 @@ export default function Index({ lesson, materials }: any) {
                                         <Input
                                             id="titulo"
                                             value={data.titulo}
-                                            onChange={e => setData('titulo', e.target.value)}
+                                            onChange={(e) => setData('titulo', e.target.value)}
                                             required
                                         />
                                         {errors.titulo && <p className="text-red-500 text-xs">{errors.titulo}</p>}
@@ -99,7 +123,7 @@ export default function Index({ lesson, materials }: any) {
                                             id="file"
                                             type="file"
                                             accept=".pdf"
-                                            onChange={e => setData('file', e.target.files ? e.target.files[0] : null)}
+                                            onChange={(e) => setData('file', e.target.files ? e.target.files[0] : null)}
                                             required
                                         />
                                         {errors.file && <p className="text-red-500 text-xs">{errors.file}</p>}
@@ -142,39 +166,89 @@ export default function Index({ lesson, materials }: any) {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                materials.map((pdf: any) => (
-                                    <TableRow key={pdf.id}>
-                                        <TableCell className="font-medium text-neutral-900">{pdf.titulo}</TableCell>
-                                        <TableCell className="text-sm text-neutral-500 truncate max-w-[200px]" title={pdf.file_path}>
-                                            {pdf.file_path}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            {pdf.allow_download ? (
-                                                <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">Sí</span>
-                                            ) : (
-                                                <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-1 rounded-full">No</span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-center font-mono text-xs text-brand-blue">
-                                            {pdf.fields_config ? pdf.fields_config.length : 0} campos
-                                        </TableCell>
-                                        <TableCell className="text-right space-x-2">
-                                            <Button asChild size="sm" variant="outline" className="text-xs border-brand-blue text-brand-blue hover:bg-brand-blue/10">
-                                                <Link href={`/admin/material-pdfs/${pdf.id}/edit`}>
-                                                    <Layout className="w-4 h-4 mr-1" /> Editar Campos
-                                                </Link>
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(pdf.id)}>
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                materials.map((pdf: any) => {
+                                    const isEditing = editingId === pdf.id;
+                                    const fieldsCount = Array.isArray(pdf.fields_config) ? pdf.fields_config.length : 0;
+
+                                    return (
+                                        <TableRow key={pdf.id}>
+                                            <TableCell className="font-medium text-neutral-900">
+                                                {isEditing ? (
+                                                    <Input
+                                                        value={editTitle}
+                                                        onChange={(e) => setEditTitle(e.target.value)}
+                                                        className="h-8 text-sm"
+                                                    />
+                                                ) : (
+                                                    pdf.titulo
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-neutral-500 truncate max-w-[200px]" title={pdf.file_path}>
+                                                {pdf.file_path}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                {isEditing ? (
+                                                    <div className="inline-flex items-center justify-center">
+                                                        <Switch
+                                                            checked={editAllowDownload}
+                                                            onCheckedChange={setEditAllowDownload}
+                                                        />
+                                                    </div>
+                                                ) : pdf.allow_download ? (
+                                                    <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">Sí</span>
+                                                ) : (
+                                                    <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-1 rounded-full">No</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-center font-mono text-xs text-brand-blue">
+                                                {fieldsCount} campos
+                                            </TableCell>
+                                            <TableCell className="text-right space-x-2">
+                                                {isEditing ? (
+                                                    <>
+                                                        <Button size="icon" variant="ghost" className="text-emerald-600" onClick={() => saveEdit(pdf.id)}>
+                                                            <Check className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button size="icon" variant="ghost" className="text-neutral-500" onClick={() => setEditingId(null)}>
+                                                            <X className="w-4 h-4" />
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Button size="icon" variant="ghost" className="text-neutral-600" onClick={() => startEdit(pdf)} title="Editar metadatos">
+                                                            <Pencil className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button asChild size="sm" variant="outline" className="text-xs border-brand-blue text-brand-blue hover:bg-brand-blue/10">
+                                                            <Link href={`/admin/material-pdfs/${pdf.id}/edit`}>
+                                                                <Layout className="w-4 h-4 mr-1" /> Editar Campos
+                                                            </Link>
+                                                        </Button>
+                                                        <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(pdf.id)}>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>
                 </Card>
             </div>
-        </AppLayout>
+        </>
     );
 }
+
+Index.layout = (page: React.ReactNode) => (
+    <AppLayout
+        breadcrumbs={[
+            { title: 'Panel de Control', href: '/admin' },
+            { title: 'Cursos', href: '/admin/courses' },
+            { title: 'PDFs Interactivos', href: '#' },
+        ]}
+    >
+        {page}
+    </AppLayout>
+);

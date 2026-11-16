@@ -15,14 +15,18 @@ import { PlusGridPattern } from '@/components/public/PlusGridPattern';
 import {
     PricingCard,
     resolvePurchaseTarget,
-    type ScheduledCourseCandidate,
+    stripHtmlToText,
+    WHATSAPP_PHONE
+    
 } from '@/components/public/PricingCard';
+import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
 import LandingLayout from '@/layouts/LandingLayout';
 
 export type ScheduledCourseRecord = ScheduledCourseCandidate;
 
 export interface PublicReviewItem {
     id: number | string;
+    user_name?: string | null;
     name?: string | null;
     author?: string | null;
     comment?: string | null;
@@ -35,8 +39,6 @@ export interface CourseLandingProps {
     reviews?: PublicReviewItem[];
     scheduledCourses?: ScheduledCourseRecord[];
 }
-
-const WHATSAPP_PHONE = '521234567890';
 
 function normalizeText(value: string): string {
     return value
@@ -450,6 +452,7 @@ const GENERIC_SLUG_META: Record<
         title: string;
         subtitle: string;
         keywords: string[];
+        requireAllKeywords?: boolean;
     }
 > = {
     'egel-plus': {
@@ -465,6 +468,7 @@ const GENERIC_SLUG_META: Record<
         subtitle:
             'Domina pensamiento matemático, comprensión lectora y redacción indirecta con simuladores cronometrados y retroalimentación experta.',
         keywords: ['exani', '1'],
+        requireAllKeywords: true,
     },
     'exani-2': {
         badge: 'Ingreso a Universidad',
@@ -472,6 +476,7 @@ const GENERIC_SLUG_META: Record<
         subtitle:
             'Entrenamiento estratégico por módulos específicos y habilidades transversales para asegurar tu ingreso universitario.',
         keywords: ['exani', '2'],
+        requireAllKeywords: true,
     },
     'exani-3': {
         badge: 'Ingreso a Posgrado',
@@ -479,6 +484,7 @@ const GENERIC_SLUG_META: Record<
         subtitle:
             'Metodología de investigación, pensamiento analítico y simuladores reales orientados a programas de maestría y doctorado.',
         keywords: ['exani', '3'],
+        requireAllKeywords: true,
     },
     'cursos-enarm': {
         badge: 'Especialidades Médicas',
@@ -774,6 +780,7 @@ export default function CourseLanding({
                                 <div className="mt-9 space-y-5">
                                     {MODALIDADES_ROWS.map((row) => {
                                         const IconComponent = row.Icon;
+
                                         return (
                                             <div
                                                 key={`${row.line1}-${row.line2}`}
@@ -1137,6 +1144,67 @@ export default function CourseLanding({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Reseñas de alumnos aprobadas (cuando existan en BD) */}
+                        {Array.isArray(reviews) && reviews.length > 0 && (
+                            <div className="mt-16 border-t border-[#101E33]/10 pt-14">
+                                <div className="text-center">
+                                    <span className="text-xs font-extrabold tracking-widest text-[#FF6B52] uppercase">
+                                        Comunidad Sapius
+                                    </span>
+                                    <h2 className="mt-2 font-display text-2xl font-extrabold text-[#101E33] sm:text-3xl">
+                                        Lo que opinan nuestros estudiantes
+                                    </h2>
+                                </div>
+
+                                <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+                                    {reviews.slice(0, 6).map((rev) => {
+                                        const stars = Math.max(
+                                            1,
+                                            Math.min(
+                                                5,
+                                                Number(rev.rating ?? 5),
+                                            ),
+                                        );
+                                        const author =
+                                            rev.user_name ||
+                                            rev.name ||
+                                            rev.author ||
+                                            'Alumno Sapius';
+                                        const text =
+                                            rev.content ||
+                                            rev.comment ||
+                                            'Excelente preparación académica.';
+
+                                        return (
+                                            <div
+                                                key={rev.id}
+                                                className="flex flex-col justify-between rounded-[24px] border border-[#FF6B52]/45 bg-white p-6 shadow-[0_10px_30px_-15px_rgba(16,30,51,0.12)]"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center gap-1 text-[#FF6B52]">
+                                                        {Array.from({
+                                                            length: stars,
+                                                        }).map((_, idx) => (
+                                                            <Star
+                                                                key={idx}
+                                                                className="h-4 w-4 fill-current"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <p className="mt-3 text-xs leading-relaxed text-[#101E33]/85 sm:text-sm">
+                                                        “{text}”
+                                                    </p>
+                                                </div>
+                                                <p className="mt-4 border-t border-[#101E33]/10 pt-3 text-xs font-extrabold text-[#101E33]">
+                                                    {author}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </section>
             </LandingLayout>
@@ -1156,15 +1224,15 @@ export default function CourseLanding({
         Array.isArray(scheduledCourses) ? scheduledCourses : []
     ).filter((c) => {
         const hay = normalizeText(
-            `${c.identificador ?? ''} ${c.course_title ?? ''} ${c.course?.title ?? ''} ${c.category_name ?? ''}`,
+            `${c.identificador ?? ''} ${c.course_title ?? ''} ${c.course?.title ?? ''} ${c.course_slug ?? ''} ${c.category_name ?? ''}`,
         );
-        return meta.keywords.some((kw) => hay.includes(normalizeText(kw)));
+
+        return meta.requireAllKeywords
+            ? meta.keywords.every((kw) => hay.includes(normalizeText(kw)))
+            : meta.keywords.some((kw) => hay.includes(normalizeText(kw)));
     });
 
-    const displayedCohorts =
-        filteredCohorts.length > 0
-            ? filteredCohorts
-            : (scheduledCourses ?? []).slice(0, 3);
+    const displayedCohorts = filteredCohorts;
 
     const whatsappAdvisoryUrl = `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(
         `Hola equipo Sapius, me gustaría recibir información sobre ${meta.title}.`,
@@ -1326,11 +1394,15 @@ export default function CourseLanding({
                                     const title =
                                         item.course_title ||
                                         item.course?.title ||
-                                        item.identificador ||
                                         meta.title;
                                     const amount = Number(
                                         item.precio ?? item.price ?? 0,
                                     );
+                                    const cleanDescription = stripHtmlToText(
+                                        item.course_description ||
+                                            item.course?.description,
+                                    );
+
                                     return (
                                         <PricingCard
                                             key={item.id}
@@ -1338,8 +1410,7 @@ export default function CourseLanding({
                                             price={`$${amount.toLocaleString('es-MX')} MXN`}
                                             paymentNote="Un solo pago"
                                             description={
-                                                item.course_description ||
-                                                item.course?.description ||
+                                                cleanDescription ||
                                                 'Acceso a plataforma Sapius con contenidos actualizados.'
                                             }
                                             ctaLabel="Comprar"
@@ -1381,13 +1452,14 @@ export default function CourseLanding({
                                         </div>
                                         <p className="mt-3 text-xs leading-relaxed text-[#101E33]/85">
                                             “
-                                            {rev.comment ||
-                                                rev.content ||
+                                            {rev.content ||
+                                                rev.comment ||
                                                 'Excelente preparación académica.'}
                                             ”
                                         </p>
                                         <p className="mt-3 text-xs font-bold text-[#101E33]">
-                                            {rev.name ||
+                                            {rev.user_name ||
+                                                rev.name ||
                                                 rev.author ||
                                                 'Alumno Sapius'}
                                         </p>

@@ -3,6 +3,14 @@
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
+use Tests\Concerns\CreatesLegacySchema;
+
+uses(CreatesLegacySchema::class);
+
+beforeEach(function () {
+    $this->setUpLegacySchema();
+    $this->seedLegacyRoles();
+});
 
 test('sends verification notification', function () {
     Notification::fake();

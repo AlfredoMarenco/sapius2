@@ -4,7 +4,11 @@ import { Menu, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import MiniTestModal from '@/components/public/MiniTestModal';
 import PlusGridPattern from '@/components/public/PlusGridPattern';
-import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
+import {
+    WHATSAPP_PHONE
+    
+} from '@/components/public/PricingCard';
+import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
 import { SapiusWordmark } from '@/components/public/SapiusLogo';
 
 export interface LandingLayoutProps {
@@ -37,11 +41,24 @@ export default function LandingLayout({
     children,
     scheduledCourses: propScheduledCourses,
 }: LandingLayoutProps) {
-    const [mobileOpen, setMobileOpen] = useState(false);
+    const [mobileMenuOpenedPath, setMobileMenuOpenedPath] = useState<
+        string | null
+    >(null);
     const [scrolled, setScrolled] = useState(false);
 
     const page = usePage<SharedPageProps>();
     const currentPath = (page.url || '/').split('?')[0].split('#')[0] || '/';
+    const mobileOpen = mobileMenuOpenedPath === currentPath;
+    const setMobileOpen = (value: boolean | ((prev: boolean) => boolean)) => {
+        setMobileMenuOpenedPath((prevPath) => {
+            const prevOpen = prevPath === currentPath;
+            const nextOpen =
+                typeof value === 'function' ? value(prevOpen) : value;
+
+            return nextOpen ? currentPath : null;
+        });
+    };
+
     const resolvedCourses =
         propScheduledCourses ??
         (Array.isArray(page.props?.scheduledCourses)
@@ -54,17 +71,15 @@ export default function LandingLayout({
         };
         handleScroll();
         window.addEventListener('scroll', handleScroll, { passive: true });
+
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
-
-    useEffect(() => {
-        setMobileOpen(false);
-    }, [currentPath]);
 
     const isActiveLink = (item: (typeof NAV_LINKS)[number]): boolean => {
         if (item.matchExact) {
             return currentPath === '/';
         }
+
         return (
             item.matchPrefixes?.some((prefix) =>
                 currentPath.startsWith(prefix),
@@ -106,6 +121,7 @@ export default function LandingLayout({
                         >
                             {NAV_LINKS.map((item) => {
                                 const active = isActiveLink(item);
+
                                 return (
                                     <Link
                                         key={item.href}
@@ -168,6 +184,7 @@ export default function LandingLayout({
                                 <nav className="flex flex-col space-y-2">
                                     {NAV_LINKS.map((item) => {
                                         const active = isActiveLink(item);
+
                                         return (
                                             <Link
                                                 key={item.href}
@@ -308,7 +325,7 @@ export default function LandingLayout({
                             </p>
                             <p>
                                 <a
-                                    href="tel:+529992988744"
+                                    href={`tel:+${WHATSAPP_PHONE}`}
                                     className="transition-colors hover:text-[#FF6B52]"
                                 >
                                     +52 999 298 8744

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
+use App\Models\Exam;
 use App\Models\Homework;
 use App\Models\Lesson;
 use App\Models\Module;
@@ -257,6 +258,62 @@ class CourseController extends Controller
             'selectedCohort' => $selectedCohort,
             'students' => $enrolledStudents->values(),
             'total_cohorts' => $cohorts->count(),
+        ]);
+    }
+
+    public function resultados($inscripcion_id)
+    {
+        $inscripcion = Enrollment::with(['user', 'scheduledCourse.course'])->findOrFail($inscripcion_id);
+        $user = auth()->user();
+        $isAdmin = ($user && method_exists($user, 'hasRole') && $user->hasRole('admin'))
+            || ($user && isset($user->role) && $user->role === 'admin');
+
+        $cohort = $inscripcion->scheduledCourse;
+
+        if (! $isAdmin) {
+            if (! $cohort || ! $user || (int) $cohort->user_id !== (int) $user->id) {
+                abort(403, 'No tienes autorización para ver los resultados de esta inscripción.');
+            }
+        }
+
+        $student = $inscripcion->user;
+        $course = $cohort ? $cohort->course : null;
+
+        $examenes = Exam::with('quiz')
+            ->where('inscripcion_id', $inscripcion_id)
+            ->orderBy('id', 'asc')
+            ->get()
+            ->map(function ($ex) {
+                return [
+                    'id' => $ex->id,
+                    'quiz_id' => $ex->prueba_id,
+                    'quiz_title' => $ex->quiz ? $ex->quiz->title : 'Evaluación',
+                    'quiz_description' => $ex->quiz ? $ex->quiz->description : '',
+                    'min_score' => $ex->quiz ? ($ex->quiz->min_score ?? 60) : 60,
+                    'max_score' => $ex->quiz ? ($ex->quiz->score ?? 100) : 100,
+                    'duration' => $ex->quiz ? ($ex->quiz->duration ?? 0) : 0,
+                    'score' => $ex->score_total ?? $ex->score ?? $ex->calificacion ?? 0,
+                    'correct_answers' => $ex->total_correctas ?? $ex->aciertos ?? 0,
+                    'total_questions' => $ex->total_preguntas ?? 0,
+                    'finished' => $ex->finalizado ?? 'no',
+                    'feedback_viewed' => $ex->retro_visualizado ?? 'no',
+                    'created_at' => $ex->created_at ? $ex->created_at->format('d/m/Y H:i') : null,
+                    'updated_at' => $ex->updated_at ? $ex->updated_at->format('d/m/Y H:i') : null,
+                ];
+            });
+
+        return Inertia::render('Admin/Exams/Results', [
+            'enrollment' => [
+                'id' => $inscripcion->id,
+                'user_id' => $inscripcion->user_id,
+                'student_name' => $student ? ($student->nombre_completo ?: $student->name ?: $student->email) : 'Alumno',
+                'student_email' => $student ? $student->email : '',
+                'accepted' => $inscripcion->aceptado,
+                'cohort_id' => $cohort ? $cohort->id : 0,
+                'cohort_internal_id' => $cohort ? $cohort->identificador : '',
+                'course_title' => $course ? $course->title : 'Curso',
+            ],
+            'exams' => $examenes,
         ]);
     }
 }

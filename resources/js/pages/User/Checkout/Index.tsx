@@ -1,25 +1,25 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
-import { useState, useEffect, useRef } from 'react';
-import { 
-    CreditCard, 
-    ShieldCheck, 
-    Lock, 
-    CheckCircle2, 
-    BookOpen, 
+import {
+    CreditCard,
+    ShieldCheck,
+    Lock,
+    BookOpen,
     ArrowLeft,
     Sparkles,
     Ticket,
     X,
     Loader2,
-    AlertCircle
+    AlertCircle,
+    CheckCircle2,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import AppLayout from '@/layouts/app-layout';
 
 declare global {
     interface Window {
@@ -40,6 +40,7 @@ interface CheckoutProps {
     };
     coupon: {
         code: string;
+        percent?: number;
         discount: number;
     } | null;
     user: {
@@ -55,40 +56,54 @@ interface CheckoutProps {
 }
 
 export default function Checkout({ course, coupon, user, openpay }: CheckoutProps) {
+    const { props } = usePage();
+    const flash = (props as any).flash as { error?: string; success?: string } | undefined;
+
     const [couponCode, setCouponCode] = useState('');
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
-    const { data, setData, post, processing, errors } = useForm({
+    // Datos no sensibles del formulario enviados al backend
+    const { data, setData, post, processing } = useForm({
         curso_id: course.id,
         user_name: user.name,
         user_email: user.email,
         user_phone: user.phone || '',
-        card_number: '',
-        card_holder: user.name,
-        card_month: '',
-        card_year: '',
-        card_cvv: '',
-        token_id: '',
-        device_session_id: '',
     });
+
+    // Datos sensibles de tarjeta aislados en estado local (PCI-DSS: nunca en useForm ni enviados al backend)
+    const [cardHolder, setCardHolder] = useState(user.name);
+    const [cardNumber, setCardNumber] = useState('');
+    const [cardMonth, setCardMonth] = useState('');
+    const [cardYear, setCardYear] = useState('');
+    const [cardCvv, setCardCvv] = useState('');
 
     const [isTokenizing, setIsTokenizing] = useState(false);
     const [paymentError, setPaymentError] = useState<string | null>(null);
     const [deviceSessionId, setDeviceSessionId] = useState<string>('');
     const [openpayReady, setOpenpayReady] = useState(false);
 
+    const isFree = course.price <= 0 && Boolean(coupon && (coupon.percent ?? 0) >= 100);
+
     useEffect(() => {
-        if (course.price <= 0) return;
+        if (isFree) {
+return;
+}
+
+        if (!openpay.merchantId || !openpay.publicKey) {
+return;
+}
 
         const initOpenPay = () => {
             if (window.OpenPay) {
                 window.OpenPay.setId(openpay.merchantId);
                 window.OpenPay.setApiKey(openpay.publicKey);
                 window.OpenPay.setSandboxMode(openpay.sandbox);
+
                 if (window.OpenPay.deviceData) {
                     const sessionId = window.OpenPay.deviceData.setup();
                     setDeviceSessionId(sessionId);
                 }
+
                 setOpenpayReady(true);
             }
         };
@@ -96,10 +111,13 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
         const loadScript = (src: string) =>
             new Promise<void>((resolve, reject) => {
                 const existing = document.querySelector(`script[src="${src}"]`);
+
                 if (existing) {
                     resolve();
+
                     return;
                 }
+
                 const script = document.createElement('script');
                 script.src = src;
                 script.async = true;
@@ -118,7 +136,7 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                     setPaymentError('No se pudo cargar el módulo de pago seguro de OpenPay. Recarga la página.');
                 });
         }
-    }, [openpay.merchantId, openpay.publicKey, openpay.sandbox, course.price]);
+    }, [openpay.merchantId, openpay.publicKey, openpay.sandbox, isFree]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -127,20 +145,25 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
         if (isFree) {
             post('/alumno/payout', {
                 onError: (errs) => {
-                    setPaymentError(errs.payment || 'Ocurrió un error inesperado al procesar la solicitud.');
+                    const firstErr = Object.values(errs)[0] as string | undefined;
+                    setPaymentError(firstErr || 'Ocurrió un error inesperado al procesar la solicitud.');
                 },
             });
+
             return;
         }
 
         if (!openpayReady || !window.OpenPay) {
             setPaymentError('El módulo de pago aún está cargando. Espera un momento e intenta de nuevo.');
+
             return;
         }
 
-        const cleanCardNumber = data.card_number.replace(/\s+/g, '');
-        if (!data.card_holder || !cleanCardNumber || !data.card_month || !data.card_year || !data.card_cvv) {
+        const cleanCardNumber = cardNumber.replace(/\s+/g, '');
+
+        if (!cardHolder.trim() || !cleanCardNumber || !cardMonth.trim() || !cardYear.trim() || !cardCvv.trim()) {
             setPaymentError('Por favor completa todos los datos de tu tarjeta.');
+
             return;
         }
 
@@ -148,10 +171,10 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
         window.OpenPay.token.create(
             {
                 card_number: cleanCardNumber,
-                holder_name: data.card_holder,
-                expiration_year: data.card_year.slice(-2),
-                expiration_month: data.card_month.padStart(2, '0'),
-                cvv2: data.card_cvv,
+                holder_name: cardHolder.trim(),
+                expiration_year: cardYear.trim().slice(-2),
+                expiration_month: cardMonth.trim().padStart(2, '0'),
+                cvv2: cardCvv.trim(),
             },
             (response: any) => {
                 const tokenId = response.data.id;
@@ -183,26 +206,35 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
     };
 
     const handleApplyCoupon = () => {
-        if (!couponCode) return;
+        if (!couponCode.trim()) {
+return;
+}
+
         setIsApplyingCoupon(true);
-        router.post('/alumno/checkout/check-coupon', {
-            clave: couponCode,
-            curso_id: course.id
-        }, {
-            preserveScroll: true,
-            onFinish: () => setIsApplyingCoupon(false)
-        });
+        router.post(
+            '/alumno/checkout/check-coupon',
+            {
+                clave: couponCode.trim(),
+                curso_id: course.id,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setIsApplyingCoupon(false),
+            }
+        );
     };
 
     const handleRemoveCoupon = () => {
         setIsApplyingCoupon(true);
-        router.post('/alumno/checkout/remove-coupon', {}, {
-            preserveScroll: true,
-            onFinish: () => setIsApplyingCoupon(false)
-        });
+        router.post(
+            '/alumno/checkout/remove-coupon',
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setIsApplyingCoupon(false),
+            }
+        );
     };
-
-    const isFree = course.price <= 0;
 
     return (
         <>
@@ -231,11 +263,20 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                 </CardDescription>
                             </CardHeader>
 
-                            {(usePage().props as any).flash?.error && (
+                            {flash?.error && (
                                 <div className="px-6 pb-2">
                                     <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4 shrink-0" />
-                                        <span>{(usePage().props as any).flash.error}</span>
+                                        <span>{flash.error}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {flash?.success && (
+                                <div className="px-6 pb-2">
+                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg flex items-center gap-2">
+                                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                        <span>{flash.success}</span>
                                     </div>
                                 </div>
                             )}
@@ -253,7 +294,7 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                 <Input
                                                     id="user_name"
                                                     value={data.user_name}
-                                                    onChange={e => setData('user_name', e.target.value)}
+                                                    onChange={(e) => setData('user_name', e.target.value)}
                                                     required
                                                 />
                                             </div>
@@ -263,7 +304,7 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                     id="user_email"
                                                     type="email"
                                                     value={data.user_email}
-                                                    onChange={e => setData('user_email', e.target.value)}
+                                                    onChange={(e) => setData('user_email', e.target.value)}
                                                     required
                                                 />
                                             </div>
@@ -273,7 +314,7 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                     id="user_phone"
                                                     type="tel"
                                                     value={data.user_phone}
-                                                    onChange={e => setData('user_phone', e.target.value)}
+                                                    onChange={(e) => setData('user_phone', e.target.value)}
                                                 />
                                             </div>
                                         </div>
@@ -298,8 +339,8 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                         id="card_holder"
                                                         type="text"
                                                         placeholder="Como aparece en la tarjeta"
-                                                        value={data.card_holder}
-                                                        onChange={e => setData('card_holder', e.target.value)}
+                                                        value={cardHolder}
+                                                        onChange={(e) => setCardHolder(e.target.value)}
                                                         required
                                                     />
                                                 </div>
@@ -312,8 +353,8 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                         inputMode="numeric"
                                                         maxLength={19}
                                                         placeholder="0000 0000 0000 0000"
-                                                        value={data.card_number}
-                                                        onChange={e => setData('card_number', e.target.value)}
+                                                        value={cardNumber}
+                                                        onChange={(e) => setCardNumber(e.target.value)}
                                                         required
                                                     />
                                                 </div>
@@ -327,8 +368,8 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                             inputMode="numeric"
                                                             maxLength={2}
                                                             placeholder="MM"
-                                                            value={data.card_month}
-                                                            onChange={e => setData('card_month', e.target.value)}
+                                                            value={cardMonth}
+                                                            onChange={(e) => setCardMonth(e.target.value)}
                                                             required
                                                         />
                                                     </div>
@@ -340,8 +381,8 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                             inputMode="numeric"
                                                             maxLength={2}
                                                             placeholder="AA"
-                                                            value={data.card_year}
-                                                            onChange={e => setData('card_year', e.target.value)}
+                                                            value={cardYear}
+                                                            onChange={(e) => setCardYear(e.target.value)}
                                                             required
                                                         />
                                                     </div>
@@ -355,8 +396,8 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                                         inputMode="numeric"
                                                         maxLength={4}
                                                         placeholder="3 o 4 dígitos"
-                                                        value={data.card_cvv}
-                                                        onChange={e => setData('card_cvv', e.target.value)}
+                                                        value={cardCvv}
+                                                        onChange={(e) => setCardCvv(e.target.value)}
                                                         required
                                                     />
                                                 </div>
@@ -380,15 +421,15 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                     )}
 
                                     {isFree && (
-                                         <div className="bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-emerald-800 dark:text-emerald-300 text-center">
+                                        <div className="bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-emerald-800 dark:text-emerald-300 text-center">
                                             <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center mb-2">
                                                 <Sparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                                             </div>
                                             <h4 className="font-bold text-lg">¡Inscripción Gratuita!</h4>
                                             <p className="text-sm px-4">
-                                                Tu cupón de descuento cubre el costo total del curso. No se requiere tarjeta de crédito. Da clic en el botón de abajo para finalizar.
+                                                Tu cupón de descuento del 100% cubre el costo total del curso. No se requiere tarjeta de crédito. Da clic en el botón de abajo para finalizar.
                                             </p>
-                                         </div>
+                                        </div>
                                     )}
                                 </CardContent>
 
@@ -397,18 +438,20 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                         type="submit"
                                         disabled={processing || isTokenizing}
                                         className={`w-full h-12 text-base font-bold shadow-lg ${
-                                            isFree 
-                                            ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white' 
-                                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20 text-white'
+                                            isFree
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white'
+                                                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20 text-white'
                                         }`}
                                     >
-                                        {(processing || isTokenizing) ? (
+                                        {processing || isTokenizing ? (
                                             <>
                                                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                                                 Procesando inscripción...
                                             </>
+                                        ) : isFree ? (
+                                            'Completar Inscripción Gratuita'
                                         ) : (
-                                            isFree ? 'Completar Inscripción Gratuita' : `Pagar $${course.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`
+                                            `Pagar $${course.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`
                                         )}
                                     </Button>
                                 </CardFooter>
@@ -428,6 +471,7 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                         onError={(e) => {
                                             const target = e.target as HTMLImageElement;
                                             const fallback = 'https://images.unsplash.com/photo-1576091160550-217359f42f8c?auto=format&fit=crop&q=80&w=2070';
+
                                             if (target.src !== fallback && !target.dataset.fallbackApplied) {
                                                 target.dataset.fallbackApplied = 'true';
                                                 target.src = fallback;
@@ -445,20 +489,16 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                             </div>
 
                             <CardHeader className="p-5 pb-3">
-                                <CardTitle className="text-xl font-bold leading-snug">
-                                    {course.title}
-                                </CardTitle>
+                                <CardTitle className="text-xl font-bold leading-snug">{course.title}</CardTitle>
                                 {course.identifier && (
-                                    <CardDescription className="text-xs">
-                                        Identificador: {course.identifier}
-                                    </CardDescription>
+                                    <CardDescription className="text-xs">Identificador: {course.identifier}</CardDescription>
                                 )}
                             </CardHeader>
 
                             <CardContent className="p-5 pt-0 space-y-4">
-                                <div 
+                                <div
                                     className="text-xs text-neutral-500 line-clamp-3 prose prose-sm max-w-none dark:prose-invert"
-                                    dangerouslySetInnerHTML={{ __html: course.description }} 
+                                    dangerouslySetInnerHTML={{ __html: course.description }}
                                 />
 
                                 <Separator />
@@ -466,14 +506,20 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                 {/* Coupon Section */}
                                 <div>
                                     <Label className="text-sm font-semibold mb-2 block">¿Tienes un cupón de descuento?</Label>
-                                    
+
                                     {coupon ? (
                                         <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 rounded-lg">
                                             <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-medium">
                                                 <Ticket className="w-4 h-4" />
                                                 <span>{coupon.code}</span>
+                                                {coupon.percent !== undefined && (
+                                                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs">
+                                                        -{coupon.percent}%
+                                                    </Badge>
+                                                )}
                                             </div>
-                                            <button 
+                                            <button
+                                                type="button"
                                                 onClick={handleRemoveCoupon}
                                                 disabled={isApplyingCoupon}
                                                 className="text-neutral-400 hover:text-red-500 p-1"
@@ -484,17 +530,18 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                         </div>
                                     ) : (
                                         <div className="flex gap-2">
-                                            <Input 
-                                                placeholder="Ingresa tu código" 
+                                            <Input
+                                                placeholder="Ingresa tu código"
                                                 value={couponCode}
                                                 onChange={(e) => setCouponCode(e.target.value)}
                                                 className="uppercase"
                                                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleApplyCoupon())}
                                             />
-                                            <Button 
-                                                variant="secondary" 
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
                                                 onClick={handleApplyCoupon}
-                                                disabled={!couponCode || isApplyingCoupon}
+                                                disabled={!couponCode.trim() || isApplyingCoupon}
                                             >
                                                 {isApplyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
                                             </Button>
@@ -511,14 +558,16 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
                                             ${course.originalPrice.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
                                         </span>
                                     </div>
-                                    
+
                                     {coupon && (
                                         <div className="flex justify-between text-sm text-emerald-600 font-medium">
-                                            <span>Descuento aplicado:</span>
+                                            <span>
+                                                Descuento aplicado{coupon.percent !== undefined ? ` (${coupon.percent}%)` : ''}:
+                                            </span>
                                             <span>-${coupon.discount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</span>
                                         </div>
                                     )}
-                                    
+
                                     <Separator />
                                     <div className="flex justify-between text-lg font-bold text-neutral-900 dark:text-neutral-100">
                                         <span>Total a Pagar:</span>
@@ -531,7 +580,7 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
 
                             <CardFooter className="p-5 bg-blue-50/50 dark:bg-blue-950/20 border-t border-blue-100 dark:border-blue-900/30 flex items-center gap-3 text-xs text-blue-900 dark:text-blue-200">
                                 <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
-                                <span>Garantía de acceso inmediato una vez completado el pago.</span>
+                                <span>Pago seguro encriptado. Tu inscripción será validada automáticamente tras confirmar el pago.</span>
                             </CardFooter>
                         </Card>
                     </div>
@@ -542,10 +591,12 @@ export default function Checkout({ course, coupon, user, openpay }: CheckoutProp
 }
 
 Checkout.layout = (page: any) => (
-    <AppLayout breadcrumbs={[
-        { title: 'Cursos Disponibles', href: '/alumno/cursos' },
-        { title: 'Inscripción y Pago', href: '#' },
-    ]}>
+    <AppLayout
+        breadcrumbs={[
+            { title: 'Cursos Disponibles', href: '/alumno/cursos' },
+            { title: 'Inscripción y Pago', href: '#' },
+        ]}
+    >
         {page}
     </AppLayout>
 );

@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-
 use App\Concerns\MapsLegacyAttributes;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable(['user_id', 'title', 'slug', 'description', 'image', 'is_active'])]
 class Course extends Model
@@ -20,6 +19,13 @@ class Course extends Model
         'image' => 'imagen',
         'is_active' => 'activo',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function user()
     {

@@ -3,19 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Exam;
+use App\Models\Cursos\Leccion;
 use App\Models\Enrollment;
-use App\Models\ScheduledCourse;
-use App\Models\Course;
-use App\Models\Lesson;
-use Illuminate\Support\Facades\DB;
+use App\Models\Exam;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class TrackingExamController extends Controller
 {
     /**
-     * Elimina el examen para reiniciar el progreso
+     * Elimina el examen para reiniciar el progreso.
      */
     public function reset(Exam $exam)
     {
@@ -25,49 +21,59 @@ class TrackingExamController extends Controller
     }
 
     /**
-     * Alterna la opción de mostrar retroalimentación
+     * Alterna el bloqueo de retroalimentación (retro_visualizado: 'no' = Habilitada, 'si' = Consumida).
      */
     public function toggleFeedback(Exam $exam)
     {
-        $exam->feedback_enabled = ($exam->feedback_enabled === 'si') ? 'no' : 'si';
+        $newValue = ($exam->retro_visualizado === 'si') ? 'no' : 'si';
+        $exam->retro_visualizado = $newValue;
         $exam->save();
 
-        return back()->with('success', 'Retroalimentación ' . ($exam->feedback_enabled === 'si' ? 'activada' : 'desactivada') . ' para este examen.');
+        return back()->with(
+            'success',
+            $newValue === 'no'
+                ? 'Retroalimentación habilitada para este examen.'
+                : 'Retroalimentación marcada como consumida/bloqueada.'
+        );
     }
 
     /**
-     * Descarga el reporte PDF de los exámenes de un alumno
+     * Descarga el reporte PDF de los exámenes de un alumno (incluyendo quizzes directos de módulo).
      */
     public function downloadReport(Enrollment $enrollment)
     {
-        // Obtener el curso activo y sus lecciones
-        $cohort = ScheduledCourse::with('course.modules.lessons')->find($enrollment->curso_programado_id);
-        
+        $enrollment->load(['user', 'scheduledCourse.course']);
+        $cohort = $enrollment->scheduledCourse;
+
         $lecciones = collect();
-        if ($cohort && $cohort->course) {
-            foreach ($cohort->course->modules as $module) {
-                if ($module->lessons) {
-                    $lecciones = $lecciones->merge($module->lessons->where('activo', 'si'));
-                }
-            }
+        if ($cohort) {
+            // Incluye tanto módulos (leccion_id = 0) con quizzes directos como lecciones hijas (leccion_id > 0)
+            $lecciones = Leccion::with(['pruebas' => function ($q) {
+                $q->where('activo', 'si');
+            }])
+                ->where('curso_id', $cohort->curso_id)
+                ->where('activo', 'si')
+                ->orderBy('leccion_id', 'asc')
+                ->orderBy('posicion', 'asc')
+                ->get();
         }
 
-        // Obtener los exámenes realizados en esta inscripción
         $examenes = Exam::with('quiz')
             ->where('inscripcion_id', $enrollment->id)
+            ->orderBy('id', 'asc')
             ->get();
-            
-        // El legacy usa relations con nombre 'Prueba' y modelo 'CursosCurso' (Course)
-        // Por compatibilidad de vista enviaremos la variable renombrada pero con la misma estructura.
-        
+
         $pdf = Pdf::loadView('alumno.exportresultados', [
             'examenes' => $examenes,
             'lecciones' => $lecciones,
-            'inscripcion' => $enrollment
+            'inscripcion' => $enrollment,
         ]);
 
-        $userName = $enrollment->user ? ($enrollment->user->name ?? $enrollment->user->email) : 'Alumno';
-        
-        return $pdf->download($userName . ' - Reporte de Resultados - ' . date('Y-m-d H:i:s') . '.pdf');
+        $userName = $enrollment->user
+            ? ($enrollment->user->nombre_completo ?: ($enrollment->user->name ?? $enrollment->user->email))
+            : 'Alumno';
+        $cleanName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $userName);
+
+        return $pdf->download($cleanName.' - Reporte de Resultados - '.date('Y-m-d_H-i-s').'.pdf');
     }
 }

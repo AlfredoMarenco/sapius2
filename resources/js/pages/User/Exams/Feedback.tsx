@@ -3,8 +3,9 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, AlertCircle, Clock, Lightbulb, Award, BarChart3 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Clock, Lightbulb, Award, Eye } from 'lucide-react';
 import { useAntiCheat } from '@/hooks/useAntiCheat';
+import MathHtml from '@/components/MathHtml';
 
 interface CriteriaRow {
     label: string;
@@ -25,7 +26,19 @@ interface FeedbackProps {
     feedback: any[];
     questions: any[];
     timeLeft?: number;
+    scheduled_course_id?: number | null;
     examCriteria?: Record<string, CriteriaTable>;
+}
+
+function resolveQuestionImageUrl(img?: string | null): string | null {
+    if (!img) return null;
+    const trimmed = String(img).trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+        return trimmed;
+    }
+    const filename = trimmed.split('/').pop() || trimmed;
+    return `/alumno/preguntas/imagen/${encodeURIComponent(filename)}`;
 }
 
 export default function Feedback({
@@ -33,23 +46,37 @@ export default function Feedback({
     feedback,
     questions,
     timeLeft: initialTimeLeft,
+    scheduled_course_id,
     examCriteria = {},
 }: FeedbackProps) {
     const { auth } = usePage<any>().props;
     const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
 
-    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+    // Activar feedbackMode: true (100 pts bloqueo inmediato)
+    const antiCheatConfig = {
         enabled: true,
         watermarkText: userEmail,
-    });
+        feedbackMode: true,
+        onBlocked: (redirectUrl?: string) => {
+            router.visit(redirectUrl || '/alumno/cuenta-bloqueada');
+        },
+    };
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat(antiCheatConfig);
+
     const [timeLeft, setTimeLeft] = useState<number>(initialTimeLeft ? Math.max(0, Math.floor(initialTimeLeft)) : 0);
+    const [revealedCards, setRevealedCards] = useState<Record<number, boolean>>({});
+
+    const courseIdForReturn =
+        scheduled_course_id ||
+        exam.enrollment?.scheduled_course_id ||
+        exam.enrollment?.curso_programado_id ||
+        exam.inscripcion?.curso_programado_id;
 
     useEffect(() => {
         if (!initialTimeLeft || initialTimeLeft <= 0) return;
 
         if (timeLeft <= 0) {
-            const redirectId = exam.enrollment?.curso_programado_id || exam.inscripcion?.curso_programado_id || exam.enrollment?.curso_id;
-            router.visit(redirectId ? `/alumno/curso/${redirectId}` : '/alumno');
+            router.visit(courseIdForReturn ? `/alumno/curso/${courseIdForReturn}` : '/alumno');
             return;
         }
 
@@ -58,13 +85,18 @@ export default function Feedback({
         }, 1000);
 
         return () => clearInterval(timerId);
-    }, [timeLeft, initialTimeLeft]);
+    }, [timeLeft, initialTimeLeft, courseIdForReturn]);
 
     const formatTime = (seconds: number) => {
         const validSeconds = Math.max(0, Math.floor(seconds));
-        const m = Math.floor(validSeconds / 60).toString().padStart(2, '0');
+        const h = Math.floor(validSeconds / 3600)
+            .toString()
+            .padStart(2, '0');
+        const m = Math.floor((validSeconds % 3600) / 60)
+            .toString()
+            .padStart(2, '0');
         const s = (validSeconds % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
+        return h !== '00' ? `${h}:${m}:${s}` : `${m}:${s}`;
     };
 
     const totalQuestions = Number(exam.total_preguntas || questions.length || 0);
@@ -76,15 +108,13 @@ export default function Feedback({
     const normalizedType = rawQuizType.includes('EXANI')
         ? 'EXANI'
         : rawQuizType.includes('ENARM')
-        ? 'ENARM'
-        : 'EGEL';
+          ? 'ENARM'
+          : 'EGEL';
 
     const scoreValue = Number(exam.score ?? exam.score_total ?? 0);
 
-    // Determinar si aprobó según escala CENEVAL (>=1000) o porcentaje (>=60%)
-    const isPassing = normalizedType === 'ENARM'
-        ? accuracyPercent >= 60
-        : scoreValue >= 1000 || accuracyPercent >= 60;
+    // Escala CENEVAL (>=1000) o porcentaje ENARM (>=60%)
+    const isPassing = normalizedType === 'ENARM' ? accuracyPercent >= 60 : scoreValue >= 1000;
 
     const criteriaTable = examCriteria[normalizedType] || examCriteria['EGEL'];
 
@@ -94,7 +124,10 @@ export default function Feedback({
             <StrikeAlert />
             <Watermark />
 
-            <div className={`py-8 bg-gray-50 min-h-screen select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}>
+            <div
+                className={`py-8 bg-gray-50 min-h-screen select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}
+                onContextMenu={(e) => e.preventDefault()}
+            >
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
                     {/* Header con temporizador de vigencia de retroalimentación */}
                     {initialTimeLeft && initialTimeLeft > 0 ? (
@@ -115,7 +148,7 @@ export default function Feedback({
                         </div>
                     ) : null}
 
-                    {/* Resumen de Resultados + Gráfica Visual */}
+                    {/* Resumen de Resultados + Tabla de Referencia */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         <Card className="lg:col-span-7 shadow-md overflow-hidden border-neutral-200/80 flex flex-col justify-between">
                             <div className={`h-2.5 ${isPassing ? 'bg-emerald-500' : 'bg-rose-500'}`} />
@@ -147,12 +180,11 @@ export default function Feedback({
                                         </div>
                                         {normalizedType !== 'ENARM' && (
                                             <p className="text-xs text-gray-500 mt-1">
-                                                Escala CENEVAL (700 puntos base + puntos por reactivos acertados)
+                                                Escala CENEVAL (700 puntos base + puntos por reactivos acertados; satisfactorio &ge; 1000)
                                             </p>
                                         )}
                                     </div>
 
-                                    {/* Barra visual estilo gráfica Correctas vs Incorrectas */}
                                     <div className="w-full max-w-md pt-2 space-y-2">
                                         <div className="flex justify-between text-xs font-semibold">
                                             <span className="text-emerald-700">
@@ -178,7 +210,7 @@ export default function Feedback({
                                 <Link href="/alumno">
                                     <Button variant="outline">Volver al inicio</Button>
                                 </Link>
-                                <Link href={`/alumno/curso/${exam.enrollment?.curso_programado_id || exam.inscripcion?.curso_programado_id}`}>
+                                <Link href={courseIdForReturn ? `/alumno/curso/${courseIdForReturn}` : '/alumno'}>
                                     <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
                                         Regresar al curso
                                     </Button>
@@ -186,7 +218,6 @@ export default function Feedback({
                             </CardFooter>
                         </Card>
 
-                        {/* Tabla Oficial de Criterios de Desempeño (Administrable) */}
                         {criteriaTable && (
                             <Card className="lg:col-span-5 shadow-md border-neutral-200/80 flex flex-col">
                                 <CardHeader className="pb-3 bg-slate-900 text-white rounded-t-xl">
@@ -212,8 +243,8 @@ export default function Feedback({
                                                 )}
                                                 <th className="py-2.5 px-4 text-right">
                                                     {normalizedType === 'ENARM'
-                                                        ? (criteriaTable.columns?.[2] || 'Mínimo')
-                                                        : (criteriaTable.columns?.[1] || 'Puntaje')}
+                                                        ? criteriaTable.columns?.[2] || 'Mínimo'
+                                                        : criteriaTable.columns?.[1] || 'Puntaje'}
                                                 </th>
                                             </tr>
                                         </thead>
@@ -236,114 +267,163 @@ export default function Feedback({
                         )}
                     </div>
 
-                    {/* Revisión Detallada de Preguntas con Explicación / Retroalimentación */}
+                    {/* Revisión Detallada con hover-to-reveal por tarjeta */}
                     {feedback && feedback.length > 0 && (
                         <Card className="shadow-md border-neutral-200/80">
-                            <CardHeader className="border-b border-neutral-100">
+                            <CardHeader className="border-b border-neutral-100 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xl font-bold flex items-center">
                                     <AlertCircle className="w-5 h-5 mr-2 text-indigo-600" />
                                     Revisión del Examen y Retroalimentación
                                 </CardTitle>
+                                <span className="text-xs text-slate-500 hidden sm:inline">
+                                    Pasa el cursor sobre cada tarjeta para visualizar el detalle
+                                </span>
                             </CardHeader>
                             <CardContent className="space-y-5 pt-6">
                                 {feedback.map((item, index) => {
-                                    const questionId = item.correct_answer?.question_id || item.correct_answer?.pregunta_id || item.user_answer?.name;
-                                    const question = questions.find((q) => q.id === questionId) || item.correct_answer?.question;
+                                    const questionId =
+                                        item.correct_answer?.question_id ||
+                                        item.correct_answer?.pregunta_id ||
+                                        item.user_answer?.name;
+                                    const question =
+                                        questions.find((q) => Number(q.id) === Number(questionId)) ||
+                                        item.correct_answer?.question;
 
                                     if (!question) return null;
 
-                                    const userAnswerObj = question.answers?.find((a: any) => a.id === item.user_answer?.value);
+                                    const userAnswerObj = question.answers?.find(
+                                        (a: any) => Number(a.id) === Number(item.user_answer?.value),
+                                    );
                                     const explanationHtml = question.explanation || question.opciones || null;
+                                    const qImageUrl = resolveQuestionImageUrl(question.image || question.imagen);
 
                                     const isCorrect = item.status === 'correct';
                                     const isUnanswered = item.status === 'unanswered';
+                                    const isRevealed = Boolean(revealedCards[index]);
 
                                     const containerClass = isCorrect
-                                        ? 'p-5 rounded-xl border border-emerald-200 bg-emerald-50/70'
+                                        ? 'p-5 rounded-xl border border-emerald-200 bg-emerald-50/70 group relative transition-all'
                                         : isUnanswered
-                                        ? 'p-5 rounded-xl border border-amber-200 bg-amber-50/70'
-                                        : 'p-5 rounded-xl border border-rose-200 bg-rose-50/70';
+                                          ? 'p-5 rounded-xl border border-amber-200 bg-amber-50/70 group relative transition-all'
+                                          : 'p-5 rounded-xl border border-rose-200 bg-rose-50/70 group relative transition-all';
 
                                     const iconColor = isCorrect
                                         ? 'text-emerald-600'
                                         : isUnanswered
-                                        ? 'text-amber-600'
-                                        : 'text-rose-600';
+                                          ? 'text-amber-600'
+                                          : 'text-rose-600';
                                     const textColor = isCorrect
                                         ? 'text-emerald-800'
                                         : isUnanswered
-                                        ? 'text-amber-800'
-                                        : 'text-rose-800';
+                                          ? 'text-amber-800'
+                                          : 'text-rose-800';
 
                                     return (
-                                        <div key={index} className={containerClass}>
-                                            <div className="flex items-start gap-3 mb-3">
-                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white font-bold text-xs text-gray-700 border shadow-2xs shrink-0">
-                                                    {index + 1}
+                                        <div
+                                            key={index}
+                                            className={containerClass}
+                                            onClick={() =>
+                                                setRevealedCards((prev) => ({
+                                                    ...prev,
+                                                    [index]: !prev[index],
+                                                }))
+                                            }
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-white font-bold text-xs text-gray-700 border shadow-2xs">
+                                                    Reactivo #{index + 1}
                                                 </span>
-                                                <div
-                                                    className="font-semibold text-gray-900 prose prose-sm max-w-none"
-                                                    dangerouslySetInnerHTML={{ __html: question.text || question.pregunta || '' }}
-                                                />
+                                                <span
+                                                    className={`inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-white/80 px-2.5 py-0.5 rounded-full border transition-opacity ${
+                                                        isRevealed ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
+                                                    }`}
+                                                >
+                                                    <Eye className="w-3 h-3" /> Pasa el cursor para revelar
+                                                </span>
                                             </div>
 
-                                            <div className="mt-3 space-y-2.5 text-sm pl-10">
-                                                <div className="flex items-start">
-                                                    {isCorrect ? (
-                                                        <CheckCircle className={`w-5 h-5 ${iconColor} mr-2 shrink-0 mt-0.5`} />
-                                                    ) : (
-                                                        <XCircle className={`w-5 h-5 ${iconColor} mr-2 shrink-0 mt-0.5`} />
-                                                    )}
-                                                    <div>
-                                                        <span className={`font-bold ${textColor} block`}>Tu respuesta:</span>
-                                                        <div
-                                                            className="text-gray-800 prose prose-sm max-w-none"
-                                                            dangerouslySetInnerHTML={{
-                                                                __html: userAnswerObj
-                                                                    ? userAnswerObj.text || userAnswerObj.respuesta
-                                                                    : '<em>No respondida</em>',
-                                                            }}
-                                                        />
-                                                    </div>
+                                            <div
+                                                className={`transition-all duration-200 ${
+                                                    isRevealed
+                                                        ? 'blur-none opacity-100'
+                                                        : 'blur-[5px] opacity-65 group-hover:blur-none group-hover:opacity-100'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-3 mb-3">
+                                                    <MathHtml
+                                                        html={question.text || question.pregunta || ''}
+                                                        className="font-semibold text-gray-900 prose prose-sm max-w-none"
+                                                    />
                                                 </div>
 
-                                                {!isCorrect && item.correct_answer && (
-                                                    <div
-                                                        className={`flex items-start pt-2.5 border-t ${
-                                                            isUnanswered ? 'border-amber-200/80' : 'border-rose-200/80'
-                                                        }`}
-                                                    >
-                                                        <CheckCircle className="w-5 h-5 text-emerald-600 mr-2 shrink-0 mt-0.5" />
-                                                        <div>
-                                                            <span className="font-bold text-emerald-800 block">
-                                                                Respuesta correcta:
-                                                            </span>
-                                                            <div
-                                                                className="text-gray-800 prose prose-sm max-w-none"
-                                                                dangerouslySetInnerHTML={{
-                                                                    __html: item.correct_answer.text || item.correct_answer.respuesta || '',
-                                                                }}
-                                                            />
-                                                        </div>
+                                                {qImageUrl && (
+                                                    <div className="my-3 flex justify-center bg-white/80 p-2 rounded-lg border">
+                                                        <img
+                                                            src={qImageUrl}
+                                                            alt={`Reactivo ${index + 1}`}
+                                                            className="max-h-64 object-contain rounded"
+                                                            draggable={false}
+                                                            onContextMenu={(e) => e.preventDefault()}
+                                                        />
                                                     </div>
                                                 )}
 
-                                                {explanationHtml && (
-                                                    <div className="mt-3 pt-3 border-t border-indigo-200/60 bg-white/90 rounded-lg p-3.5 shadow-2xs">
-                                                        <div className="flex items-start gap-2.5">
-                                                            <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                                            <div className="space-y-1 min-w-0 flex-1">
-                                                                <span className="font-bold text-indigo-950 text-xs uppercase tracking-wider block">
-                                                                    Explicación / Justificación:
+                                                <div className="mt-3 space-y-2.5 text-sm">
+                                                    <div className="flex items-start">
+                                                        {isCorrect ? (
+                                                            <CheckCircle className={`w-5 h-5 ${iconColor} mr-2 shrink-0 mt-0.5`} />
+                                                        ) : (
+                                                            <XCircle className={`w-5 h-5 ${iconColor} mr-2 shrink-0 mt-0.5`} />
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <span className={`font-bold ${textColor} block`}>Tu respuesta:</span>
+                                                            {userAnswerObj ? (
+                                                                <MathHtml
+                                                                    html={userAnswerObj.text || userAnswerObj.respuesta || ''}
+                                                                    className="text-gray-800 prose prose-sm max-w-none"
+                                                                />
+                                                            ) : (
+                                                                <span className="italic text-gray-600">No respondida</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {!isCorrect && item.correct_answer && (
+                                                        <div
+                                                            className={`flex items-start pt-2.5 border-t ${
+                                                                isUnanswered ? 'border-amber-200/80' : 'border-rose-200/80'
+                                                            }`}
+                                                        >
+                                                            <CheckCircle className="w-5 h-5 text-emerald-600 mr-2 shrink-0 mt-0.5" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className="font-bold text-emerald-800 block">
+                                                                    Respuesta correcta:
                                                                 </span>
-                                                                <div
-                                                                    className="text-gray-700 text-sm leading-relaxed prose prose-sm max-w-none"
-                                                                    dangerouslySetInnerHTML={{ __html: explanationHtml }}
+                                                                <MathHtml
+                                                                    html={item.correct_answer.text || item.correct_answer.respuesta || ''}
+                                                                    className="text-gray-800 prose prose-sm max-w-none"
                                                                 />
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    )}
+
+                                                    {explanationHtml && (
+                                                        <div className="mt-3 pt-3 border-t border-indigo-200/60 bg-white/90 rounded-lg p-3.5 shadow-2xs">
+                                                            <div className="flex items-start gap-2.5">
+                                                                <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                                                <div className="space-y-1 min-w-0 flex-1">
+                                                                    <span className="font-bold text-indigo-950 text-xs uppercase tracking-wider block">
+                                                                        Explicación / Justificación:
+                                                                    </span>
+                                                                    <MathHtml
+                                                                        html={explanationHtml}
+                                                                        className="text-gray-700 text-sm leading-relaxed prose prose-sm max-w-none"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );

@@ -4,26 +4,27 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 
 class CertificateController extends Controller
 {
     protected function formatSpanishDate($date): string
     {
-        if (!$date) {
+        if (! $date) {
             $date = now();
         }
-        $c = \Carbon\Carbon::parse($date);
+        $c = Carbon::parse($date);
         $meses = [
             1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
             5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
             9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
         ];
         $mes = $meses[(int) $c->format('n')] ?? 'enero';
-        return $c->format('d') . ' de ' . $mes . ' de ' . $c->format('Y');
+
+        return $c->format('d').' de '.$mes.' de '.$c->format('Y');
     }
 
     protected function getLogoBase64(): ?string
@@ -39,10 +40,11 @@ class CertificateController extends Controller
             if (file_exists($path)) {
                 $data = @file_get_contents($path);
                 if ($data !== false) {
-                    return 'data:image/png;base64,' . base64_encode($data);
+                    return 'data:image/png;base64,'.base64_encode($data);
                 }
             }
         }
+
         return null;
     }
 
@@ -51,6 +53,8 @@ class CertificateController extends Controller
      */
     public function index()
     {
+        Certificate::ensureStorageReady();
+
         $certificates = Certificate::with(['scheduledCourse.course'])
             ->where('user_id', Auth::id())
             ->orderBy('fecha_emision', 'desc')
@@ -66,7 +70,7 @@ class CertificateController extends Controller
             });
 
         return Inertia::render('User/Certificates/Index', [
-            'certificates' => $certificates
+            'certificates' => $certificates,
         ]);
     }
 
@@ -75,6 +79,8 @@ class CertificateController extends Controller
      */
     public function download($id)
     {
+        Certificate::ensureStorageReady();
+
         $certificate = Certificate::with(['user', 'scheduledCourse.course', 'scheduledCourse.instructor'])
             ->where('user_id', Auth::id())
             ->findOrFail($id);
@@ -92,8 +98,8 @@ class CertificateController extends Controller
         $pdf = Pdf::loadView('pdf.certificate', $data)
             ->setPaper('letter', 'landscape'); // Formato horizontal
 
-        $filename = 'Certificado_' . str_replace(' ', '_', $data['course_name']) . '_' . $data['validation_code'] . '.pdf';
-        
+        $filename = 'Certificado_'.str_replace(' ', '_', $data['course_name']).'_'.$data['validation_code'].'.pdf';
+
         return $pdf->stream($filename);
     }
 }

@@ -4,11 +4,15 @@ namespace App\Actions\Fortify;
 
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
+use App\Mail\RegistroEmail;
+use App\Models\Role;
 use App\Models\User;
+use App\Rules\ValidRecaptcha;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -29,31 +33,29 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ];
 
-        // Validar reCAPTCHA si está configurado
+        // Validar reCAPTCHA si está configurado (en entorno testing sin secret no bloquear tests)
         if (config('elearning.captcha_secret_key')) {
-            $rules['g-recaptcha-response'] = [new \App\Rules\ValidRecaptcha()];
+            $rules['g-recaptcha-response'] = ['required', new ValidRecaptcha];
         }
 
         Validator::make($input, $rules, [
             'g-recaptcha-response.required' => 'Por favor, marca la casilla "No soy un robot".',
         ])->validate();
 
-        return DB::transaction(function () use ($input) {
+        $user = DB::transaction(function () use ($input) {
             $firstName = trim($input['first_name'] ?? '');
             $lastName = trim($input['last_name'] ?? '');
             $fullName = trim($input['name'] ?? '');
 
-            if (!$firstName && $fullName) {
+            if (! $firstName && $fullName) {
                 $nameParts = preg_split('/\s+/', $fullName, 2);
                 $firstName = $nameParts[0] ?? $fullName;
                 $lastName = $nameParts[1] ?? '';
-            } elseif (!$fullName && ($firstName || $lastName)) {
-                $fullName = trim("{$firstName} {$lastName}");
             }
 
             // Obtener username ingresado o generar uno único seguro
             $rawUsername = trim($input['username'] ?? '');
-            if (!empty($rawUsername)) {
+            if (! empty($rawUsername)) {
                 $username = $rawUsername;
             } else {
                 $baseUsername = strtolower(explode('@', $input['email'])[0]);
@@ -61,13 +63,12 @@ class CreateNewUser implements CreatesNewUsers
                 $username = $baseUsername;
                 $counter = 1;
                 while (User::where('username', $username)->exists()) {
-                    $username = $baseUsername . $counter;
+                    $username = $baseUsername.$counter;
                     $counter++;
                 }
             }
 
             $user = User::create([
-                'name' => $fullName,
                 'first_name' => $firstName,
                 'last_name' => $lastName,
                 'username' => $username,
@@ -77,17 +78,33 @@ class CreateNewUser implements CreatesNewUsers
                 'validado' => 'no',
             ]);
 
-            // Asignar rol de Alumno (ID 3 en Sapius)
+            // Asignar rol de Alumno dinámicamente con timestamps
             if (Schema::hasTable('role_user')) {
-                DB::table('role_user')->insertOrIgnore([
-                    'user_id' => $user->id,
-                    'role_id' => 3,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                $alumnoRoleId = Schema::hasTable('roles')
+                    ? (Role::where('slug', 'alumno')->value('id') ?? 3)
+                    : 3;
+
+                $now = now();
+                $user->roles()->syncWithoutDetaching([
+                    $alumnoRoleId => [
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
                 ]);
+                $user->unsetRelation('roles');
             }
 
             return $user;
         });
+
+        try {
+            Mail::to($user->email)
+                ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
+                ->send(new RegistroEmail($user));
+        } catch (\Throwable $e) {
+            Log::warning("Error enviando RegistroEmail a {$user->email}: {$e->getMessage()}");
+        }
+
+        return $user;
     }
 }

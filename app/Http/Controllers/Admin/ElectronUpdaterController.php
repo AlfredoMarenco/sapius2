@@ -17,14 +17,14 @@ class ElectronUpdaterController extends Controller
     {
         $updateDir = public_path('updates/detector');
 
-        if (!File::exists($updateDir)) {
+        if (! File::exists($updateDir)) {
             File::makeDirectory($updateDir, 0755, true);
         }
 
         $files = [];
         $currentVersion = 'No registrada';
 
-        $latestYmlPath = $updateDir . '/latest.yml';
+        $latestYmlPath = $updateDir.'/latest.yml';
         if (File::exists($latestYmlPath)) {
             $ymlContent = File::get($latestYmlPath);
             if (preg_match('/version:\s*([^\s\n]+)/', $ymlContent, $matches)) {
@@ -38,7 +38,7 @@ class ElectronUpdaterController extends Controller
                 'name' => $file->getFilename(),
                 'size' => $this->formatBytes($file->getSize()),
                 'last_modified' => date('d/m/Y H:i:s', $file->getMTime()),
-                'url' => asset('updates/detector/' . $file->getFilename()),
+                'url' => asset('updates/detector/'.$file->getFilename()),
             ];
         }
 
@@ -55,75 +55,116 @@ class ElectronUpdaterController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'latest_yml' => 'nullable|file',
-            'installer_exe' => 'nullable|file',
-            'blockmap_file' => 'nullable|file',
+            'latest_yml' => 'nullable|file|max:1024',
+            'installer_exe' => 'nullable|file|max:512000',
+            'blockmap_file' => 'nullable|file|max:102400',
         ]);
 
         $updateDir = public_path('updates/detector');
 
-        if (!File::exists($updateDir)) {
+        if (! File::exists($updateDir)) {
             File::makeDirectory($updateDir, 0755, true);
         }
 
-        $uploadedCount = 0;
+        $exeFile = $request->file('installer_exe');
+        $blockmapFile = $request->file('blockmap_file');
+        $ymlFile = $request->file('latest_yml');
 
-        // 1. Guardar latest.yml
-        if ($request->hasFile('latest_yml')) {
-            $file = $request->file('latest_yml');
-            if ($file->getClientOriginalName() === 'latest.yml' || $file->getClientOriginalExtension() === 'yml') {
-                try {
-                    $ymlContent = File::get($file->getRealPath());
-                    if (preg_match('/version:\s*([^\s\n]+)/', $ymlContent, $matches)) {
-                        $newVersion = $matches[1];
-                        if ($newVersion) {
-                            $dirFiles = File::files($updateDir);
-                            foreach ($dirFiles as $existingFile) {
-                                $filename = $existingFile->getFilename();
-                                if ($filename !== 'latest.yml' && strpos($filename, $newVersion) === false) {
-                                    File::delete($existingFile->getRealPath());
-                                }
-                            }
-                        }
-                    }
-                } catch (\Exception $e) {
-                    // Continuar si falla la lectura de versión previa
-                }
+        if (! $exeFile && ! $blockmapFile && ! $ymlFile) {
+            return redirect()->back()->with('error', 'No se seleccionó ningún archivo para subir.');
+        }
 
-                $file->move($updateDir, 'latest.yml');
-                $uploadedCount++;
-            } else {
+        // Validación previa de nombres y extensiones exactas antes de mover archivos
+        $safeExeName = null;
+        if ($exeFile) {
+            $safeExeName = $this->sanitizeReleaseFilename($exeFile->getClientOriginalName());
+            if ($safeExeName === '' || strtolower(pathinfo($safeExeName, PATHINFO_EXTENSION)) !== 'exe') {
+                return redirect()->back()->with('error', 'El instalador debe ser un archivo ejecutable válido (.exe).');
+            }
+        }
+
+        $safeBlockmapName = null;
+        if ($blockmapFile) {
+            $safeBlockmapName = $this->sanitizeReleaseFilename($blockmapFile->getClientOriginalName());
+            if ($safeBlockmapName === '' || strtolower(pathinfo($safeBlockmapName, PATHINFO_EXTENSION)) !== 'blockmap') {
+                return redirect()->back()->with('error', 'El archivo blockmap debe tener extensión final exacta .blockmap.');
+            }
+        }
+
+        if ($ymlFile) {
+            $safeYmlName = $this->sanitizeReleaseFilename($ymlFile->getClientOriginalName());
+            if (strtolower($safeYmlName) !== 'latest.yml' || strtolower(pathinfo($safeYmlName, PATHINFO_EXTENSION)) !== 'yml') {
                 return redirect()->back()->with('error', 'El archivo latest.yml debe llamarse exactamente "latest.yml".');
             }
         }
 
-        // 2. Guardar instalador .exe
-        if ($request->hasFile('installer_exe')) {
-            $file = $request->file('installer_exe');
-            if (strtolower($file->getClientOriginalExtension()) === 'exe') {
-                $file->move($updateDir, $file->getClientOriginalName());
-                $uploadedCount++;
-            } else {
-                return redirect()->back()->with('error', 'El instalador debe ser un archivo ejecutable (.exe).');
+        $uploadedCount = 0;
+
+        // 1. Mover primero el instalador .exe
+        if ($exeFile && $safeExeName) {
+            $exeFile->move($updateDir, $safeExeName);
+            $uploadedCount++;
+        }
+
+        // 2. Mover el archivo .blockmap
+        if ($blockmapFile && $safeBlockmapName) {
+            $blockmapFile->move($updateDir, $safeBlockmapName);
+            $uploadedCount++;
+        }
+
+        // 3. Validar latest.yml (referencia a path:) y moverlo al final antes de limpiar versiones antiguas
+        if ($ymlFile) {
+            $ymlContent = File::get($ymlFile->getRealPath());
+            $referencedPath = null;
+            if (preg_match('/^path:\s*(.+)$/m', $ymlContent, $pathMatches)) {
+                $referencedPath = $this->sanitizeReleaseFilename(trim($pathMatches[1], " \t\n\r\0\x0B'\""));
+            }
+
+            if (! $referencedPath || ! File::exists($updateDir.DIRECTORY_SEPARATOR.$referencedPath)) {
+                return redirect()->back()->with('error', 'El archivo referenciado en "path:" dentro de latest.yml no existe en el servidor.');
+            }
+
+            $ymlFile->move($updateDir, 'latest.yml');
+            $uploadedCount++;
+
+            $newVersion = null;
+            if (preg_match('/^version:\s*([^\s\n]+)/m', $ymlContent, $matches)) {
+                $newVersion = trim($matches[1]);
+            }
+
+            $keepFiles = array_filter([
+                'latest.yml',
+                $referencedPath,
+                $referencedPath.'.blockmap',
+                $safeExeName,
+                $safeBlockmapName,
+            ]);
+
+            foreach (File::files($updateDir) as $existingFile) {
+                $filename = $existingFile->getFilename();
+                if (in_array($filename, $keepFiles, true)) {
+                    continue;
+                }
+                if ($newVersion && str_contains($filename, $newVersion)) {
+                    continue;
+                }
+                File::delete($existingFile->getRealPath());
             }
         }
 
-        // 3. Guardar archivo .blockmap
-        if ($request->hasFile('blockmap_file')) {
-            $file = $request->file('blockmap_file');
-            if (str_contains($file->getClientOriginalName(), '.blockmap')) {
-                $file->move($updateDir, $file->getClientOriginalName());
-                $uploadedCount++;
-            } else {
-                return redirect()->back()->with('error', 'El archivo blockmap debe contener la extensión .blockmap.');
-            }
+        return redirect()->back()->with('success', "Se subieron {$uploadedCount} archivos de actualización con éxito.");
+    }
+
+    private function sanitizeReleaseFilename(string $originalName): string
+    {
+        $base = basename($originalName);
+        if (str_contains($base, '..') || str_contains($base, "\0")) {
+            return '';
         }
 
-        if ($uploadedCount > 0) {
-            return redirect()->back()->with('success', "Se subieron {$uploadedCount} archivos de actualización con éxito.");
-        }
+        $sanitized = preg_replace('/[^a-zA-Z0-9._ \-]/', '', $base);
 
-        return redirect()->back()->with('error', 'No se seleccionó ningún archivo para subir.');
+        return ltrim(trim((string) $sanitized), '.');
     }
 
     private function formatBytes($bytes, $precision = 2)
@@ -133,6 +174,7 @@ class ElectronUpdaterController extends Controller
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
-        return round($bytes, $precision) . ' ' . $units[$pow];
+
+        return round($bytes, $precision).' '.$units[$pow];
     }
 }

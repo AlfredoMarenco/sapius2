@@ -1,9 +1,16 @@
 import { Head, Link } from '@inertiajs/react';
 import { motion } from 'framer-motion';
+import { BookOpen, Layers, Sparkles } from 'lucide-react';
 import React from 'react';
 import { openMiniTest } from '@/components/public/MiniTestModal';
 import { PlusGridPattern } from '@/components/public/PlusGridPattern';
-import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
+import {
+    PricingCard,
+    SafeHtmlContent,
+    stripHtmlToText
+    
+} from '@/components/public/PricingCard';
+import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
 import LandingLayout from '@/layouts/LandingLayout';
 
 export type ScheduledCourseItem = ScheduledCourseCandidate;
@@ -26,6 +33,11 @@ export interface CoursesHubProps {
     simulatorsNutrition?: ManageableResourceCard[];
 }
 
+const GUIA_QUICK_LINKS: ReadonlyArray<{ label: string; href: string }> = [
+    { label: 'Nutrición digital 2026', href: '/guias-nutricion' },
+    { label: 'Medicina digital 2026', href: '/guias-medicina' },
+];
+
 const SIMULATOR_QUICK_LINKS: ReadonlyArray<{ label: string; href: string }> = [
     { label: 'Globales nutrición', href: '/simuladores-nutricion' },
     { label: 'Compacto nutrición', href: '/simuladores-nutricion' },
@@ -38,7 +50,44 @@ const SIMULATOR_QUICK_LINKS: ReadonlyArray<{ label: string; href: string }> = [
 
 export default function CoursesHub({
     scheduledCourses = [],
+    guiasMedicine = [],
+    guiasNutrition = [],
+    simulatorsMedicine = [],
+    simulatorsNutrition = [],
 }: CoursesHubProps) {
+    const dynamicCollections = [
+        {
+            title: 'Guías Digitales Nutrición',
+            href: '/guias-nutricion',
+            badge: 'Guías · Nutrición',
+            icon: <BookOpen className="h-4 w-4 text-[#FF6B52]" />,
+            items: Array.isArray(guiasNutrition) ? guiasNutrition : [],
+        },
+        {
+            title: 'Guías Digitales Medicina',
+            href: '/guias-medicina',
+            badge: 'Guías · Medicina',
+            icon: <BookOpen className="h-4 w-4 text-[#FF6B52]" />,
+            items: Array.isArray(guiasMedicine) ? guiasMedicine : [],
+        },
+        {
+            title: 'Simuladores Nutrición',
+            href: '/simuladores-nutricion',
+            badge: 'Simuladores · Nutrición',
+            icon: <Layers className="h-4 w-4 text-[#FF6B52]" />,
+            items: Array.isArray(simulatorsNutrition) ? simulatorsNutrition : [],
+        },
+        {
+            title: 'Simuladores Medicina',
+            href: '/simuladores-medicina',
+            badge: 'Simuladores · Medicina',
+            icon: <Layers className="h-4 w-4 text-[#FF6B52]" />,
+            items: Array.isArray(simulatorsMedicine) ? simulatorsMedicine : [],
+        },
+    ].filter((group) => group.items.length > 0);
+
+    const activeCohorts = Array.isArray(scheduledCourses) ? scheduledCourses : [];
+
     return (
         <LandingLayout scheduledCourses={scheduledCourses}>
             <Head title="Cursos, Guías y Simuladores | Sapius" />
@@ -239,13 +288,16 @@ export default function CoursesHub({
                                 </h3>
                             </Link>
 
-                            <div className="mt-5 flex justify-center">
-                                <Link
-                                    href="/guias-nutricion"
-                                    className="inline-flex items-center justify-center rounded-full bg-[#FF6B52] px-10 py-3 text-[15px] font-bold text-[#101E33] shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] hover:text-white"
-                                >
-                                    Nutrición digital 2026
-                                </Link>
+                            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {GUIA_QUICK_LINKS.map((item) => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#FF6B52] px-5 py-2.5 text-center text-[14px] leading-tight font-bold text-[#101E33] shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] hover:text-white"
+                                    >
+                                        {item.label}
+                                    </Link>
+                                ))}
                             </div>
                         </motion.div>
 
@@ -289,6 +341,128 @@ export default function CoursesHub({
                             </div>
                         </motion.div>
                     </div>
+
+                    {/* Recursos administrables dinámicos desde BD (cuando existan) */}
+                    {dynamicCollections.length > 0 && (
+                        <div className="mt-16 border-t border-[#101E33]/10 pt-14">
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                <div>
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-extrabold tracking-wider text-[#FF6B52] uppercase">
+                                        <Sparkles className="h-3.5 w-3.5" />
+                                        Contenidos actualizados
+                                    </span>
+                                    <h3 className="mt-1 font-display text-2xl font-extrabold text-[#101E33]">
+                                        Explora nuestras guías y simuladores
+                                        por área
+                                    </h3>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+                                {dynamicCollections.map((group) => (
+                                    <div
+                                        key={group.href}
+                                        className="flex flex-col justify-between rounded-[24px] border border-[#FF6B52]/55 bg-white/95 p-6 shadow-[0_12px_28px_-14px_rgba(16,30,51,0.12)]"
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="inline-flex items-center gap-2 rounded-full bg-[#CFE4FF]/55 px-3 py-1 text-[11px] font-extrabold text-[#101E33]">
+                                                    {group.icon}
+                                                    {group.badge}
+                                                </span>
+                                                <span className="text-xs font-bold text-[#FF6B52]">
+                                                    {group.items.length}{' '}
+                                                    {group.items.length === 1
+                                                        ? 'opción'
+                                                        : 'opciones'}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="mt-3 font-display text-lg font-extrabold text-[#101E33]">
+                                                {group.title}
+                                            </h4>
+
+                                            <div className="mt-4 space-y-3">
+                                                {group.items
+                                                    .slice(0, 3)
+                                                    .map((card) => (
+                                                        <div
+                                                            key={card.id}
+                                                            className="rounded-2xl border border-[#101E33]/8 bg-[#FFF7F2]/50 p-3.5"
+                                                        >
+                                                            <p className="font-display text-sm font-bold text-[#101E33]">
+                                                                {card.titulo ||
+                                                                    group.title}
+                                                            </p>
+                                                            {card.descripcion && (
+                                                                <SafeHtmlContent
+                                                                    html={
+                                                                        card.descripcion
+                                                                    }
+                                                                    className="mt-1 text-xs leading-relaxed text-[#101E33]/75"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-5">
+                                            <Link
+                                                href={group.href}
+                                                className="inline-flex items-center justify-center rounded-full bg-[#101E33] px-6 py-2.5 text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FF6B52]"
+                                            >
+                                                Ver detalle en {group.title}
+                                            </Link>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cohortes activas en venta directa (cuando existan en BD) */}
+                    {activeCohorts.length > 0 && (
+                        <div className="mt-16 border-t border-[#101E33]/10 pt-14">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-[#FF6B52]" />
+                                <h3 className="font-display text-2xl font-extrabold text-[#101E33]">
+                                    Programas activos con inscripción abierta
+                                </h3>
+                            </div>
+                            <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                                {activeCohorts.slice(0, 6).map((item) => {
+                                    const title =
+                                        item.course_title ||
+                                        item.course?.title ||
+                                        'Programa Sapius';
+                                    const priceNum = Number(
+                                        item.precio ?? item.price ?? 0,
+                                    );
+
+                                    const cleanDescription = stripHtmlToText(
+                                        item.course_description ||
+                                            item.course?.description,
+                                    );
+
+                                    return (
+                                        <PricingCard
+                                            key={item.id}
+                                            title={title}
+                                            price={`$${priceNum.toLocaleString('es-MX')} MXN`}
+                                            paymentNote="Inscripción en línea"
+                                            description={
+                                                cleanDescription ||
+                                                'Acceso completo a plataforma Sapius con materiales actualizados.'
+                                            }
+                                            ctaLabel="Comprar"
+                                            href={`/checkout/${item.id}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
         </LandingLayout>

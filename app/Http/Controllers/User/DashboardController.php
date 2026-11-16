@@ -4,12 +4,15 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
-use App\Models\ScheduledCourse;
+use App\Models\UserStrikeHistory;
+use App\Services\CourseCategoryService;
+use App\Services\StrikeService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -19,20 +22,35 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $now = Carbon::now();
+        $hasSaleStart = Schema::hasColumn('cursos_programados', 'fecha_inicio_venta');
 
         $enrollments = Enrollment::with([
             'scheduledCourse.category',
             'scheduledCourse.course.modules.lessons',
             'scheduledCourse.instructor',
         ])
-        ->where('user_id', $user->id)
-        ->get();
+            ->where('user_id', $user->id)
+            ->whereHas('scheduledCourse', function ($q) use ($now, $hasSaleStart) {
+                $q->where('activo', 'si');
 
-        $now = Carbon::now();
+                if ($hasSaleStart) {
+                    $q->where(function ($qSale) use ($now) {
+                        $qSale->whereNull('fecha_inicio_venta')
+                            ->orWhere('fecha_inicio_venta', '<=', $now);
+                    });
+                }
+
+                $q->where(function ($qEnd) use ($now) {
+                    $qEnd->whereNull('fecha_fin')
+                        ->orWhere('fecha_fin', '>=', $now);
+                });
+            })
+            ->get();
 
         $enrolledCourses = $enrollments->map(function ($enrollment) use ($user, $now) {
             $scheduled = $enrollment->scheduledCourse;
-            if (!$scheduled || !$scheduled->course) {
+            if (! $scheduled || ! $scheduled->course) {
                 return null;
             }
 
@@ -61,9 +79,9 @@ class DashboardController extends Controller
                 foreach ($course->modules as $mod) {
                     if ($mod->lessons) {
                         foreach ($mod->lessons as $lesson) {
-                            if (!in_array($lesson->id, $completedLessonIds)) {
+                            if (! in_array($lesson->id, $completedLessonIds)) {
                                 $nextLessonId = $lesson->id;
-                                break 2; // Exit both loops
+                                break 2;
                             }
                         }
                     }
@@ -79,12 +97,12 @@ class DashboardController extends Controller
             }
 
             $categoryName = $scheduled->category?->name
-                ?? \App\Services\CourseCategoryService::getCategoryForCourse($course->id)?->name
+                ?? CourseCategoryService::getCategoryForCourse($course->id)?->name
                 ?? 'General';
 
             return [
                 'enrollment_id' => $enrollment->id,
-                'status' => $enrollment->aceptado, // 'si' or 'no'
+                'status' => $enrollment->aceptado,
                 'scheduled_id' => $scheduled->id,
                 'identifier' => $scheduled->identificador,
                 'course_id' => $course->id,
@@ -110,88 +128,72 @@ class DashboardController extends Controller
     }
 
     /**
-     * Register a strike for suspicious activity (anti-cheat).
+     * Register a strike for suspicious activity (anti-cheat) delegating to StrikeService (0-100 scale).
      */
-    public function registerStrike(Request $request)
+    public function registerStrike(Request $request, StrikeService $strikeService)
     {
         $user = $request->user();
-        
-        $reason = $request->input('reason', 'Actividad sospechosa');
-        
-        // Increment strike count
-        $currentStrikes = (int)($user->strikes ?? 0);
-        $newStrikes = $currentStrikes + 1;
-        
-        $user->strikes = $newStrikes;
-        
-        if ($newStrikes >= 3) {
-            $user->is_blocked = 1;
-        }
-        
-        $user->save();
 
-        // Save history
-        \App\Models\UserStrikeHistory::create([
-            'user_id' => $user->id,
-            'action' => 'Infracción Anti-Cheat',
-            'details' => $reason
-        ]);
-        
-        // Log the strike
-        \Illuminate\Support\Facades\Log::warning("Strike registrado para usuario {$user->id} ({$user->email}). Total: {$newStrikes}. Motivo: {$reason}");
+        $action = (string) ($request->input('action') ?? $request->input('reason') ?? 'Actividad sospechosa');
+        $details = (string) ($request->input('details') ?? $request->input('reason') ?? $action);
+        $feedbackMode = $request->boolean('feedback_mode');
 
-        if ($user->is_blocked === 1 || $user->is_blocked === true || $user->is_blocked === 'si') {
-            try {
-                if (\Illuminate\Support\Facades\Schema::hasTable('inscripciones') && \Illuminate\Support\Facades\Schema::hasTable('examenes')) {
-                    $enrollmentIds = Enrollment::where('user_id', $user->id)->pluck('id');
-                    if ($enrollmentIds->isNotEmpty()) {
-                        \App\Models\Exam::whereIn('inscripcion_id', $enrollmentIds)
-                            ->where('finalizado', 'no')
-                            ->update(['finalizado' => 'si']);
-                    }
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error("Error finalizando exámenes activos al bloquear usuario {$user->id}: " . $e->getMessage());
-            }
+        $result = $strikeService->register($user, $action, $details, $feedbackMode);
 
+        if ($result['blocked']) {
             return response()->json([
-                'success' => true, 
+                'success' => true,
+                'status' => $result['status'],
                 'blocked' => true,
-                'strikes' => $newStrikes,
+                'strikes' => $result['strikes'],
+                'max_strikes' => $result['max_strikes'],
+                'points_added' => $result['points_added'],
                 'redirect' => route('alumno.blocked'),
-                'message' => 'Cuenta bloqueada por exceder límite de strikes.'
+                'message' => 'Cuenta bloqueada por exceder límite de strikes.',
             ]);
         }
 
         return response()->json([
             'success' => true,
+            'status' => $result['status'],
             'blocked' => false,
-            'strikes' => $newStrikes
+            'strikes' => $result['strikes'],
+            'max_strikes' => $result['max_strikes'],
+            'points_added' => $result['points_added'],
         ]);
     }
 
     public function blocked()
     {
         $user = Auth::user();
-        if ($user->is_blocked !== 1 && $user->is_blocked !== true && $user->is_blocked !== 'si') {
+        $isBlocked = $user->is_blocked === 1
+            || $user->is_blocked === true
+            || $user->is_blocked === 'si';
+
+        if (! $isBlocked && ($user->strikes ?? 0) < 100) {
             return redirect()->route('alumno.dashboard');
         }
 
-        $strikesHistory = \App\Models\UserStrikeHistory::where('user_id', $user->id)
+        $strikesHistory = UserStrikeHistory::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->get();
 
         return Inertia::render('User/Blocked', [
-            'strikesHistory' => $strikesHistory
+            'strikesHistory' => $strikesHistory,
         ]);
     }
 
     public function checkStatus()
     {
         $user = Auth::user();
+        $isBlocked = $user->is_blocked === 1
+            || $user->is_blocked === true
+            || $user->is_blocked === 'si'
+            || (int) ($user->strikes ?? 0) >= 100;
+
         return response()->json([
-            'is_blocked' => $user->is_blocked === 1 || $user->is_blocked === true || $user->is_blocked === 'si',
-            'strikes' => (int)($user->strikes ?? 0)
+            'is_blocked' => $isBlocked,
+            'strikes' => (int) ($user->strikes ?? 0),
         ]);
     }
 }

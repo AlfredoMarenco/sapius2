@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, Link } from '@inertiajs/react';
+import { Ticket, ArrowLeft, Plus, Edit3, Power, Percent, Users } from 'lucide-react';
+import React, { useState } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Ticket, ArrowLeft, Plus, Edit3, Power, DollarSign, Users, Calendar } from 'lucide-react';
-import { toast } from 'sonner';
+import AppLayout from '@/layouts/app-layout';
 
 interface Discount {
     id: number;
@@ -21,6 +21,7 @@ interface Discount {
 
 interface ScheduledCourse {
     id: number;
+    course_id: number;
     internal_id: string;
     start_date: string;
     end_date: string;
@@ -99,7 +100,7 @@ export default function DiscountsIndex({ scheduledCourse, discounts }: Props) {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <Button asChild variant="outline" size="icon" className="h-10 w-10 rounded-full shrink-0">
-                            <Link href={`/admin/courses/${scheduledCourse.course.title ? 'todo' : 'todo'}`}> {/* Simplificado temporalmente, lo ideal es regresar a course */} 
+                            <Link href={`/admin/courses/${scheduledCourse.course_id}`}>
                                 <ArrowLeft className="h-4 w-4" />
                             </Link>
                         </Button>
@@ -151,7 +152,7 @@ export default function DiscountsIndex({ scheduledCourse, discounts }: Props) {
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-4 text-xs font-bold text-gray-500 uppercase tracking-widest">
-                                                    <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" /> ${discount.descuento} MXN</span>
+                                                    <span className="flex items-center gap-1.5"><Percent className="w-3.5 h-3.5" /> {discount.descuento}%</span>
                                                     <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Límite: {discount.limite}</span>
                                                 </div>
                                             </div>
@@ -208,15 +209,16 @@ export default function DiscountsIndex({ scheduledCourse, discounts }: Props) {
                                 {errors.clave && <p className="text-xs text-red-500 font-medium">{errors.clave}</p>}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="descuento" className="font-bold">Monto a descontar ($ MXN)</Label>
+                                <Label htmlFor="descuento" className="font-bold">Descuento (%)</Label>
                                 <Input 
                                     id="descuento" 
                                     type="number"
-                                    min="0"
-                                    step="0.01"
+                                    min="1"
+                                    max="100"
+                                    step="1"
                                     value={data.descuento} 
                                     onChange={e => setData('descuento', e.target.value)}
-                                    placeholder="0.00"
+                                    placeholder="1 - 100"
                                     className={errors.descuento ? 'border-red-500' : ''}
                                 />
                                 {errors.descuento && <p className="text-xs text-red-500 font-medium">{errors.descuento}</p>}

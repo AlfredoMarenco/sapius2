@@ -3,9 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Enrollment;
 use App\Models\Discount;
-use Illuminate\Http\Request;
+use App\Models\Enrollment;
 use Inertia\Inertia;
 use Openpay\Data\Openpay;
 
@@ -22,7 +21,7 @@ class ReportController extends Controller
                 'total' => $totalInscriptions,
                 'accepted' => $acceptedInscriptions,
                 'pending' => $pendingInscriptions,
-            ]
+            ],
         ]);
     }
 
@@ -55,7 +54,7 @@ class ReportController extends Controller
     public function showInscription($id)
     {
         $enrollment = Enrollment::with(['user', 'scheduledCourse.course'])->findOrFail($id);
-        
+
         $discount = null;
         if ($enrollment->clave) {
             $discount = Discount::where('clave', $enrollment->clave)->first();
@@ -64,28 +63,28 @@ class ReportController extends Controller
         $charge = null;
         $openpayError = null;
 
-        if ($enrollment->referencia === "Cupon de descuento") {
+        if ($enrollment->referencia === 'Cupon de descuento') {
             $charge = [
                 'status' => 'completed',
                 'description' => 'Pago cubierto al 100% por cupón de descuento',
                 'method' => 'coupon',
-                'amount' => 0.00
+                'amount' => 0.00,
             ];
         } else {
             try {
-                if (!config('openpay.sandbox')) {
+                if (! config('openpay.sandbox')) {
                     Openpay::setProductionMode(true);
                 }
 
                 $merchantId = config('openpay.merchant_id');
                 $privateKey = config('openpay.private_key');
-                $currency = config('openpay.currency') ?: 'MXN';
+                $country = config('openpay.country', 'MX') ?: 'MX';
                 $ip = config('openpay.ip') ?: '127.0.0.1';
 
                 if ($merchantId && $privateKey) {
-                    $openpay = Openpay::getInstance($merchantId, $privateKey, $currency, $ip);
+                    $openpay = Openpay::getInstance($merchantId, $privateKey, $country, $ip);
                     $openpayCharge = $openpay->charges->get($enrollment->referencia);
-                    
+
                     $charge = [
                         'id' => $openpayCharge->id ?? null,
                         'status' => $openpayCharge->status ?? null,
@@ -105,10 +104,21 @@ class ReportController extends Controller
                         'error_message' => $openpayCharge->error_message ?? null,
                     ];
                 } else {
-                    $openpayError = "Credenciales de OpenPay no configuradas (merchant_id o private_key). Configura el .env local.";
+                    $openpayError = 'Credenciales de OpenPay no configuradas (merchant_id o private_key). Configura el .env local.';
                 }
-            } catch (\Exception $e) {
-                $openpayError = "Error al conectar con OpenPay: " . $e->getMessage();
+            } catch (\Throwable $e) {
+                $safeMessage = $e->getMessage();
+                if (! empty($privateKey)) {
+                    $safeMessage = str_replace($privateKey, '[REDACTED]', $safeMessage);
+                }
+                $safeMessage = preg_replace('/sk_[a-zA-Z0-9_]+/', '[REDACTED]', $safeMessage);
+
+                \Log::warning('Error consultando cargo en OpenPay desde ReportController', [
+                    'enrollment_id' => $enrollment->id,
+                    'error' => $safeMessage,
+                ]);
+
+                $openpayError = 'No fue posible consultar el detalle del cargo en OpenPay en este momento.';
             }
         }
 
@@ -116,7 +126,7 @@ class ReportController extends Controller
             'enrollment' => $enrollment,
             'discount' => $discount,
             'charge' => $charge,
-            'openpayError' => $openpayError
+            'openpayError' => $openpayError,
         ]);
     }
 }

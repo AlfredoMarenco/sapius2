@@ -3,28 +3,40 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Mail\TareaEmail;
 use App\Models\Homework;
-use App\Models\Lesson;
+use App\Models\User;
+use App\Services\EnrollmentAccessService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 class HomeworkController extends Controller
 {
+    public function __construct(
+        protected EnrollmentAccessService $accessService
+    ) {}
+
     public function submit(Request $request, $leccion_id)
     {
         $request->validate([
-            'documento' => 'required|file|mimes:pdf,doc,docx|max:10240', // 10MB max
-            'curso_programado_id' => 'required|integer'
+            'documento' => 'required|file|mimes:pdf,doc,docx|max:10240',
+            'curso_programado_id' => 'required|integer',
         ]);
 
-        $leccion = Lesson::findOrFail($leccion_id);
-        $curso_programado = \App\Models\ScheduledCourse::findOrFail($request->curso_programado_id);
-        $instructor = \App\Models\User::find($curso_programado->user_id);
-        
-        $user = auth()->user();
+        $user = $request->user();
+        $access = $this->accessService->requireLessonInCohort(
+            $user,
+            (int) $leccion_id,
+            (int) $request->curso_programado_id
+        );
 
-        // Check if already submitted
-        $existing = Homework::where('leccion_id', $leccion_id)
+        $leccion = $access['lesson'];
+        $cursoProgramado = $access['scheduled'];
+        $instructor = $cursoProgramado->user_id ? User::find($cursoProgramado->user_id) : null;
+
+        $existing = Homework::where('leccion_id', $leccion->id)
             ->where('user_id', $user->id)
             ->first();
 
@@ -33,55 +45,44 @@ class HomeworkController extends Controller
         }
 
         $file = $request->file('documento');
-        $path = Storage::put('tareas', $file);
+        $relativePath = Storage::disk('local')->putFile('tareas', $file);
+        $physicalPath = Storage::disk('local')->path($relativePath);
 
-        $datos = [
-            'nombre' => $user->name ?? $user->nombre_completo ?? 'Alumno Sapius',
-            'leccion' => $leccion->title,
-            'tarea' => $request->tarea ?? 'Entregado vía Plataforma Web'
-        ];
+        $isModule = empty($leccion->leccion_id) || (int) $leccion->leccion_id === 0;
+        $schedule = $this->accessService->evaluateSchedule(
+            (int) $cursoProgramado->id,
+            (int) $user->id,
+            (int) $leccion->id,
+            $isModule ? null : (int) $leccion->leccion_id
+        );
+        $isLate = (bool) ($schedule['is_late'] ?? false);
 
-        try {
-            $copia = $user->email;
-            if ($instructor) {
-                \Illuminate\Support\Facades\Mail::to($instructor->email)->cc([$copia, 'tareas@sapius.com.mx'])->send(new \App\Mail\TareaEmail($datos));
-            }
-        } catch (\Exception $e) {
-            // Log warning but continue process as mail service might fail
-        }
-
-        $isLate = false;
-        $contenidoProgramado = \App\Models\Registro\ContenidoProgramado::where('curso_programado_id', $request->curso_programado_id)->first();
-        if ($contenidoProgramado && $contenidoProgramado->contenido) {
-            $schedule = collect($contenidoProgramado->contenido);
-            $scheduleItem = $schedule->firstWhere('id', $leccion->id);
-            if (!$scheduleItem) {
-                $scheduleItem = $schedule->firstWhere('id', $leccion->parent_id); // parent_id maps to leccion_id in old logic
-            }
-            if ($scheduleItem && isset($scheduleItem['fecha_final'])) {
-                try {
-                    $endFormat = 'd/m/Y';
-                    $endStr = $scheduleItem['fecha_final'];
-                    if (isset($scheduleItem['hora_final'])) {
-                        $endFormat .= ' H:i';
-                        $endStr .= ' ' . $scheduleItem['hora_final'];
-                    }
-                    $fechaFinal = \Carbon\Carbon::createFromFormat($endFormat, $endStr);
-                    if (!isset($scheduleItem['hora_final'])) {
-                        $fechaFinal->setTime(23, 59, 59);
-                    }
-                    if (\Carbon\Carbon::now()->gt($fechaFinal)) {
-                        $isLate = true;
-                    }
-                } catch (\Exception $e) {}
-            }
-        }
-
-        $homework = new Homework();
+        $homework = new Homework;
         $homework->leccion_id = $leccion->id;
         $homework->user_id = $user->id;
         $homework->is_late = $isLate ? 1 : 0;
         $homework->save();
+
+        $datos = [
+            'nombre' => $user->nombre_completo ?: ($user->name ?? 'Alumno Sapius'),
+            'leccion' => $leccion->title ?? $leccion->titulo,
+            'tarea' => $request->input('tarea', 'Entregado vía Plataforma Web'),
+        ];
+
+        try {
+            $ccRecipients = array_filter([$user->email, 'tareas@sapius.com.mx']);
+            if ($instructor && $instructor->email) {
+                Mail::to($instructor->email)
+                    ->cc($ccRecipients)
+                    ->send(new TareaEmail($datos, $physicalPath));
+            } elseif ($user->email) {
+                Mail::to('tareas@sapius.com.mx')
+                    ->cc([$user->email])
+                    ->send(new TareaEmail($datos, $physicalPath));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Error enviando correo de tarea para lección {$leccion->id}: ".$e->getMessage());
+        }
 
         return back()->with('success', 'Tarea enviada exitosamente.');
     }

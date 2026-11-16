@@ -8,7 +8,10 @@ class ContenidoProgramado extends Model
 {
     protected $table = 'contenidos_programados';
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'curso_programado_id',
+        'contenido',
+    ];
 
     protected $casts = [
         'contenido' => 'array',

@@ -8,7 +8,6 @@ trait MapsLegacyAttributes
      * Define the attribute mapping in the model using:
      * protected $legacyMapping = ['english_name' => 'spanish_name'];
      */
-
     public function getAttribute($key)
     {
         $isMapped = false;
@@ -58,6 +57,7 @@ trait MapsLegacyAttributes
                     $mapped[] = $englishKey;
                 }
             }
+
             return array_values(array_unique(array_merge($fillable, $mapped)));
         }
 
@@ -66,17 +66,30 @@ trait MapsLegacyAttributes
 
     public function isFillable($key)
     {
-        return in_array($key, $this->getFillable());
+        return parent::isFillable($key);
     }
 
     public function attributesToArray()
     {
         $attributes = parent::attributesToArray();
-        
+
         if (property_exists($this, 'legacyMapping')) {
+            $spanishKeysToRemove = [];
             foreach ($this->legacyMapping as $english => $spanish) {
                 if (array_key_exists($spanish, $attributes)) {
-                    $attributes[$english] = $attributes[$spanish];
+                    $value = $attributes[$spanish];
+                    if (str_starts_with($english, 'is_') && ($value === 'si' || $value === 'no')) {
+                        $value = ($value === 'si');
+                    } elseif ($this->hasCast($english)) {
+                        $value = parent::castAttribute($english, $value);
+                    }
+                    $attributes[$english] = $value;
+                    $spanishKeysToRemove[] = $spanish;
+                }
+            }
+
+            foreach (array_unique($spanishKeysToRemove) as $spanish) {
+                if (! array_key_exists($spanish, $this->legacyMapping)) {
                     unset($attributes[$spanish]);
                 }
             }
@@ -96,6 +109,7 @@ trait MapsLegacyAttributes
                 return parent::castAttribute($englishKey, $value);
             }
         }
+
         return parent::castAttribute($key, $value);
     }
 }

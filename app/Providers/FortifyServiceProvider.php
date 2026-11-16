@@ -7,12 +7,20 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\RegisterResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
+use App\Models\User;
+use App\Rules\ValidRecaptcha;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Laravel\Fortify\Actions\AttemptToAuthenticate;
+use Laravel\Fortify\Actions\CanonicalizeUsername;
+use Laravel\Fortify\Actions\EnsureLoginIsNotThrottled;
+use Laravel\Fortify\Actions\PrepareAuthenticatedSession;
+use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
@@ -50,24 +58,27 @@ class FortifyServiceProvider extends ServiceProvider
         // 1. Validar reCAPTCHA antes de la autenticación
         Fortify::authenticateThrough(function (Request $request) {
             return array_filter([
-                config('fortify.limiters.login') ? null : \Laravel\Fortify\Actions\EnsureLoginIsNotThrottled::class,
-                \Laravel\Fortify\Actions\CanonicalizeUsername::class,
-                new class {
-                    public function handle($request, $next) {
+                config('fortify.limiters.login') ? null : EnsureLoginIsNotThrottled::class,
+                CanonicalizeUsername::class,
+                new class
+                {
+                    public function handle($request, $next)
+                    {
                         $recaptchaSecret = config('elearning.captcha_secret_key');
                         if ($recaptchaSecret) {
                             $request->validate([
-                                'g-recaptcha-response' => ['required', new \App\Rules\ValidRecaptcha()],
+                                'g-recaptcha-response' => ['required', new ValidRecaptcha],
                             ], [
                                 'g-recaptcha-response.required' => 'Por favor, marca la casilla "No soy un robot".',
                             ]);
                         }
+
                         return $next($request);
                     }
                 },
-                \Laravel\Fortify\Features::enabled(\Laravel\Fortify\Features::twoFactorAuthentication()) ? \Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable::class : null,
-                \Laravel\Fortify\Actions\AttemptToAuthenticate::class,
-                \Laravel\Fortify\Actions\PrepareAuthenticatedSession::class,
+                Features::enabled(Features::twoFactorAuthentication()) ? RedirectIfTwoFactorAuthenticatable::class : null,
+                AttemptToAuthenticate::class,
+                PrepareAuthenticatedSession::class,
             ]);
         });
 
@@ -76,16 +87,16 @@ class FortifyServiceProvider extends ServiceProvider
             $loginInput = $request->input('username') ?? $request->input('email');
             $password = $request->input('password');
 
-            if (!$loginInput || !$password) {
+            if (! $loginInput || ! $password) {
                 return null;
             }
 
             // Buscar por username o por email
-            $user = \App\Models\User::where('username', $loginInput)
+            $user = User::where('username', $loginInput)
                 ->orWhere('email', $loginInput)
                 ->first();
 
-            if ($user && \Illuminate\Support\Facades\Hash::check($password, $user->password)) {
+            if ($user && $user->activo === 'si' && Hash::check($password, $user->password)) {
                 return $user;
             }
 

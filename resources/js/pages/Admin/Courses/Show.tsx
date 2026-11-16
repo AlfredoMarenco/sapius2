@@ -1,5 +1,4 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { 
     ChevronLeft, 
     Calendar, 
@@ -19,13 +18,12 @@ import {
     BookOpen,
     Users,
     Percent,
-    Activity,
-    Video,
-    FileText,
-    ListChecks,
     Ticket,
     CalendarDays
 } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
@@ -34,10 +32,8 @@ import {
     DropdownMenuItem, 
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { useState } from 'react';
+import AppLayout from '@/layouts/app-layout';
 import ScheduleModal from './Partials/ScheduleModal';
-import { toast } from 'sonner';
 
 interface Instructor {
     id: number;
@@ -54,6 +50,8 @@ interface ScheduledCourse {
     } | null;
     start_date: string;
     end_date: string;
+    fecha_inicio_venta?: string | null;
+    fecha_fin_venta?: string | null;
     price: number;
     internal_id: string | null;
     is_active: boolean;
@@ -274,7 +272,7 @@ export default function Show({ course, instructors }: Props) {
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/admin/registro/descuentos?cp_id=${schedule.id}`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
+                                                            <Link href={`/admin/scheduled-courses/${schedule.id}/discounts`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
                                                                 <Percent className="w-3.5 h-3.5 text-emerald-600" /> Códigos Descuento
                                                             </Link>
                                                         </DropdownMenuItem>

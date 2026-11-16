@@ -2,100 +2,71 @@
 
 namespace App\Http\Controllers\Api;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Models\Landing\Pride;
+use App\Models\Landing\Slide;
+use App\Models\Landing\Teacher;
 use App\Models\ManageableGuiaMedicine;
 use App\Models\ManageableGuiaNutrition;
 use App\Models\ManageableSimulatorMedicine;
 use App\Models\ManageableSimulatorNutrition;
-use App\Models\Landing\Pride;
-use App\Models\Landing\Slide;
-use App\Models\Landing\Teacher;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class SortController extends Controller
 {
-    public function teachers(Request $request){
-        $position = 1;
-
-        $sorts = $request->get('teachers');
-        foreach ($sorts as $sort) {
-            $teacher = Teacher::find($sort);
-            $teacher->position = $position;
-            $teacher->save();
-            $position++;
-        }
+    public function teachers(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'teachers', Teacher::class);
     }
 
-    public function prides(Request $request){
-        $position = 1;
-
-        $sorts = $request->get('prides');
-        foreach ($sorts as $sort) {
-            $pride = Pride::find($sort);
-            $pride->position = $position;
-            $pride->save();
-            $position++;
-        }
+    public function prides(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'prides', Pride::class);
     }
 
-    public function slides(Request $request){
-        $position = 1;
-
-        $sorts = $request->get('slides');
-        foreach ($sorts as $sort) {
-            $slide = Slide::find($sort);
-            $slide->position = $position;
-            $slide->save();
-            $position++;
-        }
+    public function slides(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'slides', Slide::class);
     }
 
-    public function manageableSimulatorMedicine(Request $request){
-        $position = 1;
-
-        $sorts = $request->get('simulatormedicines');
-        foreach ($sorts as $sort) {
-            $medicine = ManageableSimulatorMedicine::find($sort);
-            $medicine->position = $position;
-            $medicine->save();
-            $position++;
-        }
+    public function manageableSimulatorMedicine(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'simulatormedicines', ManageableSimulatorMedicine::class);
     }
 
-
-    public function manageableSimulatorNutrition(Request $request){
-        $position = 1;
-
-        $sorts = $request->get('simulatornutritions');
-        foreach ($sorts as $sort) {
-            $nutrition = ManageableSimulatorNutrition::find($sort);
-            $nutrition->position = $position;
-            $nutrition->save();
-            $position++;
-        }
+    public function manageableSimulatorNutrition(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'simulatornutritions', ManageableSimulatorNutrition::class);
     }
 
-    public function manageableGuiasMedicine(Request $request){
-        $position = 1;
-
-        $sorts = $request->get('guiamedicines');
-        foreach ($sorts as $sort) {
-            $guiamedicines = ManageableGuiaMedicine::find($sort);
-            $guiamedicines->position = $position;
-            $guiamedicines->save();
-            $position++;
-        }
+    public function manageableGuiasMedicine(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'guiamedicines', ManageableGuiaMedicine::class);
     }
 
-    public function manageableGuiasNutrition(Request $request){
-        $position = 1;
+    public function manageableGuiasNutrition(Request $request): JsonResponse
+    {
+        return $this->reorderModel($request, 'guianutritions', ManageableGuiaNutrition::class);
+    }
 
-        $sorts = $request->get('guianutritions');
-        foreach ($sorts as $sort) {
-            $nutrition = ManageableGuiaNutrition::find($sort);
-            $nutrition->position = $position;
-            $nutrition->save();
-            $position++;
+    protected function reorderModel(Request $request, string $inputKey, string $modelClass): JsonResponse
+    {
+        $validated = $request->validate([
+            $inputKey => ['required', 'array', 'min:1'],
+            "{$inputKey}.*" => ['integer', 'min:1'],
+        ]);
+
+        $position = 1;
+        foreach ($validated[$inputKey] as $id) {
+            $item = $modelClass::find($id);
+            if ($item) {
+                $item->position = $position;
+                $item->save();
+                $position++;
+            }
         }
+
+        return response()->json(['success' => true]);
     }
 }

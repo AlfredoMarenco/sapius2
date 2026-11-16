@@ -3,6 +3,7 @@
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\User\CheckoutController;
 use App\Http\Controllers\User\CourseLearningController;
+use App\Http\Middleware\CheckStrikes;
 use Illuminate\Support\Facades\Route;
 
 // Public Landing Pages (Identical to ../Sapius + 2026 Redesign Hub Routes)
@@ -11,6 +12,12 @@ Route::get('/cursos', [LandingController::class, 'coursesHub'])->name('public.co
 Route::get('/nosotros', [LandingController::class, 'about'])->name('public.about');
 Route::get('/orgullo-sapius', [LandingController::class, 'pride'])->name('public.pride');
 Route::get('/contacto', [LandingController::class, 'contact'])->name('public.contact');
+Route::post('/contacto', [LandingController::class, 'sendContact'])
+    ->middleware('throttle:10,1')
+    ->name('public.contact.send');
+Route::post('/informacion', [LandingController::class, 'sendContact'])
+    ->middleware('throttle:10,1')
+    ->name('informacion');
 
 Route::get('/terms/conditions', function () {
     return app(LandingController::class)->legal('terms');
@@ -63,27 +70,40 @@ Route::get('/simuladores-nutricion', function () {
     return app(LandingController::class)->simuladores('nutricion');
 })->name('simuladores.nutricion');
 
-// Public / Guest Checkout
-Route::get('/checkout/{curso_id?}', [CheckoutController::class, 'createCheckout'])->name('checkout');
-Route::post('/payout', [CheckoutController::class, 'processPay'])->name('public.checkout.processPayout');
+// Public Checkout Redirect / Auth-Protected Checkout (Paridad ../Sapius: exige login conservando url.intended)
+Route::middleware(['auth', 'verified', 'role:alumno', CheckStrikes::class])->group(function () {
+    Route::get('/checkout/{curso_id?}', [CheckoutController::class, 'createCheckout'])->name('checkout');
+    Route::post('/payout', [CheckoutController::class, 'processPay'])
+        ->middleware('throttle:10,1')
+        ->name('public.checkout.processPayout');
+});
 
-// Global media streaming fallback (for images and videos)
-Route::get('/media/stream/{filename}', [CourseLearningController::class, 'streamMedia'])
+// Public catalog/landing images ONLY (videos/private media moved behind auth.media)
+Route::get('/media/stream/{filename}', [CourseLearningController::class, 'publicMediaStream'])
     ->where('filename', '.*')
     ->name('public.media.stream');
+
+Route::get('/cursos/image/{filename}', [CourseLearningController::class, 'publicMediaStream'])
+    ->where('filename', '.*')
+    ->name('cursos.image');
 
 // Role-based dashboard redirect
 Route::middleware(['auth', 'verified'])
     ->group(function () {
         Route::get('dashboard', function () {
-            if (auth()->user()->hasRole('admin')) {
+            $user = auth()->user();
+
+            if ($user->hasRole('admin')) {
                 return redirect()->route('admin.dashboard');
             }
-            if (auth()->user()->hasRole('instructor')) {
+            if ($user->hasRole('instructor')) {
                 return redirect()->route('instructor.dashboard');
             }
+            if ($user->hasRole('alumno')) {
+                return redirect()->route('alumno.home');
+            }
 
-            return redirect()->route('alumno.home');
+            abort(403, 'Tu cuenta no tiene un rol asignado.');
         })->name('dashboard');
     });
 

@@ -5,8 +5,10 @@ import { ArrowLeft, CheckCircle2, RotateCcw, Sparkles, X } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     resolvePurchaseTarget,
-    type ScheduledCourseCandidate,
+    WHATSAPP_PHONE
+    
 } from './PricingCard';
+import type {ScheduledCourseCandidate} from './PricingCard';
 import { SapiusIsotype } from './SapiusLogo';
 
 export const MINI_TEST_OPEN_EVENT = 'sapius:open-mini-test';
@@ -209,6 +211,7 @@ function computeRecommendation(
                         'Hola Sapius, hice el Mini-Test y me recomendó el Simulador Individual de EGEL Medicina ($499 MXN).',
                 };
             }
+
             return {
                 badge: 'EGEL Medicina · Muy pronto',
                 title: 'Guía Digital — EGEL Medicina',
@@ -438,17 +441,22 @@ export function MiniTestModal({
         if (!isControlled) {
             setInternalOpen(next);
         }
+
         onOpenChange?.(next);
     };
 
     useEffect(() => {
-        if (!listenToGlobalEvent) return;
+        if (!listenToGlobalEvent) {
+return;
+}
+
         const handler = () => {
             setStep(0);
             setAnswers({});
             setOpen(true);
         };
         window.addEventListener(MINI_TEST_OPEN_EVENT, handler);
+
         return () => window.removeEventListener(MINI_TEST_OPEN_EVENT, handler);
     }, [listenToGlobalEvent]);
 
@@ -475,7 +483,10 @@ export function MiniTestModal({
     );
 
     const handleSelectOption = (optionId: string) => {
-        if (!currentQuestion) return;
+        if (!currentQuestion) {
+return;
+}
+
         const updated = { ...answers, [currentQuestion.id]: optionId };
         setAnswers(updated);
         setStep((prev) => prev + 1);
@@ -486,7 +497,7 @@ export function MiniTestModal({
         setStep(0);
     };
 
-    const whatsappHref = `https://api.whatsapp.com/send?phone=521234567890&text=${encodeURIComponent(
+    const whatsappHref = `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(
         recommendation.whatsappMessage,
     )}`;
 
@@ -556,6 +567,7 @@ export function MiniTestModal({
                                         {currentQuestion.options.map((option) => {
                                             const selected =
                                                 answers[currentQuestion.id] === option.id;
+
                                             return (
                                                 <button
                                                     key={option.id}

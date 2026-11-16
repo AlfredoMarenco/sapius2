@@ -3,12 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Mail\AccountUnlockedEmail;
+use App\Mail\RegistroEmail;
 use App\Models\Enrollment;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class UserController extends Controller
 {
@@ -28,23 +35,25 @@ class UserController extends Controller
             $search = trim($request->input('search'));
             $query->where(function ($q) use ($search) {
                 $q->where('nombre', 'like', "%{$search}%")
-                  ->orWhere('apellido', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('folio', 'like', "%{$search}%");
+                    ->orWhere('apellido', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('folio', 'like', "%{$search}%");
             });
         }
 
         $users = $query->orderBy('id', 'desc')->paginate(20)->withQueryString()->through(function ($u) {
+            $role = $u->roles->first();
+
             return [
                 'id' => $u->id,
                 'name' => $u->name,
                 'username' => $u->username,
                 'email' => $u->email,
-                'role' => $u->roles->first() ? $u->roles->first()->name : 'alumno',
+                'role' => $role ? strtolower($role->slug ?? $role->name) : 'alumno',
                 'is_active' => $u->activo === 'si',
                 'is_validated' => $u->validado === 'si',
-                'is_blocked' => (bool)$u->is_blocked,
+                'is_blocked' => (bool) $u->is_blocked,
                 'strikes' => $u->strikes ?? 0,
                 'mac_address' => $u->mac_address,
                 'pending_mac_address' => $u->pending_mac_address,
@@ -75,6 +84,8 @@ class UserController extends Controller
                 ];
             });
 
+        $firstRole = $user->roles->first();
+
         return Inertia::render('Admin/Users/Show', [
             'user' => [
                 'id' => $user->id,
@@ -85,10 +96,10 @@ class UserController extends Controller
                 'folio' => $user->folio,
                 'university' => $user->universidad_procedencia,
                 'specialty' => $user->especialidad,
-                'role' => $user->roles->first() ? $user->roles->first()->name : 'alumno',
+                'role' => $firstRole ? strtolower($firstRole->slug ?? $firstRole->name) : 'alumno',
                 'is_active' => $user->activo === 'si',
                 'is_validated' => $user->validado === 'si',
-                'is_blocked' => (bool)$user->is_blocked,
+                'is_blocked' => (bool) $user->is_blocked,
                 'strikes' => $user->strikes ?? 0,
                 'mac_address' => $user->mac_address,
                 'pending_mac_address' => $user->pending_mac_address,
@@ -101,6 +112,7 @@ class UserController extends Controller
     public function verify($id)
     {
         $user = User::with('roles')->findOrFail($id);
+        $firstRole = $user->roles->first();
 
         return Inertia::render('Admin/Users/Verify', [
             'user' => [
@@ -108,7 +120,7 @@ class UserController extends Controller
                 'name' => $user->name,
                 'username' => $user->username,
                 'email' => $user->email,
-                'role' => $user->roles->first() ? $user->roles->first()->name : 'alumno',
+                'role' => $firstRole ? strtolower($firstRole->slug ?? $firstRole->name) : 'alumno',
                 'phone' => $user->telefono,
                 'fecha_sustentacion' => $user->fecha_sustentacion,
                 'folio' => $user->folio,
@@ -116,7 +128,7 @@ class UserController extends Controller
                 'specialty' => $user->especialidad,
                 'is_validated' => $user->validado === 'si',
                 'is_active' => $user->activo === 'si',
-                'is_blocked' => (bool)$user->is_blocked,
+                'is_blocked' => (bool) $user->is_blocked,
                 'strikes' => $user->strikes ?? 0,
                 'foto' => $user->foto,
                 'documento_identificacion' => $user->documento_identificacion,
@@ -126,6 +138,52 @@ class UserController extends Controller
                 'created_at' => $user->created_at ? $user->created_at->format('d/m/Y') : null,
             ],
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'apellido' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'nullable|string|min:8',
+            'rol_id' => 'required|exists:roles,id',
+            'validado' => 'nullable|in:si,no',
+            'activo' => 'nullable|in:si,no',
+        ]);
+
+        $user = DB::transaction(function () use ($validated) {
+            $user = new User;
+            $user->nombre = strip_tags($validated['nombre']);
+            $user->apellido = strip_tags($validated['apellido']);
+            $user->username = strip_tags($validated['username']);
+            $user->email = strip_tags($validated['email']);
+            $user->password = Hash::make($validated['password'] ?? Str::password(12));
+            $user->activo = $validated['activo'] ?? 'si';
+            $user->validado = $validated['validado'] ?? 'si';
+            $user->save();
+
+            $now = now();
+            $user->roles()->sync([
+                (int) $validated['rol_id'] => [
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            ]);
+
+            return $user;
+        });
+
+        try {
+            Mail::to($user->email)
+                ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
+                ->send(new RegistroEmail($user));
+        } catch (\Throwable $e) {
+            Log::warning("Error enviando RegistroEmail desde Admin::UserController::store a {$user->email}: {$e->getMessage()}");
+        }
+
+        return redirect()->route('admin.users.index')->with('success', 'Usuario creado correctamente.');
     }
 
     public function edit($id)
@@ -170,35 +228,62 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $user->activo = ($user->activo == 'si') ? 'no' : 'si';
+
+        if ($user->activo === 'no') {
+            if (Schema::hasColumn('users', 'api_token')) {
+                $user->api_token = null;
+            }
+            if (Schema::hasColumn('users', 'session_id')) {
+                if (! empty($user->session_id)) {
+                    try {
+                        Session::getHandler()->destroy($user->session_id);
+                    } catch (\Throwable $e) {
+                        // Ignorar si la sesión ya expiró
+                    }
+                }
+                $user->session_id = null;
+            }
+        }
+
         $user->save();
 
         $status = $user->activo == 'si' ? 'activado' : 'desactivado';
-        return redirect()->back()->with('success', 'El usuario ha sido ' . $status . '.');
+
+        return redirect()->back()->with('success', 'El usuario ha sido '.$status.'.');
     }
 
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:users,username,' . $id,
-            'email' => 'required|email|max:255|unique:users,email,' . $id,
+            'username' => 'required|string|max:255|unique:users,username,'.$id,
+            'email' => 'required|email|max:255|unique:users,email,'.$id,
             'rol_id' => 'required|exists:roles,id',
+            'password' => 'nullable|string|min:8',
         ]);
 
-        $user->nombre = strip_tags($request->nombre);
-        $user->apellido = strip_tags($request->apellido);
-        $user->username = strip_tags($request->username);
-        $user->email = strip_tags($request->email);
-        $user->save();
+        DB::transaction(function () use ($user, $validated) {
+            $user->nombre = strip_tags($validated['nombre']);
+            $user->apellido = strip_tags($validated['apellido']);
+            $user->username = strip_tags($validated['username']);
+            $user->email = strip_tags($validated['email']);
+            if (! empty($validated['password'])) {
+                $user->password = Hash::make($validated['password']);
+            }
+            $user->save();
 
-        DB::table('role_user')->where('user_id', $user->id)->delete();
-        DB::table('role_user')->insert([
-            'role_id' => $request->rol_id,
-            'user_id' => $user->id,
-        ]);
+            $now = now();
+            $user->roles()->sync([
+                (int) $validated['rol_id'] => [
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            ]);
+            $user->unsetRelation('roles');
+        });
 
         return redirect()->route('admin.users.index')->with('success', 'Usuario actualizado correctamente.');
     }
@@ -210,16 +295,23 @@ class UserController extends Controller
         $user->strikes = 0;
         $user->save();
 
-        // Enviar correo de desbloqueo
-        \Illuminate\Support\Facades\Mail::to($user->email)
-            ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-            ->send(new \App\Mail\AccountUnlockedEmail($user));
+        try {
+            Mail::to($user->email)
+                ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
+                ->send(new AccountUnlockedEmail($user));
+        } catch (\Throwable $e) {
+            Log::warning("Error enviando AccountUnlockedEmail a {$user->email}: {$e->getMessage()}");
+        }
 
         return redirect()->back()->with('success', 'El usuario ha sido desbloqueado exitosamente.');
     }
 
     public function clearMac($id)
     {
+        if (! Schema::hasColumn('users', 'mac_address')) {
+            return redirect()->back()->with('error', 'La base de datos actual no cuenta con las columnas de control MAC.');
+        }
+
         $user = User::findOrFail($id);
         $user->mac_address = null;
         $user->save();
@@ -229,16 +321,21 @@ class UserController extends Controller
 
     public function approveMac($id)
     {
+        if (! Schema::hasColumn('users', 'mac_address') || ! Schema::hasColumn('users', 'pending_mac_address')) {
+            return redirect()->back()->with('error', 'La base de datos actual no cuenta con las columnas de control MAC.');
+        }
+
         $user = User::findOrFail($id);
 
         if ($user->pending_mac_address) {
             if ($user->mac_address) {
-                $user->mac_address = $user->mac_address . ', ' . $user->pending_mac_address;
+                $user->mac_address = $user->mac_address.', '.$user->pending_mac_address;
             } else {
                 $user->mac_address = $user->pending_mac_address;
             }
             $user->pending_mac_address = null;
             $user->save();
+
             return redirect()->back()->with('success', 'Nueva dirección MAC aprobada exitosamente.');
         }
 
@@ -247,6 +344,10 @@ class UserController extends Controller
 
     public function rejectMac($id)
     {
+        if (! Schema::hasColumn('users', 'pending_mac_address')) {
+            return redirect()->back()->with('error', 'La base de datos actual no cuenta con las columnas de control MAC.');
+        }
+
         $user = User::findOrFail($id);
         $user->pending_mac_address = null;
         $user->save();
@@ -257,7 +358,7 @@ class UserController extends Controller
     public function search(Request $request)
     {
         $query = $request->input('q');
-        
+
         if (empty($query)) {
             return response()->json([]);
         }
@@ -268,10 +369,10 @@ class UserController extends Controller
             ->limit(10)
             ->get(['id', 'nombre', 'apellido', 'email', 'telefono', 'username']);
 
-        $results = $users->map(function($user) {
+        $results = $users->map(function ($user) {
             return [
                 'id' => $user->id,
-                'name' => trim($user->nombre . ' ' . $user->apellido) ?: $user->username,
+                'name' => trim($user->nombre.' '.$user->apellido) ?: $user->username,
                 'email' => $user->email,
                 'phone' => $user->telefono ?? '',
             ];
@@ -282,31 +383,55 @@ class UserController extends Controller
 
     public function userPicture($file)
     {
-        $storagePath = storage_path('app/images/usuarios/' . $file);
-        if (!file_exists($storagePath)) {
-            $storagePath = storage_path('app/public/images/usuarios/' . $file);
-        }
-        if (file_exists($storagePath)) {
-            return response()->file($storagePath);
-        }
-        return abort(404);
+        return $this->servePrivateFile([
+            storage_path('app/images/usuarios'),
+            storage_path('app/public/images/usuarios'),
+        ], $file, false);
     }
 
     public function documento($file)
     {
-        $storagePath = storage_path('app/documentos/identificaciones/' . $file);
-        if (file_exists($storagePath)) {
-            return response()->download($storagePath);
-        }
-        return abort(404);
+        return $this->servePrivateFile([
+            storage_path('app/documentos/identificaciones'),
+        ], $file, true);
     }
 
     public function pase($file)
     {
-        $storagePath = storage_path('app/documentos/pases/' . $file);
-        if (file_exists($storagePath)) {
-            return response()->download($storagePath);
+        return $this->servePrivateFile([
+            storage_path('app/documentos/pases'),
+        ], $file, true);
+    }
+
+    private function servePrivateFile(array $directories, string $file, bool $download)
+    {
+        $safeFilename = basename($file);
+        if ($safeFilename === '' || $safeFilename === '.' || $safeFilename === '..') {
+            abort(404);
         }
-        return abort(404);
+
+        foreach ($directories as $dir) {
+            $baseDir = realpath($dir);
+            if ($baseDir === false) {
+                continue;
+            }
+
+            $candidatePath = realpath($baseDir.DIRECTORY_SEPARATOR.$safeFilename);
+            if (
+                $candidatePath !== false
+                && is_file($candidatePath)
+                && str_starts_with($candidatePath, $baseDir.DIRECTORY_SEPARATOR)
+            ) {
+                $headers = [
+                    'X-Content-Type-Options' => 'nosniff',
+                ];
+
+                return $download
+                    ? response()->download($candidatePath, $safeFilename, $headers)
+                    : response()->file($candidatePath, $headers);
+            }
+        }
+
+        abort(404);
     }
 }

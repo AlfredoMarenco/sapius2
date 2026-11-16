@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use App\Concerns\MapsLegacyAttributes;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['course_id', 'category_id', 'instructor_id', 'start_date', 'end_date', 'price', 'internal_id', 'is_active'])]
+#[Fillable(['course_id', 'category_id', 'instructor_id', 'start_date', 'end_date', 'fecha_inicio_venta', 'fecha_fin_venta', 'price', 'internal_id', 'is_active'])]
 class ScheduledCourse extends Model
 {
     use MapsLegacyAttributes;
@@ -23,14 +23,18 @@ class ScheduledCourse extends Model
         'is_active' => 'activo',
     ];
 
-    protected $casts = [
-        'start_date' => 'datetime',
-        'end_date' => 'datetime',
-        'fecha_inicio' => 'datetime',
-        'fecha_fin' => 'datetime',
-        'fecha_inicio_venta' => 'datetime',
-        'fecha_fin_venta' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'start_date' => 'datetime',
+            'end_date' => 'datetime',
+            'fecha_inicio' => 'datetime',
+            'fecha_fin' => 'datetime',
+            'fecha_inicio_venta' => 'datetime',
+            'fecha_fin_venta' => 'datetime',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function course()
     {

@@ -2,66 +2,165 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Homework;
-use App\Models\FileGuia;
-use App\Models\Cursos\Category;
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
-use App\Models\Registro\CursoProgramado;
-use App\Models\Registro\Inscripcion;
-use App\Models\Registro\ContenidoProgramado;
+use App\Mail\TareaEmail;
+use App\Models\Cursos\AlumnoPdfRespuesta;
 use App\Models\Cursos\Curso;
 use App\Models\Cursos\Leccion;
-use App\Models\Cursos\Prueba;
+use App\Models\Cursos\MaterialPdf;
 use App\Models\Cursos\Pregunta;
+use App\Models\Cursos\Prueba;
 use App\Models\Cursos\Respuesta;
 use App\Models\Evaluacion\Examen;
-use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Storage;
+use App\Models\FileGuia;
+use App\Models\Homework;
+use App\Models\ProgrammingCalendar;
+use App\Models\Registro\ContenidoProgramado;
+use App\Models\Registro\CursoProgramado;
+use App\Models\Registro\Inscripcion;
+use App\Models\Registro\LessonUnlock;
+use App\Models\Review;
+use App\Models\User;
+use App\Services\EnrollmentAccessService;
+use Carbon\Carbon;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\TareaEmail;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class ElectronPanelController extends Controller
 {
+    private function accessService(): EnrollmentAccessService
+    {
+        return app(EnrollmentAccessService::class);
+    }
+
+    private function parseDurationToSeconds($value): int
+    {
+        if (empty($value)) {
+            return 0;
+        }
+
+        $raw = trim((string) $value);
+        if (preg_match('/^\d{1,3}:\d{2}(:\d{2})?$/', $raw)) {
+            $parts = explode(':', $raw);
+            if (count($parts) === 3) {
+                return max(0, ((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2]);
+            }
+            if (count($parts) === 2) {
+                return max(0, ((int) $parts[0] * 3600) + ((int) $parts[1] * 60));
+            }
+        }
+
+        if (is_numeric($raw) && (int) $raw > 0) {
+            return (int) $raw * 60;
+        }
+
+        return 0;
+    }
+
+    private function resolveTimeLimitSeconds(?Prueba $prueba): int
+    {
+        if (! $prueba) {
+            return 0;
+        }
+
+        if (! empty($prueba->duracion) && (int) $prueba->duracion > 0) {
+            return (int) $prueba->duracion * 60;
+        }
+
+        return $this->parseDurationToSeconds($prueba->tiempo ?? null);
+    }
+
+    private function isMaterialDownloadAllowed(MaterialPdf $material): bool
+    {
+        $rawAttributes = $material->getAttributes();
+        if (array_key_exists('allow_download', $rawAttributes) && $rawAttributes['allow_download'] !== null) {
+            return (bool) $rawAttributes['allow_download'];
+        }
+
+        $config = is_array($material->fields_config) ? $material->fields_config : [];
+
+        return ! empty($config['allow_download']);
+    }
+
+    private function resolveSafePathInDirs(string $rawPath, array $baseDirs, bool $basenameOnly = true): ?string
+    {
+        if ($rawPath === '' || str_contains($rawPath, "\0") || str_contains($rawPath, '..')) {
+            return null;
+        }
+
+        $relative = $basenameOnly ? basename($rawPath) : ltrim($rawPath, '/\\');
+        if ($relative === '') {
+            return null;
+        }
+
+        foreach ($baseDirs as $dir) {
+            $baseReal = realpath($dir);
+            if (! $baseReal) {
+                continue;
+            }
+
+            $candidate = realpath($baseReal.DIRECTORY_SEPARATOR.$relative);
+            if ($candidate && str_starts_with($candidate, $baseReal.DIRECTORY_SEPARATOR) && is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
     private function validateMacAddress(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             abort(401, 'No autorizado.');
         }
-        if ($user->is_blocked) {
-            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+        if ($user->activo !== 'si') {
+            throw new HttpResponseException(
+                response()->json([
+                    'success' => false,
+                    'message' => 'Cuenta desactivada.',
+                ], 403)
+            );
+        }
+        if ((bool) $user->is_blocked || ($user->strikes ?? 0) >= 100) {
+            throw new HttpResponseException(
                 response()->json([
                     'success' => false,
                     'message' => 'Cuenta bloqueada por violación de seguridad.',
-                    'is_blocked' => true
+                    'is_blocked' => true,
                 ], 403)
             );
         }
         if ($user->hasRole('alumno')) {
-            $mac = $request->header('X-Sapius-MAC');
-            if (!$mac) {
-                throw new \Illuminate\Http\Exceptions\HttpResponseException(
+            $mac = strtolower(trim((string) $request->header('X-Sapius-MAC', '')));
+            if ($mac === '') {
+                throw new HttpResponseException(
                     response()->json([
                         'success' => false,
                         'message' => 'Dispositivo no autorizado.',
-                        'is_blocked' => false
+                        'is_blocked' => false,
                     ], 403)
                 );
             }
-            $macs = array_map('trim', explode(',', $user->mac_address));
-            if (!in_array($mac, $macs)) {
-                throw new \Illuminate\Http\Exceptions\HttpResponseException(
+            $macs = array_filter(array_map(fn ($m) => strtolower(trim($m)), explode(',', (string) $user->mac_address)));
+            if (! in_array($mac, $macs, true)) {
+                throw new HttpResponseException(
                     response()->json([
                         'success' => false,
                         'message' => 'Dispositivo no autorizado.',
-                        'is_blocked' => false
+                        'is_blocked' => false,
                     ], 403)
                 );
             }
         }
+
         return true;
     }
 
@@ -74,7 +173,7 @@ class ElectronPanelController extends Controller
         $mis_cursos = Inscripcion::whereHas('CursoProgramado', function ($query) {
             $query->with('Curso')->where('fecha_inicio_venta', '<=', date('Y-m-d H:i:s'))
                 ->where('fecha_fin', '>=', date('Y-m-d H:i:s'));
-        })->with(['CursoProgramado.Curso', 'CursoProgramado.category', 'CursoProgramado.instructor'])->where('user_id', $user->id)->get();
+        })->with(['CursoProgramado.Curso', 'CursoProgramado.category', 'CursoProgramado.instructor:id,nombre,apellido,foto'])->where('user_id', $user->id)->get();
 
         return response()->json([
             'success' => true,
@@ -86,54 +185,55 @@ class ElectronPanelController extends Controller
                     'email' => $user->email,
                     'is_blocked' => $user->is_blocked,
                     'mac_address' => $user->mac_address,
-                    'foto_url' => $user->foto ? '/api/electron/profile/foto/' . $user->foto : null,
+                    'foto_url' => $user->foto ? '/api/electron/profile/foto/'.$user->foto : null,
                 ],
-                'mis_cursos' => $mis_cursos
-            ]
+                'mis_cursos' => $mis_cursos,
+            ],
         ]);
     }
 
     public function courseDetails(Request $request, $curso_programado_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        
-        $inscripcion = Inscripcion::where('curso_programado_id', $curso_programado_id)
-            ->where('user_id', $user->id)->first();
-            
-        if (!$inscripcion) {
-            return response()->json(['success' => false, 'message' => 'No estás inscrito en este curso.'], 403);
-        }
+        $cohortId = (int) $curso_programado_id;
 
-        $curso = CursoProgramado::with(['Curso' => function($r){
-            $r->with(['Lecciones' => function($q){
-                $q->where('leccion_id', 0)->where('activo', 'si')->with(['Clases' => function($c){
+        $enrollment = $this->accessService()->requireActiveEnrollment($user, $cohortId);
+
+        $inscripcion = Inscripcion::find($enrollment->id);
+
+        $curso = CursoProgramado::with(['category', 'Curso' => function ($r) {
+            $r->with(['Lecciones' => function ($q) {
+                $q->where('leccion_id', 0)->where('activo', 'si')->with(['Clases' => function ($c) {
                     $c->where('activo', 'si');
                 }]);
-            }])->get();
-        }])->find($curso_programado_id);
+            }]);
+        }])->find($cohortId);
 
-        $contenido_programado = ContenidoProgramado::where('curso_programado_id', $curso_programado_id)->first();
+        if (! $curso || ! $curso->Curso) {
+            return response()->json(['success' => false, 'message' => 'Curso no encontrado.'], 404);
+        }
 
-        if ($curso->category->name == "Guias") {
-            $fileGuia = FileGuia::where('curso_programado_id', $curso_programado_id)->first();
+        $contenido_programado = ContenidoProgramado::where('curso_programado_id', $cohortId)->first();
+
+        if ($curso->category && $curso->category->name == 'Guias') {
+            $fileGuia = FileGuia::where('curso_programado_id', $cohortId)->first();
+
             return response()->json([
                 'success' => true,
                 'data' => [
                     'curso_programado' => $curso,
                     'inscrito' => $inscripcion,
                     'contenido_programado' => $contenido_programado,
-                    'guia' => $fileGuia ? 'alumno/medias/archivo/'.$fileGuia->url : null
-                ]
+                    'guia' => $fileGuia ? 'alumno/medias/archivo/'.$fileGuia->url : null,
+                ],
             ]);
         }
 
         $completedLessons = DB::table('leccion_user')
             ->where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+            ->where('curso_programado_id', $cohortId)
             ->pluck('leccion_id')
             ->toArray();
 
@@ -154,8 +254,8 @@ class ElectronPanelController extends Controller
 
         $globalProgress = $totalCursoClases > 0 ? round((count($completedLessons) / $totalCursoClases) * 100) : 0;
 
-        $unlockedLessonsData = \App\Models\Registro\LessonUnlock::where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+        $unlockedLessonsData = LessonUnlock::where('user_id', $user->id)
+            ->where('curso_programado_id', $cohortId)
             ->get()
             ->keyBy('leccion_id');
 
@@ -167,59 +267,61 @@ class ElectronPanelController extends Controller
                 'contenido_programado' => $contenido_programado,
                 'completedLessons' => $completedLessons,
                 'globalProgress' => $globalProgress,
-                'unlockedLessonsData' => $unlockedLessonsData
-            ]
+                'unlockedLessonsData' => $unlockedLessonsData,
+            ],
         ]);
     }
 
     public function lessonDetails(Request $request, $leccion_id, $curso_programado_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
+        $lessonId = (int) $leccion_id;
+        $cohortId = (int) $curso_programado_id;
 
-        $inscripcion = Inscripcion::where('curso_programado_id', $curso_programado_id)
-            ->where('user_id', $user->id)->first();
-            
-        if (!$inscripcion) {
-            return response()->json(['success' => false, 'message' => 'No estás inscrito en este curso.'], 403);
-        }
+        $context = $this->accessService()->requireLessonInCohort($user, $lessonId, $cohortId);
+        $inscripcion = Inscripcion::find($context['enrollment']->id);
 
-        $leccion = Leccion::with(['Pruebas' => function($q) use ($inscripcion){
+        $leccion = Leccion::with(['Pruebas' => function ($q) use ($inscripcion) {
             $q->where('activo', 'si');
-            $q->with('Preguntas');
+            $q->withCount(['Preguntas' => function ($pq) {
+                $pq->where('activo', 'si');
+            }]);
             if ($inscripcion) {
-                $q->with(['Examenes' => function($q2) use ($inscripcion) {
+                $q->with(['Examenes' => function ($q2) use ($inscripcion) {
                     $q2->where('inscripcion_id', $inscripcion->id);
                 }]);
             }
-        }, 'Medias' => function($q){
+        }, 'Medias' => function ($q) {
             $q->where('activo', 'si');
-        }, 'materialPdfs', 'Curso' => function($q1) use ($leccion_id){
-            $q1->with(['Lecciones' => function($q2) use ($leccion_id){
-                $q2->with('Clases')->where('activo', 'si')->where("id", "<>", $leccion_id);
-            }])->get();
-        }])->find($leccion_id);
+        }, 'materialPdfs', 'Curso' => function ($q1) use ($lessonId) {
+            $q1->with(['Lecciones' => function ($q2) use ($lessonId) {
+                $q2->with('Clases')->where('activo', 'si')->where('id', '<>', $lessonId);
+            }]);
+        }])->find($lessonId);
 
-        if (!$leccion) {
+        if (! $leccion) {
             return response()->json(['success' => false, 'message' => 'Lección no encontrada.'], 404);
         }
 
-        $video = null;
-        $videoext = null;
-        $video = $leccion->Medias->filter(function($m) {
-            return $m->tipo == "video";
+        if ($leccion->materialPdfs) {
+            $leccion->materialPdfs->each(function ($mat) {
+                $mat->setAttribute('allow_download', $this->isMaterialDownloadAllowed($mat));
+            });
+        }
+
+        $video = $leccion->Medias->filter(function ($m) {
+            return $m->tipo == 'video';
         })->first();
-        
-        $videoext = $leccion->Medias->filter(function($m) {
-            return $m->tipo == "videoext";
+
+        $videoext = $leccion->Medias->filter(function ($m) {
+            return $m->tipo == 'videoext';
         })->first();
 
         // Eliminar los videos de la lista de medias para mostrarlos por separado
-        $leccion->Medias = $leccion->Medias->filter(function($m) {
-            return $m->tipo <> "video";
+        $leccion->Medias = $leccion->Medias->filter(function ($m) {
+            return $m->tipo != 'video';
         });
 
         $homework = Homework::where('leccion_id', $leccion->id)
@@ -228,12 +330,12 @@ class ElectronPanelController extends Controller
 
         $completedLessons = DB::table('leccion_user')
             ->where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+            ->where('curso_programado_id', $cohortId)
             ->pluck('leccion_id')
             ->toArray();
 
-        $unlockedLessonsData = \App\Models\Registro\LessonUnlock::where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+        $unlockedLessonsData = LessonUnlock::where('user_id', $user->id)
+            ->where('curso_programado_id', $cohortId)
             ->get()
             ->keyBy('leccion_id');
 
@@ -246,20 +348,26 @@ class ElectronPanelController extends Controller
                 'homework' => $homework,
                 'completedLessons' => $completedLessons,
                 'unlockedLessonsData' => $unlockedLessonsData,
-                'inscripcion_id' => $inscripcion->id
-            ]
+                'inscripcion_id' => $inscripcion->id,
+            ],
         ]);
     }
 
     public function toggleLessonCompletion(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
+
+        $request->validate([
+            'leccion_id' => 'required|integer',
+            'curso_programado_id' => 'required|integer',
+        ]);
 
         $user = $request->user();
-        $leccionId = $request->leccion_id;
-        $cursoProgramadoId = $request->curso_programado_id;
+        $leccionId = (int) $request->leccion_id;
+        $cursoProgramadoId = (int) $request->curso_programado_id;
+
+        $context = $this->accessService()->requireLessonInCohort($user, $leccionId, $cursoProgramadoId);
+        $leccion = $context['lesson'];
 
         $exists = DB::table('leccion_user')
             ->where('user_id', $user->id)
@@ -279,6 +387,7 @@ class ElectronPanelController extends Controller
                 'user_id' => $user->id,
                 'leccion_id' => $leccionId,
                 'curso_programado_id' => $cursoProgramadoId,
+                'completed_at' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -292,10 +401,12 @@ class ElectronPanelController extends Controller
             ->pluck('leccion_id')
             ->toArray();
 
-        $curso = CursoProgramado::with(['Curso' => function($r){
-            $r->with(['Lecciones' => function($q){
-                $q->where('leccion_id', 0)->where('activo', 'si');
-            }])->get();
+        $curso = CursoProgramado::with(['Curso' => function ($r) {
+            $r->with(['Lecciones' => function ($q) {
+                $q->where('leccion_id', 0)->where('activo', 'si')->with(['Clases' => function ($c) {
+                    $c->where('activo', 'si');
+                }]);
+            }]);
         }])->find($cursoProgramadoId);
 
         $totalCursoClases = 0;
@@ -304,22 +415,24 @@ class ElectronPanelController extends Controller
         $moduleCompleted = 0;
         $moduleTotal = 0;
 
-        $currentModuleId = Leccion::find($leccionId)->leccion_id;
+        $currentModuleId = $leccion->leccion_id;
 
-        foreach ($curso->Curso->Lecciones as $modulo) {
-            $modTotal = $modulo->Clases->count();
-            $totalCursoClases += $modTotal;
-            
-            if ($modulo->id == $currentModuleId) {
-                $modCompleted = 0;
-                foreach ($modulo->Clases as $clase) {
-                    if (in_array($clase->id, $completedLessons)) {
-                        $modCompleted++;
+        if ($curso && $curso->Curso) {
+            foreach ($curso->Curso->Lecciones as $modulo) {
+                $modTotal = $modulo->Clases->count();
+                $totalCursoClases += $modTotal;
+
+                if ($modulo->id == $currentModuleId) {
+                    $modCompleted = 0;
+                    foreach ($modulo->Clases as $clase) {
+                        if (in_array($clase->id, $completedLessons)) {
+                            $modCompleted++;
+                        }
                     }
+                    $moduleCompleted = $modCompleted;
+                    $moduleTotal = $modTotal;
+                    $moduleProgress = $modTotal > 0 ? round(($modCompleted / $modTotal) * 100) : 0;
                 }
-                $moduleCompleted = $modCompleted;
-                $moduleTotal = $modTotal;
-                $moduleProgress = $modTotal > 0 ? round(($modCompleted / $modTotal) * 100) : 0;
             }
         }
 
@@ -333,27 +446,54 @@ class ElectronPanelController extends Controller
                 'moduleProgress' => $moduleProgress,
                 'moduleCompleted' => $moduleCompleted,
                 'moduleTotal' => $moduleTotal,
-                'moduleId' => $currentModuleId
-            ]
+                'moduleId' => $currentModuleId,
+            ],
         ]);
     }
 
     public function homeworkTracking(Request $request, $curso_programado_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
+        $cohortId = (int) $curso_programado_id;
 
-        $curso = CursoProgramado::with(['Curso' => function($r){
-            $r->with(['Lecciones' => function($q){
-                $q->with(['Clases' => function($c) {
+        if ($cohortId <= 0) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'curso_programado' => null,
+                    'modulos' => [],
+                    'homeworks' => [],
+                    'schedule' => [],
+                    'unlockedLessonsData' => [],
+                ],
+            ]);
+        }
+
+        $this->accessService()->requireActiveEnrollment($user, $cohortId);
+
+        $curso = CursoProgramado::with(['Curso' => function ($r) {
+            $r->with(['Lecciones' => function ($q) {
+                $q->with(['Clases' => function ($c) {
                     $c->where('activo', 'si');
                 }]);
                 $q->where('leccion_id', 0)->where('activo', 'si'); // Módulos
-            }])->get();
-        }])->find($curso_programado_id);
+            }]);
+        }])->find($cohortId);
+
+        if (! $curso || ! $curso->Curso) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'curso_programado' => null,
+                    'modulos' => [],
+                    'homeworks' => [],
+                    'schedule' => [],
+                    'unlockedLessonsData' => [],
+                ],
+            ]);
+        }
 
         $leccionIds = [];
         foreach ($curso->Curso->Lecciones as $modulo) {
@@ -362,16 +502,18 @@ class ElectronPanelController extends Controller
             }
         }
 
-        $homeworks = Homework::where('user_id', $user->id)
-            ->whereIn('leccion_id', $leccionIds)
-            ->get()
-            ->keyBy('leccion_id');
+        $homeworks = empty($leccionIds)
+            ? collect()
+            : Homework::where('user_id', $user->id)
+                ->whereIn('leccion_id', $leccionIds)
+                ->get()
+                ->keyBy('leccion_id');
 
-        $contenidoProgramado = ContenidoProgramado::where('curso_programado_id', $curso_programado_id)->first();
+        $contenidoProgramado = ContenidoProgramado::where('curso_programado_id', $cohortId)->first();
         $schedule = $contenidoProgramado && $contenidoProgramado->contenido ? $contenidoProgramado->contenido : [];
 
-        $unlockedLessonsData = \App\Models\Registro\LessonUnlock::where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+        $unlockedLessonsData = LessonUnlock::where('user_id', $user->id)
+            ->where('curso_programado_id', $cohortId)
             ->get()
             ->keyBy('leccion_id');
 
@@ -382,44 +524,52 @@ class ElectronPanelController extends Controller
                 'modulos' => $curso->Curso->Lecciones,
                 'homeworks' => $homeworks,
                 'schedule' => $schedule,
-                'unlockedLessonsData' => $unlockedLessonsData
-            ]
+                'unlockedLessonsData' => $unlockedLessonsData,
+            ],
         ]);
     }
 
     public function sendHomework(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
+        $this->validateMacAddress($request);
+
+        $validator = Validator::make($request->all(), [
+            'leccion_id' => 'required|integer',
+            'curso_programado_id' => 'required|integer',
+            'documento' => 'required|file|mimes:pdf,doc,docx|max:20480',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         $user = $request->user();
-        $leccion_id = $request->leccion_id;
-        $curso_programado_id = $request->curso_programado_id;
+        $leccion_id = (int) $request->leccion_id;
+        $curso_programado_id = (int) $request->curso_programado_id;
 
-        $leccion = Leccion::find($leccion_id);
-        $curso_programado = CursoProgramado::find($curso_programado_id);
-        $instructor = \App\User::find($curso_programado->user_id);
-
-        if (!$request->hasFile('documento')) {
-            return response()->json(['success' => false, 'message' => 'El archivo de la tarea es requerido.'], 400);
-        }
+        $context = $this->accessService()->requireLessonInCohort($user, $leccion_id, $curso_programado_id);
+        $leccion = $context['lesson'];
+        $curso_programado = $context['scheduled'];
+        $instructor = $curso_programado ? User::find($curso_programado->user_id) : null;
 
         $file = $request->file('documento');
-        if ($file->getSize() > 5 * 1024 * 1024) {
-            return response()->json(['success' => false, 'message' => 'El archivo no debe pesar más de 5MB.'], 400);
-        }
-        $ruta = Storage::put('tareas', $file);
+        Storage::disk('local')->put('tareas', $file);
 
         $datos = [
-            'nombre' => $user->nombre_completo,
-            'leccion' => $leccion->titulo,
-            'tarea' => $request->tarea ?? 'Entregado vía Electron'
+            'nombre' => $user->nombre_completo ?: $user->username,
+            'leccion' => $leccion->titulo ?? $leccion->title ?? 'Lección',
+            'tarea' => $request->tarea ?? 'Entregado vía Electron',
         ];
 
         try {
-            $copia = $user->email;
-            Mail::to($instructor->email)->cc([$copia, 'tareas@sapius.com.mx'])->send(new TareaEmail($datos));
+            if ($instructor && $instructor->email) {
+                $copia = $user->email;
+                Mail::to($instructor->email)->cc([$copia, 'tareas@sapius.com.mx'])->send(new TareaEmail($datos));
+            }
         } catch (\Exception $e) {
             // Log warning but continue process as mail service might fail
         }
@@ -429,7 +579,7 @@ class ElectronPanelController extends Controller
         if ($contenidoProgramado && $contenidoProgramado->contenido) {
             $schedule = collect($contenidoProgramado->contenido);
             $scheduleItem = $schedule->firstWhere('id', $leccion->id);
-            if (!$scheduleItem) {
+            if (! $scheduleItem) {
                 $scheduleItem = $schedule->firstWhere('id', $leccion->leccion_id);
             }
             if ($scheduleItem && isset($scheduleItem['fecha_final'])) {
@@ -438,20 +588,21 @@ class ElectronPanelController extends Controller
                     $endStr = $scheduleItem['fecha_final'];
                     if (isset($scheduleItem['hora_final'])) {
                         $endFormat .= ' H:i';
-                        $endStr .= ' ' . $scheduleItem['hora_final'];
+                        $endStr .= ' '.$scheduleItem['hora_final'];
                     }
-                    $fechaFinal = \Carbon\Carbon::createFromFormat($endFormat, $endStr);
-                    if (!isset($scheduleItem['hora_final'])) {
+                    $fechaFinal = Carbon::createFromFormat($endFormat, $endStr);
+                    if (! isset($scheduleItem['hora_final'])) {
                         $fechaFinal->setTime(23, 59, 59);
                     }
-                    if (\Carbon\Carbon::now()->gt($fechaFinal)) {
+                    if (Carbon::now()->gt($fechaFinal)) {
                         $isLate = true;
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
         }
 
-        $homework = new Homework();
+        $homework = new Homework;
         $homework->leccion_id = $leccion->id;
         $homework->user_id = $user->id;
         $homework->is_late = $isLate;
@@ -460,21 +611,22 @@ class ElectronPanelController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Tarea enviada con éxito.',
-            'data' => $homework
+            'data' => $homework,
         ]);
     }
 
     public function examPrevio(Request $request, $prueba_id, $inscripcion_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
+
+        $user = $request->user();
+        $this->accessService()->requireQuizAccess($user, (int) $prueba_id, (int) $inscripcion_id);
 
         $examen = Prueba::withCount(['Examenes' => function ($q) use ($inscripcion_id) {
-            $q->where('inscripcion_id', $inscripcion_id)->where('finalizado', 'si');
-        }])->find($prueba_id);
+            $q->where('inscripcion_id', (int) $inscripcion_id)->where('finalizado', 'si');
+        }])->where('activo', 'si')->find((int) $prueba_id);
 
-        if (!$examen) {
+        if (! $examen) {
             return response()->json(['success' => false, 'message' => 'Prueba no encontrada.'], 404);
         }
 
@@ -482,86 +634,155 @@ class ElectronPanelController extends Controller
             'success' => true,
             'data' => [
                 'prueba' => $examen,
-                'oportunidades_restantes' => $examen->oportunidades - $examen->examenes_count
-            ]
+                'oportunidades_restantes' => max(0, (int) $examen->oportunidades - (int) $examen->examenes_count),
+            ],
         ]);
     }
 
     public function examPresentar(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
+
+        $request->validate([
+            'inscripcion_id' => 'required|integer',
+            'prueba_id' => 'required|integer',
+        ]);
 
         $user = $request->user();
-        $inscripcion_id = $request->inscripcion_id;
-        $prueba_id = $request->prueba_id;
+        $inscripcion_id = (int) $request->inscripcion_id;
+        $prueba_id = (int) $request->prueba_id;
+
+        $this->accessService()->requireQuizAccess($user, $prueba_id, $inscripcion_id);
+
+        $prueba = Prueba::withCount(['Preguntas' => function ($q) {
+            $q->where('activo', 'si');
+        }])->with('Leccion.Curso')->where('activo', 'si')->find($prueba_id);
+
+        if (! $prueba) {
+            return response()->json(['success' => false, 'message' => 'Prueba no encontrada.'], 404);
+        }
 
         $examen = Examen::with(['Inscripcion', 'Prueba'])
             ->where('inscripcion_id', $inscripcion_id)
             ->where('prueba_id', $prueba_id)
+            ->where('finalizado', 'no')
+            ->orderByDesc('id')
             ->first();
 
-        if ($examen && $examen->finalizado == 'si') {
-            return response()->json(['success' => false, 'message' => 'Este examen ya ha sido finalizado.'], 400);
+        if ($examen === null) {
+            $finishedAttempts = Examen::where('inscripcion_id', $inscripcion_id)
+                ->where('prueba_id', $prueba_id)
+                ->where('finalizado', 'si')
+                ->count();
+
+            if ($finishedAttempts >= (int) ($prueba->oportunidades ?? 1)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Has agotado todas las oportunidades para este examen.',
+                ], 403);
+            }
+
+            $examen = new Examen;
+            $examen->inscripcion_id = $inscripcion_id;
+            $examen->prueba_id = $prueba_id;
+            $examen->total_preguntas = $prueba->preguntas_count;
+            $examen->finalizado = 'no';
+            $examen->retro_visualizado = 'no';
+            $examen->save();
+            $examen->load(['Inscripcion', 'Prueba']);
+        } else {
+            $timeLimitSeconds = $this->resolveTimeLimitSeconds($prueba);
+            if ($timeLimitSeconds > 0 && $examen->created_at) {
+                $expiresAt = Carbon::parse($examen->created_at)->addSeconds($timeLimitSeconds);
+                if (now()->gt($expiresAt)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'El tiempo límite para este examen ha expirado.',
+                        'expired' => true,
+                    ], 403);
+                }
+            }
         }
 
-        $prueba = Prueba::withCount(['Preguntas' => function ($q) {
-            $q->where('activo', 'si');
-        }])->with('Leccion.Curso')->find($prueba_id);
-
         $preguntas = Pregunta::with(['GrupoPreguntas' => function ($q) use ($prueba_id) {
-            $q->with(['Respuestas' => function ($q1) {
-                $q1->where('activo', 'si');
-            }])->where('prueba_id', $prueba_id);
-        }])->where('activo', 'si')
+            $q->select('id', 'prueba_id', 'slug', 'pregunta', 'imagen', 'activo')
+                ->with(['Respuestas' => function ($q1) {
+                    $q1->select('id', 'pregunta_id', 'respuesta', 'activo')
+                        ->where('activo', 'si');
+                }])
+                ->where('prueba_id', $prueba_id);
+        }])
+            ->where('activo', 'si')
             ->where('prueba_id', $prueba_id)
             ->select('slug')
             ->inRandomOrder($user->id)
             ->groupBy('slug')
             ->paginate(1);
 
-        $respuestas = collect([]);
-
-        if ($examen == null) {
-            $examen = new Examen;
-            $examen->inscripcion_id = $inscripcion_id;
-            $examen->prueba_id = $prueba_id;
-            $examen->total_preguntas = $prueba->preguntas_count;
-            $examen->save();
-        }
-
-        if ($examen->respuestas_json != null) {
-            $respuestas = collect(json_decode($examen->respuestas_json));
-        }
-
-        if ($request->respuestas != '') {
-            $r = collect(json_decode($request->respuestas));
-            $r->each(function ($item1, $key) use ($respuestas) {
-                $v = $respuestas->search(function ($item2, $key) use ($item1) {
-                    return $item2->name == $item1->name;
+        $preguntas->getCollection()->each(function ($mainPreg) {
+            if ($mainPreg->GrupoPreguntas) {
+                $mainPreg->GrupoPreguntas->each(function ($gp) {
+                    $gp->makeHidden(['score', 'opciones']);
+                    if ($gp->Respuestas) {
+                        $gp->Respuestas->each->makeHidden(['correcto']);
+                    }
                 });
-                if ($v !== false) {
-                    $respuestas[$v]->value = $item1->value;
-                } else {
-                    $respuestas->push($item1);
-                }
-            });
+            }
+        });
 
-            $examen->respuestas_json = $respuestas->toJson();
-            $examen->save();
+        $respuestasMap = [];
+        if ($examen->respuestas_json != null) {
+            $decoded = json_decode($examen->respuestas_json);
+            if (is_array($decoded)) {
+                foreach ($decoded as $item) {
+                    if (is_object($item) && isset($item->name)) {
+                        $respuestasMap[(string) $item->name] = (object) [
+                            'name' => $item->name,
+                            'value' => $item->value ?? null,
+                        ];
+                    }
+                }
+            }
         }
 
+        if ($request->filled('respuestas')) {
+            $rawInput = $request->respuestas;
+            $decodedInput = is_string($rawInput) ? json_decode($rawInput) : $rawInput;
+            if (is_array($decodedInput)) {
+                foreach ($decodedInput as $item1) {
+                    $itemObj = is_array($item1) ? (object) $item1 : $item1;
+                    if (is_object($itemObj) && isset($itemObj->name)) {
+                        $respuestasMap[(string) $itemObj->name] = (object) [
+                            'name' => $itemObj->name,
+                            'value' => $itemObj->value ?? null,
+                        ];
+                    }
+                }
+                $respuestas = collect(array_values($respuestasMap));
+                $examen->respuestas_json = $respuestas->toJson();
+                $examen->save();
+            }
+        }
+
+        $respuestas = collect(array_values($respuestasMap));
         $final = $preguntas->currentPage() == $preguntas->lastPage();
 
         $preguntasAll = Pregunta::with(['GrupoPreguntas' => function ($q) use ($prueba_id) {
-            $q->where('prueba_id', $prueba_id);
-        }])->where('activo', 'si')
+            $q->select('id', 'prueba_id', 'slug')
+                ->where('prueba_id', $prueba_id);
+        }])
+            ->where('activo', 'si')
             ->where('prueba_id', $prueba_id)
             ->select('slug')
             ->inRandomOrder($user->id)
             ->groupBy('slug')
             ->get();
+
+        $preguntasAll->each(function ($mainPreg) {
+            if ($mainPreg->GrupoPreguntas) {
+                $mainPreg->GrupoPreguntas->each->makeHidden(['score', 'opciones']);
+            }
+        });
 
         return response()->json([
             'success' => true,
@@ -570,45 +791,65 @@ class ElectronPanelController extends Controller
                 'preguntas' => $preguntas,
                 'respuestas_guardadas' => $respuestas,
                 'preguntasAll' => $preguntasAll,
-                'final' => $final
-            ]
+                'final' => $final,
+            ],
         ]);
     }
 
     public function examFinalizar(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
-        $examen_id = $request->examen_id;
+        $request->validate([
+            'examen_id' => 'required|integer',
+        ]);
+
+        $user = $request->user();
+        $examen_id = (int) $request->examen_id;
+
+        $this->accessService()->requireExamOwnership($user, $examen_id);
+
         $examen = Examen::with('Prueba')->find($examen_id);
-
-        if (!$examen) {
+        if (! $examen) {
             return response()->json(['success' => false, 'message' => 'Examen no encontrado.'], 404);
         }
 
-        $examen->total_correctas = 0;
-        $examen->score_total = 700; // Ceneval base
-
-        if ($examen->Prueba->tipo == 'ENARM') {
-            $examen->score_total = 0;
+        if ($examen->finalizado === 'si') {
+            return response()->json(['success' => false, 'message' => 'Este examen ya ha sido finalizado.'], 400);
         }
 
-        $respuestas = collect(json_decode($examen->respuestas_json));
+        $timeLimitSeconds = $this->resolveTimeLimitSeconds($examen->Prueba);
+        if ($timeLimitSeconds > 0 && $examen->created_at) {
+            $deadline = Carbon::parse($examen->created_at)->addSeconds($timeLimitSeconds + 30);
+            if (now()->gt($deadline)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La ventana de tiempo para finalizar el examen ha expirado.',
+                ], 403);
+            }
+        }
 
-        $respuestas_db = Respuesta::with(['Pregunta' => function ($q1) use ($examen) {
-            $q1->where('prueba_id', $examen->prueba_id);
-        }])
-        ->where('correcto', 1)
-        ->where('activo', 'si')
-        ->get()
-        ->keyBy(function ($item) {
-            return $item->pregunta_id . '-' . $item->id;
-        });
+        $examen->total_correctas = 0;
+        $examen->score_total = ($examen->Prueba && $examen->Prueba->tipo == 'ENARM') ? 0 : 700;
 
-        $respuestas->each(function ($r, $key) use ($respuestas_db, $examen) {
-            $busqueda = $r->name . '-' . $r->value;
+        $rawAnswers = json_decode($examen->respuestas_json ?? '[]');
+        $respuestas = collect(is_array($rawAnswers) ? $rawAnswers : [])
+            ->filter(fn ($item) => is_object($item) && isset($item->name, $item->value))
+            ->keyBy(fn ($item) => (string) $item->name);
+
+        $respuestas_db = Respuesta::whereHas('Pregunta', function ($q1) use ($examen) {
+            $q1->where('prueba_id', $examen->prueba_id)->where('activo', 'si');
+        })
+            ->with('Pregunta')
+            ->where('correcto', 1)
+            ->where('activo', 'si')
+            ->get()
+            ->keyBy(function ($item) {
+                return $item->pregunta_id.'-'.$item->id;
+            });
+
+        $respuestas->each(function ($r) use ($respuestas_db, $examen) {
+            $busqueda = $r->name.'-'.$r->value;
             if ($respuestas_db->has($busqueda)) {
                 $r_db = $respuestas_db->get($busqueda);
                 $examen->total_correctas++;
@@ -620,13 +861,13 @@ class ElectronPanelController extends Controller
 
         $isLate = false;
         $inscripcion = Inscripcion::find($examen->inscripcion_id);
-        if ($inscripcion) {
+        if ($inscripcion && $examen->Prueba) {
             $contenidoProgramado = ContenidoProgramado::where('curso_programado_id', $inscripcion->curso_programado_id)->first();
             if ($contenidoProgramado && $contenidoProgramado->contenido) {
                 $schedule = collect($contenidoProgramado->contenido);
                 $leccionId = $examen->Prueba->leccion_id;
                 $scheduleItem = $schedule->firstWhere('id', $leccionId);
-                if (!$scheduleItem) {
+                if (! $scheduleItem) {
                     $leccion = Leccion::find($leccionId);
                     if ($leccion) {
                         $scheduleItem = $schedule->firstWhere('id', $leccion->leccion_id);
@@ -639,16 +880,17 @@ class ElectronPanelController extends Controller
                         $endStr = $scheduleItem['fecha_final'];
                         if (isset($scheduleItem['hora_final'])) {
                             $endFormat .= ' H:i';
-                            $endStr .= ' ' . $scheduleItem['hora_final'];
+                            $endStr .= ' '.$scheduleItem['hora_final'];
                         }
-                        $fechaFinal = \Carbon\Carbon::createFromFormat($endFormat, $endStr);
-                        if (!isset($scheduleItem['hora_final'])) {
+                        $fechaFinal = Carbon::createFromFormat($endFormat, $endStr);
+                        if (! isset($scheduleItem['hora_final'])) {
                             $fechaFinal->setTime(23, 59, 59);
                         }
-                        if ($examen->created_at->gt($fechaFinal)) {
+                        if ($examen->created_at && Carbon::parse($examen->created_at)->gt($fechaFinal)) {
                             $isLate = true;
                         }
-                    } catch (\Exception $e) {}
+                    } catch (\Exception $e) {
+                    }
                 }
             }
         }
@@ -660,20 +902,70 @@ class ElectronPanelController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Examen finalizado correctamente.',
-            'data' => $examen
+            'data' => $examen,
         ]);
     }
 
     public function examFeedback(Request $request, $examen_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
-        $examen = Examen::with('Prueba')->find($examen_id);
+        $user = $request->user();
+        $this->accessService()->requireExamOwnership($user, (int) $examen_id);
 
+        $examen = Examen::with('Prueba')->find((int) $examen_id);
         if ($examen == null) {
             return response()->json(['success' => false, 'message' => 'Examen no encontrado.'], 404);
+        }
+
+        if ($examen->finalizado !== 'si') {
+            return response()->json([
+                'success' => false,
+                'message' => 'El examen debe estar finalizado para consultar la retroalimentación.',
+            ], 403);
+        }
+
+        $caducidadRaw = $examen->tiempo_caducidad ?? ($examen->Prueba?->tiempo_caducidad ?? null);
+        if (! empty($caducidadRaw)) {
+            $caducidadSeconds = $this->parseDurationToSeconds($caducidadRaw);
+            if ($caducidadSeconds > 0 && $examen->updated_at) {
+                $elapsedCaducidad = max(0, (int) Carbon::parse($examen->updated_at)->diffInSeconds(now(), false));
+                if ($elapsedCaducidad > $caducidadSeconds) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'El tiempo de caducidad de la retroalimentación ha concluido.',
+                    ], 403);
+                }
+            } else {
+                try {
+                    if (now()->gt(Carbon::parse($caducidadRaw))) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'El tiempo de caducidad de la retroalimentación ha concluido.',
+                        ], 403);
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore unparseable value
+                }
+            }
+        }
+
+        $vigenciaSeconds = $this->parseDurationToSeconds($examen->Prueba?->tiempo_vigencia ?? null);
+        if ($vigenciaSeconds > 0 && $examen->updated_at) {
+            $elapsedVigencia = max(0, (int) Carbon::parse($examen->updated_at)->diffInSeconds(now(), false));
+            if ($elapsedVigencia > $vigenciaSeconds) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El tiempo de vigencia de la retroalimentación ha concluido.',
+                ], 403);
+            }
+        }
+
+        if ($examen->retro_visualizado === 'si' && $vigenciaSeconds <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La retroalimentación de este examen ya fue visualizada.',
+            ], 403);
         }
 
         if ($examen->retro_visualizado == 'no') {
@@ -681,53 +973,64 @@ class ElectronPanelController extends Controller
             $examen->save();
         }
 
-        $respuestas = collect(json_decode($examen->respuestas_json));
+        $rawAnswers = json_decode($examen->respuestas_json ?? '[]');
+        $respuestas = collect(is_array($rawAnswers) ? $rawAnswers : [])
+            ->filter(fn ($item) => is_object($item) && isset($item->name, $item->value))
+            ->keyBy(fn ($item) => (string) $item->name)
+            ->values();
 
         $respuestas_db = Respuesta::whereHas('Pregunta', function ($q) use ($examen) {
             $q->where('prueba_id', $examen->prueba_id)->where('activo', 'si');
         })
-        ->with(['Pregunta' => function ($q1) use ($examen) {
-            $q1->with(['Respuestas' => function ($q2) {
-                $q2->where('activo', 'si');
-            }]);
-        }])
-        ->where('correcto', 1)
-        ->where('activo', 'si')
-        ->get();
+            ->with(['Pregunta' => function ($q1) {
+                $q1->with(['Respuestas' => function ($q2) {
+                    $q2->where('activo', 'si');
+                }]);
+            }])
+            ->where('correcto', 1)
+            ->where('activo', 'si')
+            ->get();
 
-        $correctasPorId = $respuestas_db->keyBy(function($r) { return $r->pregunta_id . '-' . $r->id; });
+        $respuestas_db->each(function ($rdb) {
+            $rdb->makeVisible('correcto');
+            if ($rdb->Pregunta && $rdb->Pregunta->Respuestas) {
+                $rdb->Pregunta->Respuestas->each->makeVisible('correcto');
+            }
+        });
+
+        $correctasPorId = $respuestas_db->keyBy(function ($r) {
+            return $r->pregunta_id.'-'.$r->id;
+        });
         $correctasPorPregunta = $respuestas_db->keyBy('pregunta_id');
         $usuarioPorPregunta = $respuestas->keyBy('name');
 
         $feedback = [];
 
         // Incluir tanto las respuestas correctas como incorrectas
-        $respuestas->each(function ($r, $key) use ($correctasPorId, $correctasPorPregunta, &$feedback) {
-            $llave = $r->name . '-' . $r->value;
+        $respuestas->each(function ($r) use ($correctasPorId, $correctasPorPregunta, &$feedback) {
+            $llave = $r->name.'-'.$r->value;
             if ($correctasPorId->has($llave)) {
-                // Correctas
                 $feedback[] = [
                     'user_answer' => $r,
-                    'correct_answer' => $correctasPorId->get($llave)
+                    'correct_answer' => $correctasPorId->get($llave),
                 ];
             } else {
-                // Incorrectas
                 if ($correctasPorPregunta->has($r->name)) {
                     $feedback[] = [
                         'user_answer' => $r,
-                        'correct_answer' => $correctasPorPregunta->get($r->name)
+                        'correct_answer' => $correctasPorPregunta->get($r->name),
                     ];
                 }
             }
         });
 
         // Incluir las no respondidas
-        $respuestas_db->each(function ($rdb, $key) use ($usuarioPorPregunta, &$feedback) {
-            if (!$usuarioPorPregunta->has($rdb->pregunta_id)) {
-                $o = (object)['name' => 0, 'value' => 0];
+        $respuestas_db->each(function ($rdb) use ($usuarioPorPregunta, &$feedback) {
+            if (! $usuarioPorPregunta->has($rdb->pregunta_id)) {
+                $o = (object) ['name' => 0, 'value' => 0];
                 $feedback[] = [
                     'user_answer' => $o,
-                    'correct_answer' => $rdb
+                    'correct_answer' => $rdb,
                 ];
             }
         });
@@ -736,30 +1039,39 @@ class ElectronPanelController extends Controller
             'success' => true,
             'data' => [
                 'examen' => $examen,
-                'feedback' => $feedback
-            ]
+                'feedback' => $feedback,
+            ],
         ]);
     }
 
     public function examEventos(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
-        $examen = Examen::find($request->examen_id);
-        if (!$examen) {
+        $request->validate([
+            'examen_id' => 'required|integer',
+        ]);
+
+        $user = $request->user();
+        $this->accessService()->requireExamOwnership($user, (int) $request->examen_id);
+
+        $examen = Examen::find((int) $request->examen_id);
+        if (! $examen) {
             return response()->json(['success' => false, 'message' => 'Examen no encontrado.'], 404);
         }
 
+        if ($examen->finalizado === 'si') {
+            return response()->json(['success' => false, 'message' => 'El examen ya está finalizado.'], 400);
+        }
+
         $array = $examen->eventos ?? [];
-        array_push($array, [
-            "fecha_hora" => date('Y-m-d H:i:s'),
-            "observacion" => $request->observacion,
-            "tecla" => $request->tecla,
-            "lugar" => $request->lugar
-        ]);
-        
+        $array[] = [
+            'fecha_hora' => date('Y-m-d H:i:s'),
+            'observacion' => mb_substr(strip_tags((string) $request->input('observacion', '')), 0, 255),
+            'tecla' => mb_substr(strip_tags((string) $request->input('tecla', '')), 0, 64),
+            'lugar' => mb_substr(strip_tags((string) $request->input('lugar', '')), 0, 128),
+        ];
+
         $examen->eventos = $array;
         $examen->save();
 
@@ -768,29 +1080,40 @@ class ElectronPanelController extends Controller
 
     public function securePdf(Request $request, $leccion_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
+
+        $user = $request->user();
 
         if ($leccion_id == 0 || $leccion_id === '0') {
-            $curso_programado_id = $request->query('curso_programado_id');
+            $curso_programado_id = (int) $request->query('curso_programado_id', 0);
+            $this->accessService()->requireActiveEnrollment($user, $curso_programado_id);
+
             $fileGuia = FileGuia::where('curso_programado_id', $curso_programado_id)->first();
-            if (!$fileGuia || !$fileGuia->url) {
+            if (! $fileGuia || ! $fileGuia->url) {
                 return response()->json(['success' => false, 'message' => 'Guía no encontrada.'], 404);
             }
-            $path = storage_path('app/files/medias/' . $fileGuia->url);
-            if (!file_exists($path)) {
-                $path = storage_path('app/public/files/medias/' . $fileGuia->url);
-            }
+
+            $path = $this->resolveSafePathInDirs((string) $fileGuia->url, [
+                storage_path('app/files/medias'),
+                storage_path('app/public/files/medias'),
+            ], true);
         } else {
-            $leccion = Leccion::find($leccion_id);
-            if (!$leccion || !$leccion->archivo_pdf) {
+            $leccion = Leccion::where('id', (int) $leccion_id)->where('activo', 'si')->first();
+            if (! $leccion || ! $leccion->archivo_pdf) {
                 return response()->json(['success' => false, 'message' => 'PDF no encontrado.'], 404);
             }
-            $path = storage_path('app/public/' . $leccion->archivo_pdf);
+
+            $preferredCohortId = $request->query('curso_programado_id') ? (int) $request->query('curso_programado_id') : null;
+            $this->accessService()->requireCourseEnrollment($user, (int) $leccion->curso_id, $preferredCohortId);
+
+            $path = $this->resolveSafePathInDirs((string) $leccion->archivo_pdf, [
+                storage_path('app/public'),
+            ], true) ?? $this->resolveSafePathInDirs((string) $leccion->archivo_pdf, [
+                storage_path('app/public'),
+            ], false);
         }
 
-        if (!file_exists($path)) {
+        if (! $path || ! file_exists($path)) {
             return response()->json(['success' => false, 'message' => 'Archivo no encontrado en el servidor.'], 404);
         }
 
@@ -799,7 +1122,7 @@ class ElectronPanelController extends Controller
             'Content-Disposition' => 'inline; filename="sapius_secure.pdf"',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
             'Pragma' => 'no-cache',
-            'Expires' => '0'
+            'Expires' => '0',
         ]);
     }
 
@@ -809,19 +1132,18 @@ class ElectronPanelController extends Controller
      */
     public function preguntaImagen(Request $request, $filename)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
-        // Sanitizar el nombre del archivo para evitar path traversal
-        $filename = basename($filename);
-        $path = storage_path('app/images/preguntas/' . $filename);
+        $path = $this->resolveSafePathInDirs((string) $filename, [
+            storage_path('app/images/preguntas'),
+        ], true);
 
-        if (!file_exists($path)) {
+        if (! $path) {
             return response()->json(['success' => false, 'message' => 'Imagen no encontrada.'], 404);
         }
 
-        $mimeType = mime_content_type($path);
+        $mimeType = mime_content_type($path) ?: 'application/octet-stream';
+
         return Response::file($path, [
             'Content-Type' => $mimeType,
             'Cache-Control' => 'public, max-age=86400',
@@ -830,12 +1152,10 @@ class ElectronPanelController extends Controller
 
     public function getProfile(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -852,55 +1172,54 @@ class ElectronPanelController extends Controller
                 'foto' => $user->foto,
                 'documento_identificacion' => $user->documento_identificacion,
                 'pase_ingreso' => $user->pase_ingreso,
-                'foto_url' => $user->foto ? '/api/electron/profile/foto/' . $user->foto : null,
-                'documento_url' => $user->documento_identificacion ? '/api/electron/profile/documento/' . $user->documento_identificacion : null,
-                'pase_url' => $user->pase_ingreso ? '/api/electron/profile/pase/' . $user->pase_ingreso : null,
-                'expediente_completo' => ($user->foto && $user->documento_identificacion && $user->pase_ingreso)
-            ]
+                'foto_url' => $user->foto ? '/api/electron/profile/foto/'.$user->foto : null,
+                'documento_url' => $user->documento_identificacion ? '/api/electron/profile/documento/'.$user->documento_identificacion : null,
+                'pase_url' => $user->pase_ingreso ? '/api/electron/profile/pase/'.$user->pase_ingreso : null,
+                'expediente_completo' => ($user->foto && $user->documento_identificacion && $user->pase_ingreso),
+            ],
         ]);
+    }
+
+    private function serveOwnProfileFile(Request $request, string $file, ?string $expectedFilename, string $relativeDir)
+    {
+        $this->validateMacAddress($request);
+
+        $safeRequested = basename($file);
+        $safeExpected = $expectedFilename ? basename($expectedFilename) : '';
+
+        if ($safeExpected === '' || ! hash_equals($safeExpected, $safeRequested)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes autorización para acceder a este archivo.',
+            ], 403);
+        }
+
+        $path = $this->resolveSafePathInDirs($safeRequested, [storage_path($relativeDir)], true);
+        if (! $path) {
+            abort(404);
+        }
+
+        return response()->file($path);
     }
 
     public function profileFoto(Request $request, $file)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
-        $path = storage_path('app/images/usuarios/' . basename($file));
-        if (!file_exists($path)) {
-            abort(404);
-        }
-        return response()->file($path);
+        return $this->serveOwnProfileFile($request, (string) $file, $request->user()->foto, 'app/images/usuarios');
     }
 
     public function profileDocumento(Request $request, $file)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
-        $path = storage_path('app/documentos/identificaciones/' . basename($file));
-        if (!file_exists($path)) {
-            abort(404);
-        }
-        return response()->file($path);
+        return $this->serveOwnProfileFile($request, (string) $file, $request->user()->documento_identificacion, 'app/documentos/identificaciones');
     }
 
     public function profilePase(Request $request, $file)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
-        $path = storage_path('app/documentos/pases/' . basename($file));
-        if (!file_exists($path)) {
-            abort(404);
-        }
-        return response()->file($path);
+        return $this->serveOwnProfileFile($request, (string) $file, $request->user()->pase_ingreso, 'app/documentos/pases');
     }
 
     public function updateProfile(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
 
@@ -911,38 +1230,53 @@ class ElectronPanelController extends Controller
             'telefono' => ['nullable', 'string', 'max:20'],
             'universidad_procedencia' => ['nullable', 'string', 'max:255'],
             'especialidad' => ['nullable', 'string', 'max:255'],
-            'password' => ['nullable', 'string', 'min:6'],
+            'password' => ['nullable', 'string', 'min:8'],
+            'current_password' => ['required_with:password', 'string'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'documento_identificacion' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'pase_ingreso' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ];
 
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), $rules);
+        $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($request->filled('password')) {
+            if (! Hash::check((string) $request->current_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La contraseña actual es incorrecta.',
+                    'errors' => ['current_password' => ['La contraseña actual es incorrecta.']],
+                ], 422);
+            }
+            $user->password = Hash::make($request->password);
         }
 
         $user->nombre = strip_tags($request->nombre);
         $user->apellido = strip_tags($request->apellido);
-        $user->telefono = strip_tags($request->telefono);
-        $user->universidad_procedencia = strip_tags($request->universidad_procedencia);
-        $user->especialidad = strip_tags($request->especialidad);
-
-        if ($request->filled('password')) {
-            $user->password = \Illuminate\Support\Facades\Hash::make($request->password);
-        }
+        $user->telefono = $request->telefono !== null ? strip_tags($request->telefono) : null;
+        $user->universidad_procedencia = $request->universidad_procedencia !== null ? strip_tags($request->universidad_procedencia) : null;
+        $user->especialidad = $request->especialidad !== null ? strip_tags($request->especialidad) : null;
 
         // Upload files if provided
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
-            $user->foto = basename(Storage::put('images/usuarios', $file));
+            $user->foto = basename(Storage::disk('local')->put('images/usuarios', $file));
         }
 
         if ($request->hasFile('documento_identificacion')) {
             $file = $request->file('documento_identificacion');
-            $user->documento_identificacion = basename(Storage::put('documentos/identificaciones', $file));
+            $user->documento_identificacion = basename(Storage::disk('local')->put('documentos/identificaciones', $file));
         }
 
         if ($request->hasFile('pase_ingreso')) {
             $file = $request->file('pase_ingreso');
-            $user->pase_ingreso = basename(Storage::put('documentos/pases', $file));
+            $user->pase_ingreso = basename(Storage::disk('local')->put('documentos/pases', $file));
         }
 
         $user->save();
@@ -952,47 +1286,44 @@ class ElectronPanelController extends Controller
             'message' => 'Perfil actualizado exitosamente.',
             'user' => [
                 'nombre_completo' => $user->nombre_completo,
-                'avatar' => $user->nombre[0],
-                'foto_url' => $user->foto ? '/api/electron/profile/foto/' . $user->foto : null,
-            ]
+                'avatar' => mb_substr((string) $user->nombre, 0, 1),
+                'foto_url' => $user->foto ? '/api/electron/profile/foto/'.$user->foto : null,
+            ],
         ]);
     }
 
     public function getNotifications(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        
+
         $notifications = $user->notifications()->take(50)->get()->map(function ($notif) {
             return [
                 'id' => $notif->id,
                 'type' => $notif->type,
                 'data' => $notif->data,
                 'read_at' => $notif->read_at,
-                'created_at' => $notif->created_at->toIso8651String(),
+                'created_at' => $notif->created_at?->toIso8601String(),
             ];
         });
 
         return response()->json([
             'success' => true,
-            'data' => $notifications
+            'data' => $notifications,
         ]);
     }
 
     public function markNotificationRead(Request $request, $id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
         $notification = $user->notifications()->find($id);
 
         if ($notification) {
             $notification->markAsRead();
+
             return response()->json(['success' => true, 'message' => 'Notificación marcada como leída.']);
         }
 
@@ -1001,9 +1332,7 @@ class ElectronPanelController extends Controller
 
     public function clearAllNotifications(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
         $user->unreadNotifications->markAsRead();
@@ -1013,40 +1342,50 @@ class ElectronPanelController extends Controller
 
     public function checkOpinionPending(Request $request, $curso_programado_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        
+        $cohortId = (int) $curso_programado_id;
+
+        $this->accessService()->requireActiveEnrollment($user, $cohortId);
+
+        $courseColumn = Schema::hasColumn('reviews', 'curso_programado_id')
+            ? 'curso_programado_id'
+            : 'course_id';
+
         // Check if there is already a review for this course program
-        $hasReview = \App\Reviews::where('user_id', $user->id)
-            ->where('course_id', $curso_programado_id)
+        $hasReview = Review::where('user_id', $user->id)
+            ->where($courseColumn, $cohortId)
             ->exists();
 
         return response()->json([
             'success' => true,
-            'pending' => !$hasReview
+            'pending' => ! $hasReview,
         ]);
     }
 
     public function submitOpinion(Request $request)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
 
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'course_id' => 'required|integer',
             'rating' => 'required|integer|min:1|max:5',
             'comment' => 'required|string|min:50',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
         }
+
+        $cohortId = (int) $request->course_id;
+        $this->accessService()->requireActiveEnrollment($user, $cohortId);
 
         $badWords = [
             'puta', 'puto', 'pendejo', 'pendeja', 'mierda', 'chingar', 'chingada', 'chingado',
@@ -1056,7 +1395,7 @@ class ElectronPanelController extends Controller
             'estafa', 'engaño', 'mentira', 'timar', 'robo', 'inútil', 'decepción', 'engañoso',
             'aburrido', 'mediocre', 'desastre', 'pobre', 'deficiente', 'inservible', 'vergonzoso',
             'curso malo', 'curso pésimo', 'curso horrible', 'curso basura', 'profesor malo',
-            'profesor pésimo', 'no sirve', 'no aprendes', 'malísimo', 'pérdida de tiempo','culo','pene'
+            'profesor pésimo', 'no sirve', 'no aprendes', 'malísimo', 'pérdida de tiempo', 'culo', 'pene',
         ];
 
         $comment = strtolower($request->comment);
@@ -1073,41 +1412,61 @@ class ElectronPanelController extends Controller
             $visible = false;
             $rating = 0;
         } else {
-            $rating = $request->rating;
-            $visible = $request->rating >= 4 ? true : false;
+            $rating = (int) $request->rating;
+            $visible = $rating >= 4;
         }
 
-        \App\Reviews::create([
-            'user_id' => $user->id,
-            'name' => $user->nombre_completo,
-            'rating' => $rating,
-            'comment' => strip_tags($request->comment),
-            'visible' => $visible,
-            'course_id' => $request->course_id
-        ]);
+        $courseColumn = Schema::hasColumn('reviews', 'curso_programado_id')
+            ? 'curso_programado_id'
+            : 'course_id';
+
+        $displayName = trim((string) $user->nombre_completo);
+        if ($displayName === '') {
+            $displayName = (string) ($user->username ?: 'Estudiante');
+        }
+
+        $review = new Review;
+        $review->user_id = $user->id;
+        $review->name = $displayName;
+        $review->rating = $rating;
+        $review->comment = strip_tags($request->comment);
+        $review->visible = $visible;
+        $review->{$courseColumn} = $cohortId;
+        $review->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Opinión registrada correctamente.'
+            'message' => 'Opinión registrada correctamente.',
         ]);
     }
 
     public function getCalendar(Request $request, $curso_programado_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        $curso = CursoProgramado::with(['Curso.Lecciones'])->find($curso_programado_id);
-        
-        if (!$curso) {
+        $cohortId = (int) $curso_programado_id;
+
+        if ($cohortId <= 0) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'events' => [],
+                    'weekly_calendars' => [],
+                ],
+            ]);
+        }
+
+        $this->accessService()->requireActiveEnrollment($user, $cohortId);
+
+        $curso = CursoProgramado::with(['Curso.Lecciones'])->find($cohortId);
+        if (! $curso) {
             return response()->json(['success' => false, 'message' => 'Curso no encontrado.'], 404);
         }
 
         $events = [];
-        $contenido_programado = ContenidoProgramado::where('curso_programado_id', $curso_programado_id)->first();
-        if ($contenido_programado && $contenido_programado->contenido) {
+        $contenido_programado = ContenidoProgramado::where('curso_programado_id', $cohortId)->first();
+        if ($contenido_programado && $contenido_programado->contenido && $curso->Curso) {
             $schedule = collect($contenido_programado->contenido);
             foreach ($curso->Curso->Lecciones as $leccion) {
                 $contenido = $schedule->where('id', $leccion->id)->first();
@@ -1124,7 +1483,7 @@ class ElectronPanelController extends Controller
         }
 
         $current_date = now()->format('Y-m-d');
-        $weekly_calendars = \App\ProgrammingCalendar::where('curso_id', $curso->curso_id)
+        $weekly_calendars = ProgrammingCalendar::where('curso_id', $curso->curso_id)
             ->where('start_date', '<=', $current_date)
             ->where('end_date', '>=', $current_date)
             ->orderBy('position', 'asc')
@@ -1134,25 +1493,31 @@ class ElectronPanelController extends Controller
             'success' => true,
             'data' => [
                 'events' => $events,
-                'weekly_calendars' => $weekly_calendars
-            ]
+                'weekly_calendars' => $weekly_calendars,
+            ],
         ]);
     }
 
     public function getGrades(Request $request, $inscripcion_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        $inscripcion = Inscripcion::find($inscripcion_id);
-        if (!$inscripcion) {
+        $inscripcion = Inscripcion::with('CursoProgramado')->find((int) $inscripcion_id);
+        if (! $inscripcion) {
             return response()->json(['success' => false, 'message' => 'Inscripción no encontrada.'], 404);
         }
 
+        if ((int) $inscripcion->user_id !== (int) $user->id || $inscripcion->aceptado !== 'si') {
+            return response()->json(['success' => false, 'message' => 'No tienes autorización para consultar estas calificaciones.'], 403);
+        }
+
+        if (! $inscripcion->CursoProgramado) {
+            return response()->json(['success' => false, 'message' => 'Curso no encontrado.'], 404);
+        }
+
         $curso = Curso::find($inscripcion->CursoProgramado->curso_id);
-        if (!$curso) {
+        if (! $curso) {
             return response()->json(['success' => false, 'message' => 'Curso no encontrado.'], 404);
         }
 
@@ -1165,18 +1530,20 @@ class ElectronPanelController extends Controller
             ->where('activo', 'si')
             ->where(function ($query) use ($modulosActivosIds) {
                 $query->where('leccion_id', 0)
-                      ->orWhereIn('leccion_id', $modulosActivosIds);
+                    ->orWhereIn('leccion_id', $modulosActivosIds);
             })
-            ->with(['pruebas' => function($q) {
+            ->with(['pruebas' => function ($q) {
                 $q->where('activo', 'si');
             }])
             ->get();
 
         $examenes = Examen::with('Prueba')
-            ->where('inscripcion_id', $inscripcion_id)
+            ->where('inscripcion_id', $inscripcion->id)
+            ->where('finalizado', 'si')
             ->whereHas('Prueba', function ($query) use ($curso) {
                 $query->where('curso_id', $curso->id);
             })
+            ->orderBy('id', 'asc')
             ->get()
             ->keyBy('prueba_id');
 
@@ -1194,7 +1561,7 @@ class ElectronPanelController extends Controller
                             'total_preguntas' => $examen->total_preguntas,
                             'total_correctas' => $examen->total_correctas,
                             'score_total' => $examen->score_total,
-                            'presented' => true
+                            'presented' => true,
                         ];
                     } else {
                         $calificaciones[] = [
@@ -1204,7 +1571,7 @@ class ElectronPanelController extends Controller
                             'total_preguntas' => 0,
                             'total_correctas' => 0,
                             'score_total' => 0,
-                            'presented' => false
+                            'presented' => false,
                         ];
                     }
                 }
@@ -1215,40 +1582,41 @@ class ElectronPanelController extends Controller
             'success' => true,
             'data' => [
                 'inscripcion' => $inscripcion,
-                'calificaciones' => $calificaciones
-            ]
+                'calificaciones' => $calificaciones,
+            ],
         ]);
     }
 
     public function getCourseProgress(Request $request, $curso_programado_id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        
-        $curso = CursoProgramado::with(['Curso' => function($r){
-            $r->with(['Lecciones' => function($q){
-                $q->with(['Pruebas' => function($p) {
+        $cohortId = (int) $curso_programado_id;
+
+        $enrollment = $this->accessService()->requireActiveEnrollment($user, $cohortId);
+
+        $curso = CursoProgramado::with(['Curso' => function ($r) {
+            $r->with(['Lecciones' => function ($q) {
+                $q->with(['Pruebas' => function ($p) {
                     $p->where('activo', 'si');
-                }, 'Clases' => function($c) {
-                    $c->where('activo', 'si')->with(['Pruebas' => function($p) {
+                }, 'Clases' => function ($c) {
+                    $c->where('activo', 'si')->with(['Pruebas' => function ($p) {
                         $p->where('activo', 'si');
                     }]);
                 }]);
                 $q->where('leccion_id', 0)->where('activo', 'si'); // Módulos
             }]);
-        }])->find($curso_programado_id);
+        }])->find($cohortId);
 
-        if (!$curso) {
+        if (! $curso || ! $curso->Curso) {
             return response()->json(['success' => false, 'message' => 'Curso no encontrado.'], 404);
         }
 
         $leccionIds = [];
         $pruebaIds = [];
         foreach ($curso->Curso->Lecciones as $modulo) {
-             foreach ($modulo->Pruebas as $prueba) {
+            foreach ($modulo->Pruebas as $prueba) {
                 $pruebaIds[] = $prueba->id;
             }
             foreach ($modulo->Clases as $clase) {
@@ -1261,26 +1629,28 @@ class ElectronPanelController extends Controller
 
         $completedLessons = DB::table('leccion_user')
             ->where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+            ->where('curso_programado_id', $cohortId)
             ->pluck('leccion_id')
             ->toArray();
 
-        $homeworks = Homework::where('user_id', $user->id)
-            ->whereIn('leccion_id', $leccionIds)
-            ->get()
-            ->keyBy('leccion_id');
+        $homeworks = empty($leccionIds)
+            ? collect()
+            : Homework::where('user_id', $user->id)
+                ->whereIn('leccion_id', $leccionIds)
+                ->get()
+                ->keyBy('leccion_id');
 
-        $inscripcion = Inscripcion::where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)->first();
+        $examenes = empty($pruebaIds)
+            ? collect()
+            : Examen::with('Prueba')
+                ->where('inscripcion_id', $enrollment->id)
+                ->whereIn('prueba_id', $pruebaIds)
+                ->orderBy('id', 'asc')
+                ->get()
+                ->keyBy('prueba_id');
 
-        $examenes = Examen::with('Prueba')
-            ->where('inscripcion_id', $inscripcion ? $inscripcion->id : 0)
-            ->whereIn('prueba_id', $pruebaIds)
-            ->get()
-            ->keyBy('prueba_id');
-
-        $unlockedLessonsData = \App\Models\Registro\LessonUnlock::where('user_id', $user->id)
-            ->where('curso_programado_id', $curso_programado_id)
+        $unlockedLessonsData = LessonUnlock::where('user_id', $user->id)
+            ->where('curso_programado_id', $cohortId)
             ->get()
             ->keyBy('leccion_id');
 
@@ -1291,24 +1661,29 @@ class ElectronPanelController extends Controller
                 'completedLessons' => $completedLessons,
                 'homeworks' => $homeworks,
                 'examenes' => $examenes,
-                'unlockedLessonsData' => $unlockedLessonsData
-            ]
+                'unlockedLessonsData' => $unlockedLessonsData,
+            ],
         ]);
     }
 
     public function getMaterialPdfDetails(Request $request, $id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        $material = \App\Models\Cursos\MaterialPdf::find($id);
-        if (!$material) {
+        $material = MaterialPdf::with('leccion')->find((int) $id);
+        if (! $material) {
             return response()->json(['success' => false, 'message' => 'PDF interactivo no encontrado.'], 404);
         }
 
-        $respuesta = \App\Models\Cursos\AlumnoPdfRespuesta::where('user_id', $user->id)
+        if (! $material->leccion) {
+            return response()->json(['success' => false, 'message' => 'Lección asociada no encontrada.'], 404);
+        }
+
+        $this->accessService()->requireCourseEnrollment($user, (int) $material->leccion->curso_id);
+        $material->setAttribute('allow_download', $this->isMaterialDownloadAllowed($material));
+
+        $respuesta = AlumnoPdfRespuesta::where('user_id', $user->id)
             ->where('material_pdf_id', $material->id)
             ->first();
 
@@ -1316,55 +1691,88 @@ class ElectronPanelController extends Controller
             'success' => true,
             'data' => [
                 'material' => $material,
-                'respuesta' => $respuesta
-            ]
+                'respuesta' => $respuesta,
+            ],
         ]);
     }
 
     public function saveMaterialPdfAnswers(Request $request, $id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
         $user = $request->user();
-        $material = \App\Models\Cursos\MaterialPdf::find($id);
-        if (!$material) {
+        $material = MaterialPdf::with('leccion')->find((int) $id);
+        if (! $material) {
             return response()->json(['success' => false, 'message' => 'PDF interactivo no encontrado.'], 404);
         }
 
-        $respuesta = \App\Models\Cursos\AlumnoPdfRespuesta::updateOrCreate(
+        if (! $material->leccion) {
+            return response()->json(['success' => false, 'message' => 'Lección asociada no encontrada.'], 404);
+        }
+
+        $this->accessService()->requireCourseEnrollment($user, (int) $material->leccion->curso_id);
+
+        AlumnoPdfRespuesta::updateOrCreate(
             [
                 'user_id' => $user->id,
-                'material_pdf_id' => $material->id
+                'material_pdf_id' => $material->id,
             ],
             [
-                'respuestas' => $request->input('respuestas', [])
+                'respuestas' => $request->input('respuestas', []),
             ]
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Tus respuestas han sido guardadas con éxito.'
+            'message' => 'Tus respuestas han sido guardadas con éxito.',
         ]);
     }
 
     public function downloadMaterialPdfRaw(Request $request, $id)
     {
-        if (!$this->validateMacAddress($request)) {
-            return response()->json(['success' => false, 'message' => 'Dispositivo no autorizado.'], 403);
-        }
+        $this->validateMacAddress($request);
 
-        $material = \App\Models\Cursos\MaterialPdf::find($id);
-        if (!$material) {
+        $user = $request->user();
+        $material = MaterialPdf::with('leccion')->find((int) $id);
+        if (! $material) {
             return response()->json(['success' => false, 'message' => 'PDF interactivo no encontrado.'], 404);
         }
 
-        $path = storage_path('app/files/interactive_pdfs/' . $material->file_path);
-        if (!file_exists($path)) {
+        if (! $material->leccion) {
+            return response()->json(['success' => false, 'message' => 'Lección asociada no encontrada.'], 404);
+        }
+
+        $this->accessService()->requireCourseEnrollment($user, (int) $material->leccion->curso_id);
+
+        $isStream = $request->boolean('stream') || $request->query('stream') === '1';
+        $allowDownload = $this->isMaterialDownloadAllowed($material);
+
+        if (! $allowDownload && ! $isStream) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La descarga directa de este material PDF no está permitida.',
+            ], 403);
+        }
+
+        $path = $this->resolveSafePathInDirs((string) $material->file_path, [
+            storage_path('app/files/interactive_pdfs'),
+            storage_path('app/public/files/interactive_pdfs'),
+        ], true);
+
+        if (! $path) {
             return response()->json(['success' => false, 'message' => 'El archivo físico del PDF interactivo no existe.'], 404);
         }
 
-        return response()->download($path, $material->titulo . '.pdf');
+        if ($isStream) {
+            return Response::file($path, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="sapius_interactive.pdf"',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]);
+        }
+
+        return response()->download($path, ($material->titulo ?: 'material').'.pdf');
     }
 }

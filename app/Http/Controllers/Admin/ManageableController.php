@@ -7,6 +7,7 @@ use App\Models\ManageableGuiaMedicine;
 use App\Models\ManageableGuiaNutrition;
 use App\Models\ManageableSimulatorMedicine;
 use App\Models\ManageableSimulatorNutrition;
+use App\Services\ExamCriteriaService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -28,17 +29,27 @@ class ManageableController extends Controller
             'simulatorsNutrition' => $simulatorsNutrition,
             'guiasMedicine' => $guiasMedicine,
             'guiasNutrition' => $guiasNutrition,
-            'examCriteria' => \App\Services\ExamCriteriaService::getAll(),
+            'examCriteria' => ExamCriteriaService::getAll(),
         ]);
     }
 
     public function updateExamCriteria(Request $request)
     {
         $validated = $request->validate([
-            'criteria' => 'required|array',
+            'criteria' => 'required|array:EGEL,EXANI,ENARM|min:1',
+            'criteria.*' => 'required|array',
+            'criteria.*.title' => 'required|string|max:255',
+            'criteria.*.subtitle' => 'nullable|string|max:500',
+            'criteria.*.columns' => 'required|array|min:2|max:4',
+            'criteria.*.columns.*' => 'required|string|max:120',
+            'criteria.*.rows' => 'required|array|max:100',
+            'criteria.*.rows.*.label' => 'required|string|max:255',
+            'criteria.*.rows.*.value' => 'required|string|max:100',
+            'criteria.*.rows.*.max' => 'nullable|string|max:100',
+            'criteria.*.rows.*.badge' => 'nullable|string|in:danger,success,excellent,info,warning',
         ]);
 
-        \App\Services\ExamCriteriaService::save($validated['criteria']);
+        ExamCriteriaService::save($validated['criteria']);
 
         return redirect()->back()->with('success', 'Tablas de criterios de evaluación actualizadas correctamente.');
     }
@@ -123,6 +134,7 @@ class ManageableController extends Controller
     {
         $item = ManageableSimulatorMedicine::findOrFail($id);
         $item->delete();
+
         return redirect()->back()->with('success', 'Simulador eliminado.');
     }
 
@@ -130,6 +142,7 @@ class ManageableController extends Controller
     {
         $item = ManageableSimulatorNutrition::findOrFail($id);
         $item->delete();
+
         return redirect()->back()->with('success', 'Simulador eliminado.');
     }
 
@@ -137,6 +150,7 @@ class ManageableController extends Controller
     {
         $item = ManageableGuiaMedicine::findOrFail($id);
         $item->delete();
+
         return redirect()->back()->with('success', 'Guía eliminada.');
     }
 
@@ -144,6 +158,7 @@ class ManageableController extends Controller
     {
         $item = ManageableGuiaNutrition::findOrFail($id);
         $item->delete();
+
         return redirect()->back()->with('success', 'Guía eliminada.');
     }
 }

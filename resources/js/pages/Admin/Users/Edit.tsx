@@ -1,9 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, Link } from '@inertiajs/react';
+import { Save, ArrowLeft, UserCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     Select, 
     SelectContent, 
@@ -11,8 +12,7 @@ import {
     SelectTrigger, 
     SelectValue 
 } from '@/components/ui/select';
-import { Save, ArrowLeft, UserCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import AppLayout from '@/layouts/app-layout';
 
 interface UserData {
     id: number;
@@ -170,4 +170,4 @@ export default function EditUser({ user, roles }: Props) {
     );
 }
 
-EditUser.layout = (page: any) => <AppLayout breadcrumbs={[{ title: 'Usuarios', href: '/admin/users' }, { title: 'Editar Usuario' }]}>{page}</AppLayout>;
+EditUser.layout = (page: any) => <AppLayout breadcrumbs={[{ title: 'Usuarios', href: '/admin/users' }, { title: 'Editar Usuario', href: '#' }]}>{page}</AppLayout>;

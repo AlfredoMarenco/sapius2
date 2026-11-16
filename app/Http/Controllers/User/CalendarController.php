@@ -5,11 +5,11 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\ProgrammingCalendar;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class CalendarController extends Controller
 {
@@ -26,8 +26,8 @@ class CalendarController extends Controller
                 }]);
             },
         ])
-        ->where('user_id', $user->id)
-        ->get();
+            ->where('user_id', $user->id)
+            ->get();
 
         $events = [];
         $coursesSummary = [];
@@ -35,7 +35,7 @@ class CalendarController extends Controller
 
         foreach ($inscripciones as $inscripcion) {
             $scheduled = $inscripcion->scheduledCourse;
-            if (!$scheduled || !$scheduled->course) {
+            if (! $scheduled || ! $scheduled->course) {
                 continue;
             }
 
@@ -63,7 +63,7 @@ class CalendarController extends Controller
                         ->where('curso_programado_id', $scheduled->id)
                         ->first();
 
-                    if ($contenido && !empty($contenido->contenido)) {
+                    if ($contenido && ! empty($contenido->contenido)) {
                         $contenidoArray = is_string($contenido->contenido)
                             ? json_decode($contenido->contenido, true)
                             : (array) $contenido->contenido;
@@ -83,7 +83,7 @@ class CalendarController extends Controller
                 $modStartCarbon = $courseStartCarbon;
                 $modEndCarbon = $courseEndCarbon;
 
-                if ($item && !empty($item['fecha_inicial'])) {
+                if ($item && ! empty($item['fecha_inicial'])) {
                     try {
                         $rawInit = str_replace('/', '-', $item['fecha_inicial']);
                         $modStartCarbon = Carbon::parse($rawInit);
@@ -92,7 +92,7 @@ class CalendarController extends Controller
                     }
                 }
 
-                if ($item && !empty($item['fecha_final'])) {
+                if ($item && ! empty($item['fecha_final'])) {
                     try {
                         $rawEnd = str_replace('/', '-', $item['fecha_final']);
                         $modEndCarbon = Carbon::parse($rawEnd);
@@ -134,7 +134,7 @@ class CalendarController extends Controller
                     'identifier' => $scheduled->identificador,
                     'module_id' => $modulo->id,
                     'module_title' => $modulo->title,
-                    'title' => $course->title . ': ' . $modulo->title,
+                    'title' => $course->title.': '.$modulo->title,
                     'start' => $startFormatted,
                     'end' => $endFormatted,
                     'start_iso' => $startIso,
@@ -200,15 +200,25 @@ class CalendarController extends Controller
 
         $weeklyCalendars = [];
         try {
-            if (!empty($courseIds) && Schema::hasTable('programming_calendars')) {
+            if (! empty($courseIds) && Schema::hasTable('programming_calendars')) {
+                $today = Carbon::today();
+
                 $weeklyCalendars = ProgrammingCalendar::whereIn('curso_id', array_unique($courseIds))
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('start_date')
+                            ->orWhereDate('start_date', '<=', $today);
+                    })
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('end_date')
+                            ->orWhereDate('end_date', '>=', $today);
+                    })
                     ->orderBy('position', 'asc')
                     ->get()
                     ->map(fn ($cal) => [
                         'id' => $cal->id,
                         'course_id' => $cal->curso_id,
                         'group_name' => $cal->group_name,
-                        'image_url' => '/media/stream/' . ltrim($cal->image_path, '/'),
+                        'image_url' => '/media/stream/'.ltrim($cal->image_path, '/'),
                         'start_date' => $cal->start_date ? Carbon::parse($cal->start_date)->format('d/m/Y') : null,
                         'end_date' => $cal->end_date ? Carbon::parse($cal->end_date)->format('d/m/Y') : null,
                     ])

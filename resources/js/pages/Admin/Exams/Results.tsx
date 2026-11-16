@@ -1,35 +1,55 @@
 import React, { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { 
-    Award, 
-    ChevronLeft, 
-    Download, 
-    RotateCcw, 
-    Eye, 
-    EyeOff, 
-    CheckCircle2, 
-    XCircle, 
-    Clock, 
-    AlertTriangle, 
-    FileText 
+import {
+    Award,
+    ChevronLeft,
+    Download,
+    RotateCcw,
+    Eye,
+    EyeOff,
+    CheckCircle2,
+    Clock,
+    AlertTriangle,
+    ShieldAlert,
+    X,
 } from 'lucide-react';
+
+interface ExamEventItem {
+    fecha_hora?: string;
+    observacion?: string;
+    tecla?: string;
+    lugar?: string;
+}
 
 interface ExamItem {
     id: number;
     quiz_id: number;
     quiz_title: string;
     quiz_description: string;
+    quiz_type?: string;
     min_score: number;
     max_score: number;
-    duration: number;
+    duration: number | string;
     score: number;
     correct_answers: number;
     total_questions: number;
     finished: string;
     feedback_viewed: string;
+    feedback_status?: string;
+    is_best_attempt?: boolean;
+    is_late?: boolean;
+    eventos?: ExamEventItem[];
     created_at: string | null;
     updated_at: string | null;
+}
+
+interface NotPresentedQuiz {
+    id: number;
+    title: string;
+    type: string;
+    min_score: number;
+    max_score: number;
 }
 
 interface EnrollmentInfo {
@@ -46,10 +66,12 @@ interface EnrollmentInfo {
 interface Props {
     enrollment: EnrollmentInfo;
     exams: ExamItem[];
+    notPresentedQuizzes?: NotPresentedQuiz[];
 }
 
-export default function Results({ enrollment, exams }: Props) {
+export default function Results({ enrollment, exams = [], notPresentedQuizzes = [] }: Props) {
     const [confirmModalId, setConfirmModalId] = useState<number | null>(null);
+    const [eventsModalExam, setEventsModalExam] = useState<ExamItem | null>(null);
 
     const handleToggleFinished = (examId: number) => {
         router.post('/admin/examen/finalizar', { id: examId }, { preserveScroll: true });
@@ -60,16 +82,32 @@ export default function Results({ enrollment, exams }: Props) {
     };
 
     const handleResetExam = (examId: number) => {
-        router.post('/admin/examen/reiniciar', { id: examId }, {
-            preserveScroll: true,
-            onSuccess: () => setConfirmModalId(null),
-        });
+        router.post(
+            '/admin/examen/reiniciar',
+            { id: examId },
+            {
+                preserveScroll: true,
+                onSuccess: () => setConfirmModalId(null),
+            },
+        );
     };
 
-    const passedCount = exams.filter((e) => Number(e.score) >= Number(e.min_score)).length;
-    const avgScore = exams.length > 0
-        ? (exams.reduce((acc, curr) => acc + Number(curr.score), 0) / exams.length).toFixed(1)
-        : '0.0';
+    // Priorizar mejor intento finalizado para métricas resumen
+    const bestFinishedExams = exams.filter((e) => e.finished === 'si' && (e.is_best_attempt ?? true));
+    const metricSource = bestFinishedExams.length > 0 ? bestFinishedExams : exams;
+    const passedCount = metricSource.filter((e) => Number(e.score) >= Number(e.min_score)).length;
+    const avgScore =
+        metricSource.length > 0
+            ? (metricSource.reduce((acc, curr) => acc + Number(curr.score), 0) / metricSource.length).toFixed(1)
+            : '0.0';
+
+    const allEvents = exams.flatMap((ex) =>
+        (ex.eventos || []).map((ev) => ({
+            ...ev,
+            exam_id: ex.id,
+            quiz_title: ex.quiz_title,
+        })),
+    );
 
     return (
         <>
@@ -106,27 +144,34 @@ export default function Results({ enrollment, exams }: Props) {
                             href={`/admin/exportCalificaciones/${enrollment.id}`}
                             className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted transition-all"
                         >
-                            <Download className="size-4 text-green-600" />
-                            Descargar Calificaciones (Excel)
+                            <Download className="size-4 text-rose-600" />
+                            Descargar Calificaciones (PDF)
                         </a>
                     </div>
                 </div>
 
                 {/* Métricas rápidas */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <p className="text-xs font-medium text-muted-foreground">Exámenes Presentados</p>
+                        <p className="text-xs font-medium text-muted-foreground">Intentos Registrados</p>
                         <p className="text-2xl font-bold text-foreground mt-1">{exams.length}</p>
                     </div>
 
                     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <p className="text-xs font-medium text-muted-foreground">Exámenes Aprobados</p>
+                        <p className="text-xs font-medium text-muted-foreground">Satisfactorios (Mejor Intento)</p>
                         <p className="text-2xl font-bold text-green-600 mt-1">{passedCount}</p>
                     </div>
 
                     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <p className="text-xs font-medium text-muted-foreground">Promedio General</p>
-                        <p className="text-2xl font-bold text-brand-blue mt-1">{avgScore} / 100</p>
+                        <p className="text-xs font-medium text-muted-foreground">Promedio (Mejor Intento)</p>
+                        <p className="text-2xl font-bold text-brand-blue mt-1">{avgScore} pts</p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                        <p className="text-xs font-medium text-muted-foreground">Incidencias Anti-Trampa</p>
+                        <p className={`text-2xl font-bold mt-1 ${allEvents.length > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {allEvents.length}
+                        </p>
                     </div>
                 </div>
 
@@ -141,6 +186,7 @@ export default function Results({ enrollment, exams }: Props) {
                                     <th className="px-6 py-4 text-center">Aciertos</th>
                                     <th className="px-6 py-4 text-center">Estado</th>
                                     <th className="px-6 py-4 text-center">Retroalimentación</th>
+                                    <th className="px-6 py-4 text-center">Eventos</th>
                                     <th className="px-6 py-4">Fecha</th>
                                     <th className="px-6 py-4 text-right">Acciones</th>
                                 </tr>
@@ -148,33 +194,47 @@ export default function Results({ enrollment, exams }: Props) {
                             <tbody className="divide-y divide-border">
                                 {exams.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                                        <td colSpan={8} className="py-12 text-center text-muted-foreground">
                                             Este alumno aún no ha presentado ninguna evaluación en esta cohorte.
                                         </td>
                                     </tr>
                                 ) : (
                                     exams.map((exam) => {
                                         const isPassed = Number(exam.score) >= Number(exam.min_score);
+                                        const isFeedbackEnabled = exam.feedback_viewed === 'no';
+                                        const eventsCount = exam.eventos ? exam.eventos.length : 0;
+
                                         return (
                                             <tr key={exam.id} className="hover:bg-muted/20 transition-colors">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="flex size-9 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+                                                        <div className="flex size-9 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue shrink-0">
                                                             <Award className="size-4" />
                                                         </div>
                                                         <div>
-                                                            <p className="font-bold text-foreground">{exam.quiz_title}</p>
-                                                            <p className="text-xs text-muted-foreground">Mín. aprobatorio: {exam.min_score} pts</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-bold text-foreground">{exam.quiz_title}</p>
+                                                                {exam.is_best_attempt && (
+                                                                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
+                                                                        Mejor intento
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {exam.quiz_type || 'EXANI'} · Mín. satisfactorio: {exam.min_score} pts
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 </td>
 
                                                 <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                                                        isPassed 
-                                                            ? 'bg-green-500/10 text-green-700' 
-                                                            : 'bg-red-500/10 text-red-700'
-                                                    }`}>
+                                                    <span
+                                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                                                            isPassed
+                                                                ? 'bg-green-500/10 text-green-700'
+                                                                : 'bg-red-500/10 text-red-700'
+                                                        }`}
+                                                    >
                                                         {exam.score} / {exam.max_score}
                                                     </span>
                                                 </td>
@@ -208,23 +268,41 @@ export default function Results({ enrollment, exams }: Props) {
                                                 <td className="px-6 py-4 text-center whitespace-nowrap">
                                                     <button
                                                         onClick={() => handleToggleRetro(exam.id)}
-                                                        title="Clic para alternar visibilidad de retroalimentación"
+                                                        title={
+                                                            isFeedbackEnabled
+                                                                ? 'Habilitada: el alumno puede ver la retroalimentación. Clic para marcar como Consumida.'
+                                                                : 'Consumida/bloqueada: el alumno ya no puede abrir la retroalimentación. Clic para volver a Habilitar.'
+                                                        }
                                                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
-                                                            exam.feedback_viewed === 'si'
-                                                                ? 'bg-blue-500/10 text-blue-700 hover:bg-blue-500/20'
-                                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                                            isFeedbackEnabled
+                                                                ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20'
+                                                                : 'bg-amber-500/10 text-amber-800 hover:bg-amber-500/20'
                                                         }`}
                                                     >
-                                                        {exam.feedback_viewed === 'si' ? (
+                                                        {isFeedbackEnabled ? (
                                                             <>
-                                                                <Eye className="size-3.5" /> Visible
+                                                                <Eye className="size-3.5" /> Habilitada
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <EyeOff className="size-3.5" /> Oculta
+                                                                <EyeOff className="size-3.5" /> Consumida
                                                             </>
                                                         )}
                                                     </button>
+                                                </td>
+
+                                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                    {eventsCount > 0 ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEventsModalExam(exam)}
+                                                            className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-500/20 transition-colors"
+                                                        >
+                                                            <ShieldAlert className="size-3.5" /> {eventsCount}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">0</span>
+                                                    )}
                                                 </td>
 
                                                 <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground">
@@ -244,6 +322,74 @@ export default function Results({ enrollment, exams }: Props) {
                                             </tr>
                                         );
                                     })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Evaluaciones Activas No Presentadas */}
+                {notPresentedQuizzes.length > 0 && (
+                    <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
+                        <h3 className="text-sm font-bold text-foreground">
+                            Evaluaciones Activas No Presentadas ({notPresentedQuizzes.length})
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {notPresentedQuizzes.map((qz) => (
+                                <div key={qz.id} className="rounded-lg border border-amber-200/70 bg-amber-50/40 p-3 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-semibold text-foreground">{qz.title}</p>
+                                        <p className="text-xs text-muted-foreground">{qz.type} · Mín: {qz.min_score} pts</p>
+                                    </div>
+                                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
+                                        NP
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Tabla de Eventos Anti-Trampa */}
+                <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                    <div className="border-b border-border bg-muted/20 px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <ShieldAlert className="size-5 text-rose-600" />
+                            <h3 className="text-base font-bold text-foreground">
+                                Registro de Eventos Anti-Trampa ({allEvents.length})
+                            </h3>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="border-b border-border bg-muted/30 text-xs font-semibold uppercase text-muted-foreground">
+                                <tr>
+                                    <th className="px-6 py-3">Examen</th>
+                                    <th className="px-6 py-3">Fecha / Hora</th>
+                                    <th className="px-6 py-3">Observación</th>
+                                    <th className="px-6 py-3">Tecla</th>
+                                    <th className="px-6 py-3">Origen / Lugar</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {allEvents.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                                            No se han registrado eventos sospechosos en las evaluaciones de este alumno.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    allEvents.map((ev, idx) => (
+                                        <tr key={idx} className="hover:bg-muted/20">
+                                            <td className="px-6 py-3 font-medium text-foreground text-xs">{ev.quiz_title}</td>
+                                            <td className="px-6 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                                                {ev.fecha_hora || 'N/A'}
+                                            </td>
+                                            <td className="px-6 py-3 text-xs text-rose-700 font-medium">{ev.observacion || 'Evento registrado'}</td>
+                                            <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{ev.tecla || '-'}</td>
+                                            <td className="px-6 py-3 text-xs text-muted-foreground">{ev.lugar || 'Navegador Web'}</td>
+                                        </tr>
+                                    ))
                                 )}
                             </tbody>
                         </table>
@@ -275,6 +421,41 @@ export default function Results({ enrollment, exams }: Props) {
                             >
                                 Sí, Reiniciar Examen
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal detalle de eventos por examen */}
+            {eventsModalExam && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-2xl rounded-xl border border-border bg-card p-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between border-b pb-3">
+                            <div className="flex items-center gap-2">
+                                <ShieldAlert className="size-5 text-rose-600" />
+                                <h3 className="text-lg font-bold text-foreground">
+                                    Incidencias: {eventsModalExam.quiz_title}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setEventsModalExam(null)}
+                                className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
+                            >
+                                <X className="size-4" />
+                            </button>
+                        </div>
+                        <div className="max-h-80 overflow-y-auto divide-y divide-border">
+                            {(eventsModalExam.eventos || []).map((ev, i) => (
+                                <div key={i} className="py-2.5 text-xs space-y-0.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-semibold text-rose-700">{ev.observacion}</span>
+                                        <span className="font-mono text-muted-foreground">{ev.fecha_hora}</span>
+                                    </div>
+                                    <p className="text-muted-foreground">
+                                        Lugar: {ev.lugar || 'Web'} {ev.tecla ? `· Tecla: ${ev.tecla}` : ''}
+                                    </p>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>

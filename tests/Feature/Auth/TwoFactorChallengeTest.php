@@ -1,41 +1,14 @@
 <?php
 
-use App\Models\User;
-use Inertia\Testing\AssertableInertia as Assert;
+use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-beforeEach(function () {
-    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+test('two factor authentication feature is disabled under schema freeze', function () {
+    expect(Features::enabled(Features::twoFactorAuthentication()))->toBeFalse();
+    expect(Features::canManageTwoFactorAuthentication())->toBeFalse();
+    expect(Route::has('two-factor.login'))->toBeFalse();
 });
 
-test('two factor challenge redirects to login when not authenticated', function () {
-    $response = $this->get(route('two-factor.login'));
-
-    $response->assertRedirect(route('login'));
-});
-
-test('two factor challenge can be rendered', function () {
-    Features::twoFactorAuthentication([
-        'confirm' => true,
-        'confirmPassword' => true,
-    ]);
-
-    $user = User::factory()->create();
-
-    $user->forceFill([
-        'two_factor_secret' => encrypt('test-secret'),
-        'two_factor_recovery_codes' => encrypt(json_encode(['code1', 'code2'])),
-        'two_factor_confirmed_at' => now(),
-    ])->save();
-
-    $this->post(route('login'), [
-        'email' => $user->email,
-        'password' => 'password',
-    ]);
-
-    $this->get(route('two-factor.login'))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('auth/two-factor-challenge'),
-        );
+test('two factor challenge endpoint is not exposed', function () {
+    $this->get('/two-factor-challenge')->assertNotFound();
 });

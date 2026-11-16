@@ -1,9 +1,9 @@
-import React from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle2, User, BookOpen, AlertTriangle, Info, CreditCard } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 
 interface Props {
     enrollment: any;
@@ -13,13 +13,14 @@ interface Props {
 }
 
 export default function ShowEnrollment({ enrollment, discount, charge, openpayError }: Props) {
+    const isAccepted = (enrollment.aceptado ?? enrollment.status) === 'si';
+    const isUserActive =
+        enrollment.user?.activo !== undefined
+            ? enrollment.user.activo === 'si'
+            : enrollment.user?.is_active !== false;
+
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Panel de Control', href: '/admin' },
-            { title: 'Reportes', href: '/admin/reports' },
-            { title: 'Inscripciones', href: '/admin/reports/inscriptions' },
-            { title: `Detalles Inscripción #${enrollment.id}` },
-        ]}>
+        <>
             <Head title={`Detalle de Inscripción #${enrollment.id}`} />
 
             <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -71,7 +72,9 @@ export default function ShowEnrollment({ enrollment, discount, charge, openpayEr
                             </div>
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Estado de la cuenta</p>
-                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Activo</Badge>
+                                <Badge variant="outline" className={isUserActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}>
+                                    {isUserActive ? 'Activo' : 'Inactivo'}
+                                </Badge>
                             </div>
                         </CardContent>
                     </Card>
@@ -91,12 +94,14 @@ export default function ShowEnrollment({ enrollment, discount, charge, openpayEr
                             </div>
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Cohorte (Programado)</p>
-                                <p className="text-neutral-900">{enrollment.scheduled_course?.identificador || `ID: ${enrollment.curso_programado_id || enrollment.scheduled_course_id || 'N/A'}`}</p>
+                                <p className="text-neutral-900">
+                                    {enrollment.scheduled_course?.internal_id || enrollment.scheduled_course?.identificador || `ID: ${enrollment.scheduled_course_id || enrollment.curso_programado_id || 'N/A'}`}
+                                </p>
                             </div>
                             <div>
                                 <p className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mb-1">Estatus de Inscripción</p>
-                                <Badge variant={enrollment.aceptado === 'si' ? 'default' : 'secondary'} className={enrollment.aceptado === 'si' ? 'bg-emerald-600' : 'bg-amber-500 text-white'}>
-                                    {enrollment.aceptado === 'si' ? 'Inscrito y Aprobado' : 'Pendiente'}
+                                <Badge variant={isAccepted ? 'default' : 'secondary'} className={isAccepted ? 'bg-emerald-600' : 'bg-amber-500 text-white'}>
+                                    {isAccepted ? 'Inscrito y Aprobado' : 'Pendiente'}
                                 </Badge>
                             </div>
                         </CardContent>
@@ -176,7 +181,7 @@ export default function ShowEnrollment({ enrollment, discount, charge, openpayEr
                                         <div>
                                             <p className="text-xs text-brand-blue/70 font-semibold uppercase tracking-wider mb-1">Descuento</p>
                                             <p className="font-bold text-brand-navy">
-                                                {discount.tipo === 'porcentaje' ? `${discount.cantidad}%` : `$${discount.cantidad}`}
+                                                {`${discount.descuento}%`}
                                             </p>
                                         </div>
                                     </div>
@@ -186,6 +191,23 @@ export default function ShowEnrollment({ enrollment, discount, charge, openpayEr
                     </Card>
                 </div>
             </div>
-        </AppLayout>
+        </>
     );
 }
+
+ShowEnrollment.layout = (page: any, props?: any) => {
+    const enrollmentId = props?.enrollment?.id ?? page?.props?.enrollment?.id;
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Panel de Control', href: '/admin' },
+                { title: 'Reportes', href: '/admin/reports' },
+                { title: 'Inscripciones', href: '/admin/reports/inscriptions' },
+                { title: enrollmentId ? `Detalles Inscripción #${enrollmentId}` : 'Detalles de Inscripción', href: '#' },
+            ]}
+        >
+            {page}
+        </AppLayout>
+    );
+};

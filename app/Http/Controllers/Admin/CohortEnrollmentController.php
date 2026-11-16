@@ -3,12 +3,20 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ScheduledCourse;
+use App\Mail\AutoAceptacionEmail;
+use App\Mail\RegistroEmail;
 use App\Models\Enrollment;
+use App\Models\Role;
+use App\Models\ScheduledCourse;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class CohortEnrollmentController extends Controller
 {
@@ -20,7 +28,7 @@ class CohortEnrollmentController extends Controller
     {
         $targetId = $curso_id ?? $request->input('curso_programado_id');
 
-        if (!$targetId) {
+        if (! $targetId) {
             return redirect()->route('admin.dashboard')->with('error', 'Cohorte no especificada');
         }
 
@@ -33,6 +41,7 @@ class CohortEnrollmentController extends Controller
             ->get()
             ->map(function ($enrollment) {
                 $user = $enrollment->user;
+
                 return [
                     'id' => $enrollment->id,
                     'user_id' => $enrollment->user_id,
@@ -56,7 +65,7 @@ class CohortEnrollmentController extends Controller
             ->map(function ($c) {
                 return [
                     'id' => $c->id,
-                    'title' => ($c->course ? $c->course->title : 'Curso') . ' - ' . $c->identificador,
+                    'title' => ($c->course ? $c->course->title : 'Curso').' - '.$c->identificador,
                 ];
             });
 
@@ -64,8 +73,8 @@ class CohortEnrollmentController extends Controller
             'cohort' => [
                 'id' => $cohort->id,
                 'internal_id' => $cohort->identificador,
-                'start_date' => $cohort->fecha_inicio ? \Carbon\Carbon::parse($cohort->fecha_inicio)->format('d/m/Y') : null,
-                'end_date' => $cohort->fecha_fin ? \Carbon\Carbon::parse($cohort->fecha_fin)->format('d/m/Y') : null,
+                'start_date' => $cohort->fecha_inicio ? Carbon::parse($cohort->fecha_inicio)->format('d/m/Y') : null,
+                'end_date' => $cohort->fecha_fin ? Carbon::parse($cohort->fecha_fin)->format('d/m/Y') : null,
                 'price' => $cohort->precio,
                 'course' => $cohort->course ? [
                     'id' => $cohort->course->id,
@@ -88,6 +97,7 @@ class CohortEnrollmentController extends Controller
     public function indexPost(Request $request)
     {
         $id = $request->input('curso_programado_id');
+
         return redirect()->route('admin.cursos.get-inscritos', ['curso_id' => $id]);
     }
 
@@ -98,65 +108,111 @@ class CohortEnrollmentController extends Controller
     public function manualEnroll(Request $request, $id)
     {
         $cohort = ScheduledCourse::findOrFail($id);
-
         $userId = $request->input('user_id');
 
-        if (!$userId) {
-            $request->validate([
+        if (! $userId) {
+            $validated = $request->validate([
                 'new_name' => 'required|string|max:255',
+                'new_last_name' => 'nullable|string|max:255',
+                'apellido' => 'nullable|string|max:255',
                 'new_email' => 'required|email|max:255|unique:users,email',
-                'new_phone' => 'nullable|string|max:255'
+                'new_phone' => 'nullable|string|max:255',
+                'validado' => 'nullable|in:si,no',
             ]);
-
-            // Crear nuevo usuario
-            $user = User::create([
-                'nombre' => $request->input('new_name'),
-                'email' => $request->input('new_email'),
-                'username' => $request->input('new_email'),
-                'password' => bcrypt('Sapius' . date('Y')),
-                'telefono' => $request->input('new_phone'),
-                'rol_id' => 3, // Rol de Alumno
-                'activo' => 'si',
-                'validado' => 'si'
-            ]);
-
-            // Asignar rol explícito en role_user
-            \DB::table('role_user')->insert([
-                'user_id' => $user->id,
-                'role_id' => 3
-            ]);
-
-            $userId = $user->id;
-
-            // Enviar correo de Registro
-            \Illuminate\Support\Facades\Mail::to($user->email)
-                ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                ->send(new \App\Mail\RegistroEmail($user));
         } else {
-            $user = User::find($userId);
+            $validated = $request->validate([
+                'user_id' => 'required|exists:users,id',
+                'validado' => 'nullable|in:si,no',
+            ]);
         }
 
-        // Inscribir
-        $enrollment = Enrollment::firstOrCreate(
-            [
-                'user_id' => $userId,
-                'curso_programado_id' => $cohort->id,
-            ],
-            [
-                'aceptado' => 'si',
-                'tipo_pago' => 'Administrativo',
-                'referencia' => 'Inscripción manual por Administrador'
-            ]
-        );
+        [$user, $enrollment, $isNewUser] = DB::transaction(function () use ($userId, $validated, $cohort) {
+            $isNewUser = false;
 
-        $enrollment->aceptado = 'si';
-        $enrollment->save();
+            if (! $userId) {
+                $isNewUser = true;
+                $rawName = trim($validated['new_name']);
+                $explicitLastName = trim((string) ($validated['new_last_name'] ?? $validated['apellido'] ?? ''));
 
-        // Enviar confirmación de acceso al curso
-        if ($user) {
-            \Illuminate\Support\Facades\Mail::to($user->email)
+                if ($explicitLastName !== '') {
+                    $firstName = $rawName;
+                    $lastName = $explicitLastName;
+                } else {
+                    $parts = preg_split('/\s+/', $rawName, 2);
+                    $firstName = $parts[0] ?? $rawName;
+                    $lastName = trim($parts[1] ?? '');
+                }
+
+                $baseUsername = trim($validated['new_email']);
+                $username = $baseUsername;
+                $counter = 1;
+                while (User::where('username', $username)->exists()) {
+                    $username = $baseUsername.'_'.$counter;
+                    $counter++;
+                }
+
+                $user = new User;
+                $user->nombre = strip_tags($firstName);
+                $user->apellido = strip_tags($lastName);
+                $user->email = strip_tags($validated['new_email']);
+                $user->username = $username;
+                $user->password = Hash::make(Str::password(12));
+                $user->telefono = isset($validated['new_phone']) ? strip_tags($validated['new_phone']) : null;
+                $user->activo = 'si';
+                $user->validado = $validated['validado'] ?? 'si';
+                $user->save();
+
+                $alumnoRoleId = Role::where('slug', 'alumno')->value('id') ?? 3;
+                $now = now();
+                $user->roles()->syncWithoutDetaching([
+                    $alumnoRoleId => [
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                ]);
+                $user->unsetRelation('roles');
+            } else {
+                $user = User::findOrFail($userId);
+                if (isset($validated['validado'])) {
+                    $user->validado = $validated['validado'];
+                    $user->save();
+                }
+            }
+
+            $enrollment = Enrollment::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'curso_programado_id' => $cohort->id,
+                ],
+                [
+                    'aceptado' => 'si',
+                    'tipo_pago' => 'Administrativo',
+                    'referencia' => 'Inscripción manual por Administrador',
+                ]
+            );
+
+            $enrollment->aceptado = 'si';
+            $enrollment->save();
+
+            return [$user, $enrollment, $isNewUser];
+        });
+
+        if ($isNewUser) {
+            try {
+                Mail::to($user->email)
+                    ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
+                    ->send(new RegistroEmail($user));
+            } catch (\Throwable $e) {
+                Log::warning("Error enviando RegistroEmail a {$user->email}: {$e->getMessage()}");
+            }
+        }
+
+        try {
+            Mail::to($user->email)
                 ->cc(config('mail.to_support', 'atencion@sapius.com.mx'))
-                ->send(new \App\Mail\AutoAceptacionEmail($enrollment));
+                ->send(new AutoAceptacionEmail($enrollment));
+        } catch (\Throwable $e) {
+            Log::warning("Error enviando AutoAceptacionEmail a {$user->email}: {$e->getMessage()}");
         }
 
         return redirect()->route('admin.cursos.get-inscritos', ['curso_id' => $id])
@@ -172,7 +228,7 @@ class CohortEnrollmentController extends Controller
             $q->wherePivot('aceptado', $active);
         }])->find($curso_id);
 
-        if (!$cohort) {
+        if (! $cohort) {
             return response()->json([], 404);
         }
 
@@ -212,7 +268,7 @@ class CohortEnrollmentController extends Controller
     {
         $cohort = ScheduledCourse::with('students')->find($id_curso);
 
-        if (!$cohort) {
+        if (! $cohort) {
             return response()->json(['error' => 'Curso programado no encontrado'], 404);
         }
 
@@ -230,24 +286,30 @@ class CohortEnrollmentController extends Controller
         ]);
 
         $cohort = ScheduledCourse::findOrFail($id);
-        $added = 0;
 
-        foreach ($validated['alumnos'] as $userId) {
-            // Evitar duplicados
-            $exists = Enrollment::where('user_id', $userId)
-                ->where('curso_programado_id', $cohort->id)
-                ->exists();
+        $added = DB::transaction(function () use ($validated, $cohort) {
+            $added = 0;
 
-            if (!$exists) {
-                $enrollment = new Enrollment();
-                $enrollment->user_id = $userId;
-                $enrollment->curso_programado_id = $cohort->id;
-                $enrollment->referencia = 'Inscripción agregada por administrador';
-                $enrollment->aceptado = 'si';
-                $enrollment->save();
-                $added++;
+            foreach ($validated['alumnos'] as $userId) {
+                // Evitar duplicados
+                $exists = Enrollment::where('user_id', $userId)
+                    ->where('curso_programado_id', $cohort->id)
+                    ->exists();
+
+                if (! $exists) {
+                    $enrollment = new Enrollment;
+                    $enrollment->user_id = $userId;
+                    $enrollment->curso_programado_id = $cohort->id;
+                    $enrollment->tipo_pago = 'Administrativo';
+                    $enrollment->referencia = 'Inscripción agregada por administrador';
+                    $enrollment->aceptado = 'si';
+                    $enrollment->save();
+                    $added++;
+                }
             }
-        }
+
+            return $added;
+        });
 
         return back()->with('success', "Se agregaron {$added} alumnos exitosamente al curso.");
     }

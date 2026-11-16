@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Enrollment;
 use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class OpinionController extends Controller
@@ -37,7 +39,7 @@ class OpinionController extends Controller
             'estafa', 'engaño', 'mentira', 'timar', 'robo', 'inútil', 'decepción', 'engañoso',
             'aburrido', 'mediocre', 'desastre', 'pobre', 'deficiente', 'inservible', 'vergonzoso',
             'curso malo', 'curso pésimo', 'curso horrible', 'curso basura', 'profesor malo',
-            'profesor pésimo', 'no sirve', 'no aprendes', 'malísimo', 'pérdida de tiempo', 'culo', 'pene'
+            'profesor pésimo', 'no sirve', 'no aprendes', 'malísimo', 'pérdida de tiempo', 'culo', 'pene',
         ];
 
         $comment = strtolower($request->comment);
@@ -58,18 +60,32 @@ class OpinionController extends Controller
             $visible = $request->rating >= 4 ? 1 : 0;
         }
 
-        $enrollment = \App\Models\Enrollment::where('user_id', Auth::id())
+        $enrollment = Enrollment::where('user_id', Auth::id())
+            ->where('aceptado', 'si')
             ->orderBy('id', 'desc')
             ->first();
 
-        Review::create([
+        if (! $enrollment) {
+            $enrollment = Enrollment::where('user_id', Auth::id())
+                ->orderBy('id', 'desc')
+                ->first();
+        }
+
+        $review = new Review([
             'user_id' => Auth::id(),
             'name' => strip_tags($request->name),
             'rating' => $rating,
             'comment' => strip_tags($request->comment),
             'visible' => $visible,
-            'curso_programado_id' => $enrollment?->curso_programado_id,
         ]);
+
+        if (Schema::hasColumn('reviews', 'curso_programado_id')) {
+            $review->curso_programado_id = $enrollment?->curso_programado_id;
+        } elseif (Schema::hasColumn('reviews', 'course_id')) {
+            $review->course_id = $enrollment?->curso_programado_id;
+        }
+
+        $review->save();
 
         return redirect()->back()->with('success', '¡Gracias por tu opinión! Tu comentario ha sido enviado.');
     }

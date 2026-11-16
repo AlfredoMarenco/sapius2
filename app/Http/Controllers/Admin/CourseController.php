@@ -3,20 +3,28 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Course;
+use App\Models\Answer;
 use App\Models\Category;
-use App\Models\ScheduledCourse;
-use App\Models\Enrollment;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Str;
+use App\Models\Course;
+use App\Models\InteractivePdf;
+use App\Models\Lesson;
+use App\Models\Media;
+use App\Models\Module;
+use App\Models\Question;
+use App\Models\Quiz;
 use App\Models\User;
-
+use App\Services\CourseCategoryService;
 use App\Traits\OptimizesImages;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class CourseController extends Controller
 {
     use OptimizesImages;
+
     public function index()
     {
         $courses = Course::with('category')
@@ -24,12 +32,13 @@ class CourseController extends Controller
             ->orderBy('id', 'desc')
             ->get()
             ->map(function (Course $course) {
-                if (!$course->relationLoaded('category') || !$course->category) {
-                    $fallbackCat = \App\Services\CourseCategoryService::getCategoryForCourse($course->id);
+                if (! $course->relationLoaded('category') || ! $course->category) {
+                    $fallbackCat = CourseCategoryService::getCategoryForCourse($course->id);
                     if ($fallbackCat) {
                         $course->setRelation('category', $fallbackCat);
                     }
                 }
+
                 return $course;
             });
 
@@ -40,11 +49,12 @@ class CourseController extends Controller
 
     public function getAll($active)
     {
-        if ($active == "enable") {
+        if ($active == 'enable') {
             $cursos = Course::where('activo', 'si')->get();
         } else {
             $cursos = Course::where('activo', 'no')->get();
         }
+
         return response()->json($cursos);
     }
 
@@ -61,24 +71,24 @@ class CourseController extends Controller
             'title' => 'required|string|max:255',
             'category_id' => 'nullable',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
 
-        $course = new Course();
+        $course = new Course;
         $course->user_id = auth()->id();
         $course->title = $validated['title'];
-        $course->slug = Str::slug($validated['title']) . '-' . time();
+        $course->slug = Str::slug($validated['title']).'-'.time();
         $course->description = $validated['description'];
         $course->activo = 'si';
-        
+
         if ($request->hasFile('image')) {
             $course->image = $this->optimizeAndStoreImage($request->file('image'), 'courses');
         }
 
         $course->save();
 
-        if (!empty($validated['category_id'])) {
-            \App\Services\CourseCategoryService::setForCourse($course->id, (int) $validated['category_id']);
+        if (! empty($validated['category_id'])) {
+            CourseCategoryService::setForCourse($course->id, (int) $validated['category_id']);
             $course->scheduledCourses()->update(['category_id' => (int) $validated['category_id']]);
         }
 
@@ -87,16 +97,18 @@ class CourseController extends Controller
 
     public function show($id)
     {
-        $course = Course::with(['category', 'modules.lessons', 'scheduledCourses.instructor'])->findOrFail($id);
-        if (!$course->category) {
-            $fallbackCat = \App\Services\CourseCategoryService::getCategoryForCourse($course->id);
+        $course = Course::with(['category', 'modules.lessons', 'scheduledCourses.instructor'])
+            ->withCount('modules')
+            ->findOrFail($id);
+        if (! $course->category) {
+            $fallbackCat = CourseCategoryService::getCategoryForCourse($course->id);
             if ($fallbackCat) {
                 $course->setRelation('category', $fallbackCat);
             }
         }
-        
+
         $instructors = User::whereHas('roles', function ($q) {
-            $q->where('name', 'instructor');
+            $q->where('roles.slug', 'instructor');
         })->get();
 
         return Inertia::render('Admin/Courses/Show', [
@@ -109,7 +121,7 @@ class CourseController extends Controller
     public function edit($id)
     {
         $course = Course::with('category')->findOrFail($id);
-        $resolvedCategoryId = $course->category?->id ?? \App\Services\CourseCategoryService::getCategoryIdForCourse($course->id);
+        $resolvedCategoryId = $course->category?->id ?? CourseCategoryService::getCategoryIdForCourse($course->id);
 
         return Inertia::render('Admin/Courses/Edit', [
             'course' => array_merge($course->toArray(), [
@@ -123,14 +135,15 @@ class CourseController extends Controller
     {
         $course = Course::findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'title' => 'required|string|max:255',
             'category_id' => 'nullable',
             'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
 
-        $course->title = $request->title;
-        $course->description = $request->description;
+        $course->title = $validated['title'];
+        $course->description = $validated['description'] ?? null;
 
         if ($request->has('activo')) {
             $course->activo = $request->activo ? 'si' : 'no';
@@ -143,7 +156,7 @@ class CourseController extends Controller
         $course->save();
 
         if ($request->filled('category_id')) {
-            \App\Services\CourseCategoryService::setForCourse($course->id, (int) $request->category_id);
+            CourseCategoryService::setForCourse($course->id, (int) $request->category_id);
             $course->scheduledCourses()->update(['category_id' => (int) $request->category_id]);
         }
 
@@ -162,9 +175,10 @@ class CourseController extends Controller
     public function destroy($id)
     {
         $course = Course::findOrFail($id);
-        $course->delete();
+        $course->activo = 'no';
+        $course->save();
 
-        return redirect()->route('admin.courses.index')->with('success', 'Curso eliminado');
+        return redirect()->route('admin.courses.index')->with('success', 'Curso desactivado correctamente');
     }
 
     public function copyIndex()
@@ -192,55 +206,59 @@ class CourseController extends Controller
         ]);
 
         if ($request->boolean('copyAll')) {
-            $cursoOriginal = Course::with([
-                'modules.lessons.quizzes.questions.answers',
-                'modules.lessons.media',
-                'modules.quizzes.questions.answers',
-                'modules.media',
-            ])->findOrFail($request->curso_id);
+            DB::transaction(function () use ($request) {
+                $cursoOriginal = Course::with([
+                    'modules.lessons.quizzes.questions.answers',
+                    'modules.lessons.media',
+                    'modules.quizzes.questions.answers',
+                    'modules.media',
+                ])->findOrFail($request->curso_id);
 
-            $nuevoCurso = new Course();
-            $nuevoCurso->user_id = auth()->id() ?? $cursoOriginal->user_id;
-            $nuevoCurso->title = $cursoOriginal->title . ' (Copia)';
-            $nuevoCurso->slug = Str::slug($cursoOriginal->title) . '-copia-' . time();
-            $nuevoCurso->description = $cursoOriginal->description;
-            $nuevoCurso->image = $cursoOriginal->image;
-            $nuevoCurso->activo = 'si';
-            $nuevoCurso->save();
+                $nuevoCurso = new Course;
+                $nuevoCurso->user_id = auth()->id() ?? $cursoOriginal->user_id;
+                $nuevoCurso->title = $cursoOriginal->title.' (Copia)';
+                $nuevoCurso->slug = Str::slug($cursoOriginal->title).'-copia-'.time();
+                $nuevoCurso->description = $cursoOriginal->description;
+                $nuevoCurso->image = $cursoOriginal->image;
+                $nuevoCurso->activo = 'si';
+                $nuevoCurso->save();
 
-            // Mapeo viejo_id -> nuevo_id
-            $nuevosModulos = [];
+                // Mapeo viejo_id -> nuevo_id
+                $nuevosModulos = [];
 
-            // Copiar Módulos (leccion_id = 0)
-            $modulos = \App\Models\Module::where('curso_id', $cursoOriginal->id)->get();
-            foreach ($modulos as $modOriginal) {
-                $nuevoMod = $modOriginal->replicate();
-                $nuevoMod->curso_id = $nuevoCurso->id;
-                $nuevoMod->leccion_id = 0;
-                $nuevoMod->save();
-                $nuevosModulos[$modOriginal->id] = $nuevoMod->id;
+                // Copiar Módulos (leccion_id = 0)
+                $modulos = Module::where('curso_id', $cursoOriginal->id)->get();
+                foreach ($modulos as $modOriginal) {
+                    $nuevoMod = $modOriginal->replicate();
+                    $nuevoMod->curso_id = $nuevoCurso->id;
+                    $nuevoMod->leccion_id = 0;
+                    $nuevoMod->save();
+                    $nuevosModulos[$modOriginal->id] = $nuevoMod->id;
 
-                // Copiar Quizzes del módulo
-                $this->copyQuizzes($modOriginal->id, $nuevoMod->id, $nuevoCurso->id);
-                // Copiar Medias del módulo
-                $this->copyMedias($modOriginal->id, $nuevoMod->id);
-            }
+                    // Copiar Quizzes, Medias e InteractivePdfs del módulo
+                    $this->copyQuizzes($modOriginal->id, $nuevoMod->id, $nuevoCurso->id);
+                    $this->copyMedias($modOriginal->id, $nuevoMod->id);
+                    $this->copyInteractivePdfs($modOriginal->id, $nuevoMod->id);
+                }
 
-            // Copiar Clases (leccion_id > 0)
-            $clases = \App\Models\Lesson::where('curso_id', $cursoOriginal->id)->get();
-            foreach ($clases as $claseOriginal) {
-                if (!isset($nuevosModulos[$claseOriginal->leccion_id])) continue;
+                // Copiar Clases (leccion_id > 0)
+                $clases = Lesson::where('curso_id', $cursoOriginal->id)->get();
+                foreach ($clases as $claseOriginal) {
+                    if (! isset($nuevosModulos[$claseOriginal->leccion_id])) {
+                        continue;
+                    }
 
-                $nuevaClase = $claseOriginal->replicate();
-                $nuevaClase->curso_id = $nuevoCurso->id;
-                $nuevaClase->leccion_id = $nuevosModulos[$claseOriginal->leccion_id];
-                $nuevaClase->save();
+                    $nuevaClase = $claseOriginal->replicate();
+                    $nuevaClase->curso_id = $nuevoCurso->id;
+                    $nuevaClase->leccion_id = $nuevosModulos[$claseOriginal->leccion_id];
+                    $nuevaClase->save();
 
-                // Copiar Quizzes de la clase
-                $this->copyQuizzes($claseOriginal->id, $nuevaClase->id, $nuevoCurso->id);
-                // Copiar Medias de la clase
-                $this->copyMedias($claseOriginal->id, $nuevaClase->id);
-            }
+                    // Copiar Quizzes, Medias e InteractivePdfs de la clase
+                    $this->copyQuizzes($claseOriginal->id, $nuevaClase->id, $nuevoCurso->id);
+                    $this->copyMedias($claseOriginal->id, $nuevaClase->id);
+                    $this->copyInteractivePdfs($claseOriginal->id, $nuevaClase->id);
+                }
+            });
 
             return redirect()->route('admin.cursos.index')->with('success', 'El curso ha sido clonado completamente con éxito');
         } else {
@@ -269,72 +287,78 @@ class CourseController extends Controller
             'items' => 'required|array|min:1',
         ]);
 
-        $itemsSeleccionados = $request->items;
-        $cursoOriginal = Course::findOrFail($request->curso_id);
+        DB::transaction(function () use ($request) {
+            $itemsSeleccionados = $request->items;
+            $cursoOriginal = Course::findOrFail($request->curso_id);
 
-        $nuevoCurso = new Course();
-        $nuevoCurso->user_id = auth()->id() ?? $cursoOriginal->user_id;
-        $nuevoCurso->title = $cursoOriginal->title . ' (Copia Parcial)';
-        $nuevoCurso->slug = Str::slug($cursoOriginal->title) . '-copia-' . time();
-        $nuevoCurso->description = $cursoOriginal->description;
-        $nuevoCurso->image = $cursoOriginal->image;
-        $nuevoCurso->activo = 'si';
-        $nuevoCurso->save();
+            $nuevoCurso = new Course;
+            $nuevoCurso->user_id = auth()->id() ?? $cursoOriginal->user_id;
+            $nuevoCurso->title = $cursoOriginal->title.' (Copia Parcial)';
+            $nuevoCurso->slug = Str::slug($cursoOriginal->title).'-copia-'.time();
+            $nuevoCurso->description = $cursoOriginal->description;
+            $nuevoCurso->image = $cursoOriginal->image;
+            $nuevoCurso->activo = 'si';
+            $nuevoCurso->save();
 
-        $nuevosModulos = [];
+            $nuevosModulos = [];
 
-        // Módulos seleccionados
-        $modulos = \App\Models\Module::where('curso_id', $cursoOriginal->id)
-            ->whereIn('id', $itemsSeleccionados)
-            ->get();
+            // Módulos seleccionados
+            $modulos = Module::where('curso_id', $cursoOriginal->id)
+                ->whereIn('id', $itemsSeleccionados)
+                ->get();
 
-        foreach ($modulos as $modOriginal) {
-            $nuevoMod = $modOriginal->replicate();
-            $nuevoMod->curso_id = $nuevoCurso->id;
-            $nuevoMod->leccion_id = 0;
-            $nuevoMod->save();
-            $nuevosModulos[$modOriginal->id] = $nuevoMod->id;
+            foreach ($modulos as $modOriginal) {
+                $nuevoMod = $modOriginal->replicate();
+                $nuevoMod->curso_id = $nuevoCurso->id;
+                $nuevoMod->leccion_id = 0;
+                $nuevoMod->save();
+                $nuevosModulos[$modOriginal->id] = $nuevoMod->id;
 
-            $this->copyQuizzes($modOriginal->id, $nuevoMod->id, $nuevoCurso->id);
-            $this->copyMedias($modOriginal->id, $nuevoMod->id);
-        }
+                $this->copyQuizzes($modOriginal->id, $nuevoMod->id, $nuevoCurso->id);
+                $this->copyMedias($modOriginal->id, $nuevoMod->id);
+                $this->copyInteractivePdfs($modOriginal->id, $nuevoMod->id);
+            }
 
-        // Clases seleccionadas
-        $clases = \App\Models\Lesson::where('curso_id', $cursoOriginal->id)
-            ->whereIn('id', $itemsSeleccionados)
-            ->get();
+            // Clases seleccionadas
+            $clases = Lesson::where('curso_id', $cursoOriginal->id)
+                ->whereIn('id', $itemsSeleccionados)
+                ->get();
 
-        foreach ($clases as $claseOriginal) {
-            if (!isset($nuevosModulos[$claseOriginal->leccion_id])) continue;
+            foreach ($clases as $claseOriginal) {
+                if (! isset($nuevosModulos[$claseOriginal->leccion_id])) {
+                    continue;
+                }
 
-            $nuevaClase = $claseOriginal->replicate();
-            $nuevaClase->curso_id = $nuevoCurso->id;
-            $nuevaClase->leccion_id = $nuevosModulos[$claseOriginal->leccion_id];
-            $nuevaClase->save();
+                $nuevaClase = $claseOriginal->replicate();
+                $nuevaClase->curso_id = $nuevoCurso->id;
+                $nuevaClase->leccion_id = $nuevosModulos[$claseOriginal->leccion_id];
+                $nuevaClase->save();
 
-            $this->copyQuizzes($claseOriginal->id, $nuevaClase->id, $nuevoCurso->id);
-            $this->copyMedias($claseOriginal->id, $nuevaClase->id);
-        }
+                $this->copyQuizzes($claseOriginal->id, $nuevaClase->id, $nuevoCurso->id);
+                $this->copyMedias($claseOriginal->id, $nuevaClase->id);
+                $this->copyInteractivePdfs($claseOriginal->id, $nuevaClase->id);
+            }
+        });
 
         return redirect()->route('admin.cursos.index')->with('success', 'Los contenidos seleccionados fueron copiados con éxito');
     }
 
     private function copyQuizzes($origLessonId, $newLessonId, $newCourseId)
     {
-        $quizzes = \App\Models\Quiz::where('leccion_id', $origLessonId)->get();
+        $quizzes = Quiz::where('leccion_id', $origLessonId)->get();
         foreach ($quizzes as $q) {
             $nuevoQ = $q->replicate();
             $nuevoQ->curso_id = $newCourseId;
             $nuevoQ->leccion_id = $newLessonId;
             $nuevoQ->save();
 
-            $preguntas = \App\Models\Question::where('prueba_id', $q->id)->get();
+            $preguntas = Question::where('prueba_id', $q->id)->get();
             foreach ($preguntas as $p) {
                 $nuevaP = $p->replicate();
                 $nuevaP->prueba_id = $nuevoQ->id;
                 $nuevaP->save();
 
-                $respuestas = \App\Models\Answer::where('pregunta_id', $p->id)->get();
+                $respuestas = Answer::where('pregunta_id', $p->id)->get();
                 foreach ($respuestas as $r) {
                     $nuevaR = $r->replicate();
                     $nuevaR->pregunta_id = $nuevaP->id;
@@ -346,12 +370,42 @@ class CourseController extends Controller
 
     private function copyMedias($origLessonId, $newLessonId)
     {
-        $medias = \App\Models\Media::where('leccion_id', $origLessonId)->get();
+        $medias = Media::where('leccion_id', $origLessonId)->get();
         foreach ($medias as $m) {
             $nuevoM = $m->replicate();
             $nuevoM->leccion_id = $newLessonId;
             $nuevoM->save();
         }
     }
-}
 
+    private function copyInteractivePdfs($origLessonId, $newLessonId)
+    {
+        $pdfs = InteractivePdf::where('leccion_id', $origLessonId)->get();
+        foreach ($pdfs as $pdf) {
+            $nuevoPdf = $pdf->replicate();
+            $nuevoPdf->leccion_id = $newLessonId;
+
+            if (! empty($pdf->file_path)) {
+                $origFilename = basename($pdf->file_path);
+                $ext = pathinfo($origFilename, PATHINFO_EXTENSION) ?: 'pdf';
+                $newFilename = Str::random(40).'.'.$ext;
+
+                if (Storage::disk('public')->exists('files/interactive_pdfs/'.$origFilename)) {
+                    Storage::disk('public')->copy(
+                        'files/interactive_pdfs/'.$origFilename,
+                        'files/interactive_pdfs/'.$newFilename
+                    );
+                    $nuevoPdf->file_path = $newFilename;
+                } elseif (Storage::disk('local')->exists('files/interactive_pdfs/'.$origFilename)) {
+                    Storage::disk('local')->copy(
+                        'files/interactive_pdfs/'.$origFilename,
+                        'files/interactive_pdfs/'.$newFilename
+                    );
+                    $nuevoPdf->file_path = $newFilename;
+                }
+            }
+
+            $nuevoPdf->save();
+        }
+    }
+}

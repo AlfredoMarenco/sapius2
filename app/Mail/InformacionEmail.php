@@ -3,8 +3,9 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -13,14 +14,19 @@ class InformacionEmail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $datos;
+    /**
+     * @var array<string, mixed>
+     */
+    public array $datos;
 
     /**
      * Create a new message instance.
+     *
+     * @param  array<string, mixed>|object  $datos
      */
-    public function __construct($datos)
+    public function __construct(array|object $datos)
     {
-        $this->datos = $datos;
+        $this->datos = is_array($datos) ? $datos : (array) $datos;
     }
 
     /**
@@ -28,7 +34,16 @@ class InformacionEmail extends Mailable
      */
     public function envelope(): Envelope
     {
+        $replyTo = [];
+        $visitorEmail = trim((string) ($this->datos['email'] ?? ''));
+        $visitorName = trim((string) ($this->datos['nombre'] ?? ''));
+
+        if ($visitorEmail !== '' && filter_var($visitorEmail, FILTER_VALIDATE_EMAIL)) {
+            $replyTo[] = new Address($visitorEmail, $visitorName !== '' ? $visitorName : null);
+        }
+
         return new Envelope(
+            replyTo: $replyTo,
             subject: '¡Nueva solicitud de más información! - SAPIUS',
         );
     }
@@ -41,7 +56,7 @@ class InformacionEmail extends Mailable
         return new Content(
             markdown: 'emails.general.informacion',
             with: [
-                'datos' => $this->datos
+                'datos' => $this->datos,
             ]
         );
     }
@@ -49,7 +64,7 @@ class InformacionEmail extends Mailable
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {

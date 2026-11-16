@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -36,12 +37,69 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $sharedUser = null;
+
+        if ($user) {
+            $role = $user->role;
+            $foto = $user->foto;
+            $avatarUrl = null;
+
+            if ($foto) {
+                $cleanFoto = ltrim((string) $foto, '/');
+                if (str_starts_with($cleanFoto, 'http://') || str_starts_with($cleanFoto, 'https://')) {
+                    $avatarUrl = $cleanFoto;
+                } elseif ($role === 'admin') {
+                    $avatarUrl = '/admin/users/image/'.basename($cleanFoto);
+                } elseif ($role === 'alumno') {
+                    $avatarUrl = '/alumno/users/image/'.basename($cleanFoto);
+                }
+            }
+
+            $profileIncomplete = false;
+            if ($role === 'alumno') {
+                $requiredFields = [
+                    $user->telefono,
+                    $user->foto,
+                    $user->folio,
+                    $user->universidad_procedencia,
+                    $user->documento_identificacion,
+                    $user->pase_ingreso,
+                    $user->especialidad,
+                ];
+                if (Schema::hasColumn('users', 'fecha_sustentacion')) {
+                    $requiredFields[] = $user->fecha_sustentacion;
+                }
+                foreach ($requiredFields as $field) {
+                    if ($field === null || trim((string) $field) === '') {
+                        $profileIncomplete = true;
+                        break;
+                    }
+                }
+            }
+
+            $sharedUser = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'nombre_completo' => $user->nombre_completo,
+                'username' => $user->username,
+                'email' => $user->email,
+                'role' => $role,
+                'avatar' => $avatarUrl,
+                'email_verified_at' => $user->email_verified_at,
+                'strikes' => (int) ($user->strikes ?? 0),
+                'is_blocked' => (bool) $user->is_blocked || ((int) ($user->strikes ?? 0) >= 100),
+                'is_validated' => $user->validado === 'si',
+                'profile_incomplete' => $profileIncomplete,
+            ];
+        }
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $user,
+                'user' => $sharedUser,
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),

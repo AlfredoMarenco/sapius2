@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'slug', 'description'])]
+#[Fillable(['name', 'slug'])]
 class Category extends Model
 {
-    public function courses()
+    public function scheduledCourses()
     {
-        return $this->hasMany(Course::class);
+        return $this->hasMany(ScheduledCourse::class, 'category_id');
     }
 }

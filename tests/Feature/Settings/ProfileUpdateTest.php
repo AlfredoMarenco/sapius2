@@ -1,6 +1,14 @@
 <?php
 
 use App\Models\User;
+use Tests\Concerns\CreatesLegacySchema;
+
+uses(CreatesLegacySchema::class);
+
+beforeEach(function () {
+    $this->setUpLegacySchema();
+    $this->seedLegacyRoles();
+});
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
@@ -50,8 +58,8 @@ test('email verification status is unchanged when the email address is unchanged
     expect($user->refresh()->email_verified_at)->not->toBeNull();
 });
 
-test('user can delete their account', function () {
-    $user = User::factory()->create();
+test('admin user can delete their account', function () {
+    $user = $this->assignLegacyRole(User::factory()->create(), 'admin');
 
     $response = $this
         ->actingAs($user)
@@ -67,8 +75,21 @@ test('user can delete their account', function () {
     expect($user->fresh())->toBeNull();
 });
 
+test('student cannot self delete their account', function () {
+    $user = $this->assignLegacyRole(User::factory()->create(), 'alumno');
+
+    $response = $this
+        ->actingAs($user)
+        ->delete(route('profile.destroy'), [
+            'password' => 'password',
+        ]);
+
+    $response->assertForbidden();
+    expect($user->fresh())->not->toBeNull();
+});
+
 test('correct password must be provided to delete account', function () {
-    $user = User::factory()->create();
+    $user = $this->assignLegacyRole(User::factory()->create(), 'admin');
 
     $response = $this
         ->actingAs($user)

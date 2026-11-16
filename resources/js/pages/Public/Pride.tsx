@@ -18,8 +18,10 @@ export interface PrideRecord {
 
 export interface ReviewRecord {
     id: number | string;
-    user_name: string;
-    content: string;
+    user_name?: string;
+    name?: string;
+    content?: string;
+    comment?: string;
     rating?: number | null;
 }
 
@@ -33,22 +35,22 @@ const PLACEHOLDER_PRIDES: PrideRecord[] = [
     {
         id: 'pride-1',
         name: 'Premio CENEVAL al Desempeño de Excelencia',
-        text: 'El acompañamiento semanal y los simuladores del Método SUMA me permitieron llegar con total seguridad el día de mi examen EGEL Nutrición.',
-        text2: 'EGEL Plus Nutrición · Sobresaliente',
+        text: 'EGEL Plus Nutrición · Sobresaliente',
+        text2: 'El acompañamiento semanal y los simuladores del Método SUMA me permitieron llegar con total seguridad el día de mi examen EGEL Nutrición.',
         img: null,
     },
     {
         id: 'pride-2',
         name: 'Testimonio de Desempeño Sobresaliente',
-        text: 'Estudiar con videoclases concretas y exámenes diarios transformó por completo mi organización durante las 10 semanas de preparación.',
-        text2: 'EGEL Plus Medicina · Sobresaliente',
+        text: 'EGEL Plus Medicina · Sobresaliente',
+        text2: 'Estudiar con videoclases concretas y exámenes diarios transformó por completo mi organización durante las 10 semanas de preparación.',
         img: null,
     },
     {
         id: 'pride-3',
         name: 'Aprobación en Primera Aplicación',
-        text: 'La guía digital e impresa resume exactamente lo que necesitas dominar sin perder tiempo buscando bibliografía dispersa.',
-        text2: 'EGEL Plus Nutrición · Aprobado',
+        text: 'EGEL Plus Nutrición · Aprobado',
+        text2: 'La guía digital e impresa resume exactamente lo que necesitas dominar sin perder tiempo buscando bibliografía dispersa.',
         img: null,
     },
 ];
@@ -90,8 +92,14 @@ export default function Pride({
             : PLACEHOLDER_REVIEWS;
 
     const resolveMediaImg = (img?: string | null) => {
-        if (!img) return '/img/brand2026/expert-placeholder.png';
-        if (img.startsWith('http') || img.startsWith('/')) return img;
+        if (!img) {
+return '/img/brand2026/expert-placeholder.png';
+}
+
+        if (img.startsWith('http') || img.startsWith('/')) {
+return img;
+}
+
         return `/media/stream/${img}`;
     };
 
@@ -221,6 +229,12 @@ export default function Pride({
                                             <img
                                                 src={resolveMediaImg(item.img)}
                                                 alt={item.name}
+                                                onError={(e) => {
+                                                    (
+                                                        e.currentTarget as HTMLImageElement
+                                                    ).src =
+                                                        '/img/brand2026/expert-placeholder.png';
+                                                }}
                                                 className="h-full w-full object-cover object-top"
                                             />
                                         </div>
@@ -228,17 +242,17 @@ export default function Pride({
                                             <h3 className="font-display text-base leading-snug font-extrabold text-white">
                                                 {item.name}
                                             </h3>
-                                            {item.text2 && (
+                                            {item.text && (
                                                 <p className="mt-1 text-xs font-bold text-[#FF6B52]">
-                                                    {item.text2}
+                                                    {item.text}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
 
-                                    {item.text && (
+                                    {item.text2 && (
                                         <p className="mt-5 text-sm leading-relaxed text-white/80">
-                                            “{item.text}”
+                                            “{item.text2}”
                                         </p>
                                     )}
                                 </div>
@@ -281,6 +295,7 @@ export default function Pride({
                                 1,
                                 Math.min(5, Number(review.rating) || 5),
                             );
+
                             return (
                                 <motion.div
                                     key={review.id}
@@ -309,19 +324,27 @@ export default function Pride({
                                         </div>
 
                                         <p className="mt-4 text-sm leading-relaxed text-[#101E33]/85">
-                                            “{review.content}”
+                                            “
+                                            {review.content ||
+                                                review.comment ||
+                                                'Excelente preparación académica.'}
+                                            ”
                                         </p>
                                     </div>
 
                                     <div className="mt-6 flex items-center gap-3 border-t border-[#101E33]/10 pt-4">
                                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#101E33] text-xs font-extrabold text-white">
                                             {(
-                                                review.user_name?.[0] || 'S'
+                                                (review.user_name ||
+                                                    review.name ||
+                                                    'S')[0] || 'S'
                                             ).toUpperCase()}
                                         </div>
                                         <div>
                                             <div className="text-sm font-extrabold text-[#101E33]">
-                                                {review.user_name}
+                                                {review.user_name ||
+                                                    review.name ||
+                                                    'Alumno Sapius'}
                                             </div>
                                             <div className="text-[11px] font-medium text-[#FF6B52]">
                                                 Comunidad Sapius

@@ -2,23 +2,26 @@
 
 namespace App\Models\Registro;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
 class Inscripcion extends Model
 {
-    protected $table = "inscripciones";
+    protected $table = 'inscripciones';
 
-
-    public function Inscritos(){
-        return $this->hasMany('App\User','id','user_id');
+    public function Inscritos()
+    {
+        return $this->hasMany(User::class, 'id', 'user_id');
     }
 
-    public function CursoProgramado(){
-        return $this->belongsTo('App\Models\Registro\CursoProgramado','curso_programado_id','id');
+    public function CursoProgramado()
+    {
+        return $this->belongsTo('App\Models\Registro\CursoProgramado', 'curso_programado_id', 'id');
     }
 
-    //Relacion con user
-    public function User(){
-        return $this->belongsTo('App\User','user_id','id');
+    // Relacion con user
+    public function User()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

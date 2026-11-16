@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Enrollment;
 use App\Models\ScheduledCourse;
-use App\Models\Category;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class CatalogController extends Controller
 {
@@ -19,6 +20,7 @@ class CatalogController extends Controller
     protected function getAvailableItems($categoryName = null)
     {
         $user = Auth::user();
+        $now = Carbon::now();
 
         // Get IDs of courses the user is already enrolled in
         $enrolledScheduledIds = Enrollment::where('user_id', $user->id)
@@ -33,9 +35,23 @@ class CatalogController extends Controller
                 $q->where('activo', 'si');
             });
 
+        if (Schema::hasColumn('cursos_programados', 'fecha_inicio_venta')) {
+            $query->where(function ($q) use ($now) {
+                $q->whereNull('fecha_inicio_venta')
+                    ->orWhere('fecha_inicio_venta', '<=', $now);
+            });
+        }
+
+        if (Schema::hasColumn('cursos_programados', 'fecha_fin_venta')) {
+            $query->where(function ($q) use ($now) {
+                $q->whereNull('fecha_fin_venta')
+                    ->orWhere('fecha_fin_venta', '>=', $now);
+            });
+        }
+
         if ($categoryName) {
             $query->whereHas('category', function ($catQ) use ($categoryName) {
-                $catQ->where('name', 'LIKE', '%' . $categoryName . '%');
+                $catQ->where('name', 'LIKE', '%'.$categoryName.'%');
             });
         }
 
@@ -47,11 +63,13 @@ class CatalogController extends Controller
                 'title' => $scheduled->course->title,
                 'category' => $scheduled->category ? $scheduled->category->name : 'General',
                 'instructor' => $scheduled->instructor ? $scheduled->instructor->name : 'Sapius Team',
-                'price' => (float)$scheduled->precio,
+                'price' => (float) $scheduled->precio,
                 'image' => $scheduled->course->image,
                 'description' => $scheduled->course->description,
                 'modules_count' => $scheduled->course->modules ? $scheduled->course->modules->count() : 0,
-                'lessons_count' => $scheduled->course->modules ? $scheduled->course->modules->sum(function ($m) { return $m->lessons ? $m->lessons->count() : 0; }) : 0,
+                'lessons_count' => $scheduled->course->modules ? $scheduled->course->modules->sum(function ($m) {
+                    return $m->lessons ? $m->lessons->count() : 0;
+                }) : 0,
                 'start_date' => $scheduled->fecha_inicio ? Carbon::parse($scheduled->fecha_inicio)->format('d/m/Y') : null,
             ];
         });
@@ -112,22 +130,8 @@ class CatalogController extends Controller
      */
     public function inscripcion($curso_id)
     {
-        $scheduled = ScheduledCourse::with(['category', 'course.modules.lessons', 'instructor'])->findOrFail($curso_id);
+        ScheduledCourse::findOrFail($curso_id);
 
-        return Inertia::render('User/Catalog/Inscripcion', [
-            'course' => [
-                'id' => $scheduled->id,
-                'identifier' => $scheduled->identificador,
-                'title' => $scheduled->course->title,
-                'category' => $scheduled->category ? $scheduled->category->name : 'General',
-                'instructor' => $scheduled->instructor ? $scheduled->instructor->name : 'Sapius Team',
-                'price' => (float)$scheduled->precio,
-                'image' => $scheduled->course->image,
-                'description' => $scheduled->course->description,
-                'modules_count' => $scheduled->course->modules ? $scheduled->course->modules->count() : 0,
-                'lessons_count' => $scheduled->course->modules ? $scheduled->course->modules->sum(function ($m) { return $m->lessons ? $m->lessons->count() : 0; }) : 0,
-                'start_date' => $scheduled->fecha_inicio ? Carbon::parse($scheduled->fecha_inicio)->format('d/m/Y') : null,
-            ]
-        ]);
+        return redirect()->route('alumno.checkout', $curso_id);
     }
 }

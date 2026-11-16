@@ -168,6 +168,40 @@
         $course = $inscripcion->scheduledCourse->course ?? ($inscripcion->CursoProgramado->Curso ?? null);
         $courseTitle = $course->title ?? $course->titulo ?? 'Curso';
         $cohortIdentifier = $inscripcion->scheduledCourse->identificador ?? ($inscripcion->CursoProgramado->identificador ?? ('Cohorte #' . $inscripcion->curso_programado_id));
+
+        $resolveBestAttempt = function ($examenesCollection, $pruebaId) {
+            $group = $examenesCollection->where('prueba_id', $pruebaId);
+            if ($group->isEmpty()) {
+                return null;
+            }
+            $finished = $group->where('finalizado', 'si');
+            if ($finished->isNotEmpty()) {
+                return $finished->sortByDesc(fn ($e) => (float) ($e->score_total ?? $e->score ?? $e->calificacion ?? 0))->first();
+            }
+            return $group->sortByDesc('id')->first();
+        };
+
+        $resolveMinScore = function ($prueba) {
+            $tipo = strtoupper((string) ($prueba->tipo ?? $prueba->type ?? 'EXANI'));
+            if (str_contains($tipo, 'ENARM')) {
+                return (float) ($prueba->min_score ?? 60);
+            }
+            return (isset($prueba->min_score) && (float) $prueba->min_score >= 700)
+                ? (float) $prueba->min_score
+                : 1000.0;
+        };
+
+        $hasEventos = function ($examen) {
+            $raw = $examen->eventos ?? null;
+            if (is_bool($raw)) {
+                return $raw;
+            }
+            if (is_string($raw)) {
+                $decoded = json_decode($raw, true);
+                return is_array($decoded) && count($decoded) > 0;
+            }
+            return is_array($raw) && count($raw) > 0;
+        };
     @endphp
 
     <header>
@@ -191,8 +225,8 @@
     <table class="legend-table">
         <tr>
             <td class="legend-nopresentado">No presentado: Examen pendiente o no contestado</td>
-            <td class="legend-bajo">Puntaje bajo: Requiere reforzamiento del tema</td>
-            <td class="legend-alto">Puntaje satisfactorio: Demuestra dominio del contenido</td>
+            <td class="legend-bajo">Puntaje bajo: Requiere reforzamiento (CENEVAL &lt; 1000)</td>
+            <td class="legend-alto">Puntaje satisfactorio: Demuestra dominio (CENEVAL &ge; 1000)</td>
         </tr>
     </table>
 
@@ -215,27 +249,28 @@
                         @if (($prueba->activo ?? 'si') === 'si')
                             @php
                                 $renderedCount++;
-                                $examen = $examenes->firstWhere('prueba_id', $prueba->id);
-                                $score = $examen ? ($examen->score_total ?? $examen->score ?? $examen->calificacion ?? 0) : 0;
-                                $minScore = $prueba->min_score ?? 60;
+                                $examen = $resolveBestAttempt($examenes, $prueba->id);
+                                $score = $examen ? (float) ($examen->score_total ?? $examen->score ?? $examen->calificacion ?? 0) : 0.0;
+                                $minScore = $resolveMinScore($prueba);
+                                $tieneEventos = $examen ? $hasEventos($examen) : false;
                             @endphp
                             @if ($examen)
-                                <tr class="{{ ($examen->eventos ?? false) ? 'cerrado' : ($score < $minScore ? 'bajo' : 'alto') }}">
+                                <tr class="{{ $tieneEventos ? 'cerrado' : ($score < $minScore ? 'bajo' : 'alto') }}">
                                     <td style="text-align: left;">{{ $prueba->titulo ?? $prueba->title ?? 'Evaluación' }}</td>
-                                    <td>{{ $prueba->tipo ?? 'Quiz' }}</td>
-                                    <td>{{ $examen->total_preguntas ?? $examen->aciertos ?? 0 }}</td>
+                                    <td>{{ $prueba->tipo ?? $prueba->type ?? 'Quiz' }}</td>
+                                    <td>{{ $examen->total_preguntas ?? 0 }}</td>
                                     <td>{{ $examen->total_correctas ?? $examen->aciertos ?? 0 }}</td>
                                     <td>
-                                        <strong>{{ is_numeric($score) ? number_format($score, 1) : $score }}</strong>
-                                        @if($examen->eventos ?? false)
-                                            <span class="nota-cerrado">Cerrado por normas del sitio</span>
+                                        <strong>{{ number_format($score, 1) }}</strong>
+                                        @if($tieneEventos)
+                                            <span class="nota-cerrado">Con incidencias / normas del sitio</span>
                                         @endif
                                     </td>
                                 </tr>
                             @else
                                 <tr class="nopresentado">
                                     <td style="text-align: left;">{{ $prueba->titulo ?? $prueba->title ?? 'Evaluación' }}</td>
-                                    <td>{{ $prueba->tipo ?? 'Quiz' }}</td>
+                                    <td>{{ $prueba->tipo ?? $prueba->type ?? 'Quiz' }}</td>
                                     <td colspan="3"><em>No Presentado</em></td>
                                 </tr>
                             @endif
@@ -245,20 +280,24 @@
             @endif
 
             @if($renderedCount === 0 && isset($examenes) && count($examenes) > 0)
-                {{-- Fallback si lecciones no traen pruebas explícitas: iterar exámenes directamente --}}
-                @foreach($examenes as $examen)
+                @foreach($examenes->groupBy('prueba_id') as $pruebaId => $grupo)
                     @php
+                        $examen = $resolveBestAttempt($examenes, $pruebaId);
                         $quiz = $examen->quiz ?? $examen->Prueba;
-                        $score = $examen->score_total ?? $examen->score ?? $examen->calificacion ?? 0;
-                        $minScore = $quiz->min_score ?? 60;
+                        $score = (float) ($examen->score_total ?? $examen->score ?? $examen->calificacion ?? 0);
+                        $minScore = $resolveMinScore($quiz);
+                        $tieneEventos = $hasEventos($examen);
                     @endphp
-                    <tr class="{{ ($examen->eventos ?? false) ? 'cerrado' : ($score < $minScore ? 'bajo' : 'alto') }}">
+                    <tr class="{{ $tieneEventos ? 'cerrado' : ($score < $minScore ? 'bajo' : 'alto') }}">
                         <td style="text-align: left;">{{ $quiz->title ?? $quiz->titulo ?? ('Evaluación #' . $examen->prueba_id) }}</td>
                         <td>{{ $quiz->type ?? $quiz->tipo ?? 'Quiz' }}</td>
                         <td>{{ $examen->total_preguntas ?? 0 }}</td>
                         <td>{{ $examen->total_correctas ?? $examen->aciertos ?? 0 }}</td>
                         <td>
-                            <strong>{{ is_numeric($score) ? number_format($score, 1) : $score }}</strong>
+                            <strong>{{ number_format($score, 1) }}</strong>
+                            @if($tieneEventos)
+                                <span class="nota-cerrado">Con incidencias / normas del sitio</span>
+                            @endif
                         </td>
                     </tr>
                 @endforeach

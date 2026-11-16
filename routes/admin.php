@@ -1,31 +1,29 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AcademicTrackingController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\CertificateController;
+use App\Http\Controllers\Admin\CohortEnrollmentController;
+use App\Http\Controllers\Admin\ContenidoProgramadoController;
+use App\Http\Controllers\Admin\CourseBuilderController;
+use App\Http\Controllers\Admin\CourseCalendarController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\CourseBuilderController;
-use App\Http\Controllers\Admin\ScheduledCourseController;
-use App\Http\Controllers\Admin\ContentController;
-use App\Http\Controllers\Admin\ReviewController;
-use App\Http\Controllers\Admin\CertificateController;
-use App\Http\Controllers\Admin\ManageableController;
-use App\Http\Controllers\Admin\CourseCalendarController;
-use App\Http\Controllers\Admin\InteractivePdfController;
-use App\Http\Controllers\Admin\LandingConfigController;
-use App\Http\Controllers\Admin\Landing\LandingSlideController;
-use App\Http\Controllers\Admin\Landing\LandingPrideController;
-use App\Http\Controllers\Admin\Landing\LandingTeacherController;
-use App\Http\Controllers\Admin\Landing\LandingReviewController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\ReportController;
-use App\Http\Controllers\Admin\CohortEnrollmentController;
-use App\Http\Controllers\Admin\AcademicTrackingController;
-use App\Http\Controllers\Admin\ExamResultController;
-
-use App\Http\Controllers\Admin\ElectronUpdaterController;
-use App\Http\Controllers\Admin\ContenidoProgramadoController;
 use App\Http\Controllers\Admin\DiscountController;
+use App\Http\Controllers\Admin\ElectronUpdaterController;
+use App\Http\Controllers\Admin\ExamResultController;
+use App\Http\Controllers\Admin\InteractivePdfController;
+use App\Http\Controllers\Admin\Landing\LandingReviewController;
+use App\Http\Controllers\Admin\LandingConfigController;
+use App\Http\Controllers\Admin\ManageableController;
+use App\Http\Controllers\Admin\QuizImportController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\ScheduledCourseController;
+use App\Http\Controllers\Admin\TrackingExamController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\User\CourseLearningController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     // Admin Dashboard
@@ -55,7 +53,6 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/courses/store', [CourseController::class, 'store']);
 
     // Copiar Cursos (Legacy: /admin/cursos/copy y /admin/curso/copy-details/{curso})
-    // MUST be declared before /cursos/{id} to avoid capturing 'copy' as an ID
     Route::get('/cursos/copy', [CourseController::class, 'copyIndex'])->name('cursos.copy');
     Route::get('/courses/copy', [CourseController::class, 'copyIndex']);
     Route::post('/cursos/copy/create', [CourseController::class, 'copyCreate'])->name('cursos.copy.create');
@@ -75,7 +72,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::match(['put', 'patch', 'post'], '/courses/{id}', [CourseController::class, 'update'])->whereNumber('id');
     Route::match(['put', 'post'], '/cursos/{id}/update', [CourseController::class, 'update'])->name('cursos.update')->whereNumber('id');
     Route::match(['put', 'post'], '/courses/{id}/update', [CourseController::class, 'update'])->name('courses.update')->whereNumber('id');
-    Route::post('/cursos/update', function (\Illuminate\Http\Request $r) {
+    Route::post('/cursos/update', function (Request $r) {
         return app(CourseController::class)->update($r, $r->id);
     });
 
@@ -85,12 +82,14 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::match(['delete', 'post'], '/cursos/{id}/destroy', [CourseController::class, 'destroy'])->name('cursos.destroy')->whereNumber('id');
     Route::match(['delete', 'post'], '/courses/{id}/destroy', [CourseController::class, 'destroy'])->whereNumber('id');
     Route::delete('/courses/{id}', [CourseController::class, 'destroy'])->name('courses.destroy')->whereNumber('id');
-    
-    // Calendarios
+
+    // Calendarios (alineado tanto con /calendars como /calendars/upload)
     Route::get('/courses/{course}/calendars', [CourseCalendarController::class, 'index'])->name('courses.calendars');
-    Route::post('/courses/{course}/calendars/upload', [CourseCalendarController::class, 'upload'])->name('courses.calendars.upload');
+    Route::post('/courses/{course}/calendars', [CourseCalendarController::class, 'store'])->name('courses.calendars.store');
+    Route::post('/courses/{course}/calendars/upload', [CourseCalendarController::class, 'store'])->name('courses.calendars.upload');
     Route::post('/courses/{course}/calendars/reorder', [CourseCalendarController::class, 'reorder'])->name('courses.calendars.reorder');
     Route::delete('/courses/calendars/{calendar}', [CourseCalendarController::class, 'destroy'])->name('courses.calendars.destroy');
+    Route::delete('/calendars/{calendar}', [CourseCalendarController::class, 'destroy'])->name('calendars.destroy');
 
     // Material PDFs Interactivos
     Route::get('/lessons/{leccion_id}/material-pdfs', [InteractivePdfController::class, 'index'])->name('material-pdfs.index');
@@ -98,6 +97,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::put('/material-pdfs/{id}', [InteractivePdfController::class, 'update'])->name('material-pdfs.update');
     Route::delete('/material-pdfs/{id}', [InteractivePdfController::class, 'destroy'])->name('material-pdfs.destroy');
     Route::get('/material-pdfs/{id}/edit', [InteractivePdfController::class, 'edit'])->name('material-pdfs.edit');
+    Route::get('/material-pdfs/{id}/stream', [InteractivePdfController::class, 'stream'])->name('material-pdfs.stream');
     Route::post('/material-pdfs/{id}/save-layout', [InteractivePdfController::class, 'saveLayout'])->name('material-pdfs.save-layout');
     Route::get('/material-pdfs/{id}/review/{user_id}', [InteractivePdfController::class, 'review'])->name('material-pdfs.review');
 
@@ -114,11 +114,11 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/curso/homework-tracking/{curso_programado_id}/{user_id}', [AcademicTrackingController::class, 'homework'])->name('curso.homework.tracking');
     Route::get('/curso/progress/{curso_programado_id}/{user_id}', [AcademicTrackingController::class, 'progress'])->name('curso.progress');
     Route::post('/curso/lesson/unlock', [AcademicTrackingController::class, 'toggleLessonUnlock'])->name('curso.lesson.unlock');
-    
+
     // Tracking Exams functionalities
-    Route::delete('/tracking/exams/{exam}/reset', [\App\Http\Controllers\Admin\TrackingExamController::class, 'reset'])->name('tracking.exams.reset');
-    Route::patch('/tracking/exams/{exam}/feedback', [\App\Http\Controllers\Admin\TrackingExamController::class, 'toggleFeedback'])->name('tracking.exams.feedback');
-    Route::get('/tracking/{enrollment}/exams-report', [\App\Http\Controllers\Admin\TrackingExamController::class, 'downloadReport'])->name('tracking.exams.report');
+    Route::delete('/tracking/exams/{exam}/reset', [TrackingExamController::class, 'reset'])->name('tracking.exams.reset');
+    Route::patch('/tracking/exams/{exam}/feedback', [TrackingExamController::class, 'toggleFeedback'])->name('tracking.exams.feedback');
+    Route::get('/tracking/{enrollment}/exams-report', [TrackingExamController::class, 'downloadReport'])->name('tracking.exams.report');
 
     // Evaluaciones y Exámenes
     Route::get('/evaluacion/resultados/{inscripcion_id}', [ExamResultController::class, 'listaResultados'])->name('curso.lista-resultados');
@@ -141,15 +141,19 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/lessons/{lesson}/media', [CourseBuilderController::class, 'storeMedia'])->name('lessons.media.store');
     Route::post('/media/upload-chunk', [CourseBuilderController::class, 'uploadChunk'])->name('media.upload-chunk');
     Route::delete('/media/{media}', [CourseBuilderController::class, 'destroyMedia'])->name('media.destroy');
-    Route::post('/lessons/{lesson}/quiz', [CourseBuilderController::class, 'storeQuiz'])->name('lessons.quiz.store');
+    Route::match(['post', 'patch'], '/lessons/{lesson}/quiz', [CourseBuilderController::class, 'storeQuiz'])->name('lessons.quiz.store');
     Route::delete('/quizzes/{quiz}', [CourseBuilderController::class, 'destroyQuiz'])->name('quizzes.destroy');
     Route::post('/quizzes/{quiz}/duplicate', [CourseBuilderController::class, 'duplicateQuiz'])->name('quizzes.duplicate');
     Route::post('/quizzes/{quiz}/questions', [CourseBuilderController::class, 'storeQuestion'])->name('quizzes.questions.store');
     Route::patch('/questions/{question}', [CourseBuilderController::class, 'updateQuestion'])->name('questions.update');
     Route::delete('/questions/{question}', [CourseBuilderController::class, 'destroyQuestion'])->name('questions.destroy');
-    
-    // Importador Masivo
-    Route::post('/quizzes/{quiz}/import-questions', [\App\Http\Controllers\Admin\QuizImportController::class, 'import'])->name('quizzes.questions.import');
+
+    // Importador / Exportador Masivo de Preguntas y acceso privado a imágenes de preguntas
+    Route::post('/quizzes/{quiz}/import-questions', [QuizImportController::class, 'import'])->name('quizzes.questions.import');
+    Route::get('/quizzes/{quiz}/export-questions', [QuizImportController::class, 'export'])->name('quizzes.questions.export');
+    Route::get('/preguntas/imagen/{filename}', [CourseLearningController::class, 'preguntaImagen'])
+        ->where('filename', '.*')
+        ->name('preguntas.imagen');
     Route::post('/lessons/{lesson}/homework', [CourseBuilderController::class, 'storeHomework'])->name('lessons.homework.store');
 
     // Programación de Cursos (Legacy URL: /admin/registro/programacion)
@@ -157,7 +161,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::resource('courses.schedules', ScheduledCourseController::class)->shallow();
     Route::patch('/schedules/{schedule}/toggle', [ScheduledCourseController::class, 'toggle'])->name('schedules.toggle');
     Route::resource('categories', CategoryController::class);
-    
+
     // Programación de Contenido por Cohorte (Legacy: /admin/registro/contenido)
     Route::match(['get', 'post'], '/registro/contenido', [ContenidoProgramadoController::class, 'index'])->name('contenido.index');
     Route::post('/registro/contenido/store', [ContenidoProgramadoController::class, 'store'])->name('contenido.store');
@@ -165,19 +169,21 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Configuraciones de Landing (Legacy URL: /admin/configuraciones)
     Route::get('/configuraciones', [LandingConfigController::class, 'index'])->name('configuracion.index');
     Route::post('/configuraciones/upload', [LandingConfigController::class, 'uploadSlide'])->name('configuracion.slide');
-    Route::get('/configuraciones/delete/{slide}', [LandingConfigController::class, 'deleteSlide'])->name('configuracion.slide.delete');
+    Route::match(['delete', 'post'], '/configuraciones/delete/{slide}', [LandingConfigController::class, 'deleteSlide'])->name('configuracion.slide.delete');
     Route::post('/configuraciones/pride/upload', [LandingConfigController::class, 'uploadPride'])->name('configuracion.pride');
     Route::put('/configuraciones/pride/{pride}/update', [LandingConfigController::class, 'updatePride'])->name('configuracion.pride.update');
-    Route::get('/configuraciones/pride/{pride}/delete', [LandingConfigController::class, 'deletePride'])->name('configuracion.pride.delete');
+    Route::match(['delete', 'post'], '/configuraciones/pride/{pride}/delete', [LandingConfigController::class, 'deletePride'])->name('configuracion.pride.delete');
     Route::post('/configuraciones/teacher/upload', [LandingConfigController::class, 'uploadTeacher'])->name('configuracion.teacher');
     Route::put('/configuraciones/teacher/{teacher}/update', [LandingConfigController::class, 'updateTeacher'])->name('configuracion.teacher.update');
-    Route::get('/configuraciones/teacher/{teacher}/delete', [LandingConfigController::class, 'deleteTeacher'])->name('configuracion.teacher.delete');
+    Route::match(['delete', 'post'], '/configuraciones/teacher/{teacher}/delete', [LandingConfigController::class, 'deleteTeacher'])->name('configuracion.teacher.delete');
+    Route::post('/configuraciones/trigger-reminders', [LandingConfigController::class, 'triggerOverdueReminders'])->name('configuracion.trigger-reminders');
 
     // Reviews (Legacy URL: /admin/reviews)
     Route::resource('reviews', LandingReviewController::class);
 
     // Users Management & Verification (Legacy URLs)
     Route::get('/users/search', [UserController::class, 'search'])->name('users.search');
+    Route::post('/users/store', [UserController::class, 'store'])->name('users.store');
     Route::get('/users/{activo?}', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/{id}/view', [UserController::class, 'show'])->name('users.show');
     Route::get('/users/{id}/edit', [UserController::class, 'edit'])->name('users.edit');
@@ -204,10 +210,10 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/manageable/store', [ManageableController::class, 'store'])->name('manageable.store');
     Route::put('/manageable/update', [ManageableController::class, 'update'])->name('manageable.update');
     Route::post('/manageable/exam-criteria', [ManageableController::class, 'updateExamCriteria'])->name('manageable.exam-criteria.update');
-    Route::get('/manageable/simulators/medicine/delete/{id}', [ManageableController::class, 'deleteManageablesimulatormedicine'])->name('manageablesimulatormedicine.delete');
-    Route::get('/manageable/simulators/nutrition/delete/{id}', [ManageableController::class, 'deleteManageablesimulatornutrition'])->name('manageablesimulatornutrition.delete');
-    Route::get('/manageable/guides/medicine/delete/{id}', [ManageableController::class, 'deleteManageableguiamedicine'])->name('manageableguiamedicine.delete');
-    Route::get('/manageable/guides/nutrition/delete/{id}', [ManageableController::class, 'deleteManageableguianutrition'])->name('manageableguianutrition.delete');
+    Route::match(['delete', 'post'], '/manageable/simulators/medicine/delete/{id}', [ManageableController::class, 'deleteManageablesimulatormedicine'])->name('manageablesimulatormedicine.delete');
+    Route::match(['delete', 'post'], '/manageable/simulators/nutrition/delete/{id}', [ManageableController::class, 'deleteManageablesimulatornutrition'])->name('manageablesimulatornutrition.delete');
+    Route::match(['delete', 'post'], '/manageable/guides/medicine/delete/{id}', [ManageableController::class, 'deleteManageableguiamedicine'])->name('manageableguiamedicine.delete');
+    Route::match(['delete', 'post'], '/manageable/guides/nutrition/delete/{id}', [ManageableController::class, 'deleteManageableguianutrition'])->name('manageableguianutrition.delete');
 
     // Electron Auto Updater (Legacy URLs: /admin/electron/updater)
     Route::get('/electron/updater', [ElectronUpdaterController::class, 'index'])->name('electron.updater.index');

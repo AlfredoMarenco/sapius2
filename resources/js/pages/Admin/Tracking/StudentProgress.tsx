@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { 
-    ChevronLeft, 
-    CheckCircle2, 
-    Clock, 
-    Lock, 
-    Unlock, 
-    Award, 
-    Layers, 
-    BookOpen, 
-    X, 
-    Calendar,
+import {
+    ChevronLeft,
+    CheckCircle2,
+    Clock,
+    Lock,
+    Unlock,
+    Award,
+    Layers,
+    X,
     Eye,
     EyeOff,
     Trash2,
-    HelpCircle,
-    Activity
+    Activity,
 } from 'lucide-react';
 
 interface LessonItem {
@@ -30,6 +27,13 @@ interface ModuleItem {
     title: string;
     quizzes: { id: number; title: string }[];
     lessons: LessonItem[];
+}
+
+interface ExamSummary {
+    id: number;
+    calificacion: number;
+    finalizado: string;
+    feedback_enabled: string; // retro_visualizado: 'no' = Habilitada, 'si' = Consumida
 }
 
 interface Props {
@@ -47,18 +51,18 @@ interface Props {
     modules: ModuleItem[];
     completedLessons: number[];
     homeworks: Record<string, any>;
-    exams: Record<string, { id: number; calificacion: number; finalizado: string; feedback_enabled: string }>;
+    exams: Record<string, ExamSummary>;
     unlocks: Record<string, { until_date: string | null }>;
 }
 
-export default function StudentProgress({ 
-    cohort, 
-    student, 
-    enrollmentId, 
-    modules, 
-    completedLessons, 
-    exams, 
-    unlocks 
+export default function StudentProgress({
+    cohort,
+    student,
+    enrollmentId,
+    modules,
+    completedLessons,
+    exams,
+    unlocks,
 }: Props) {
     const [unlockModalOpen, setUnlockModalOpen] = useState(false);
     const [activeLesson, setActiveLesson] = useState<{ id: number; title: string } | null>(null);
@@ -88,12 +92,16 @@ export default function StudentProgress({
 
     const handleToggleLock = (lessonId: number, isCurrentlyUnlocked: boolean) => {
         if (isCurrentlyUnlocked) {
-            router.post('/admin/curso/lesson/unlock', {
-                user_id: student.id,
-                curso_programado_id: cohort.id,
-                leccion_id: lessonId,
-                action: 'lock',
-            }, { preserveScroll: true });
+            router.post(
+                '/admin/curso/lesson/unlock',
+                {
+                    user_id: student.id,
+                    curso_programado_id: cohort.id,
+                    leccion_id: lessonId,
+                    action: 'lock',
+                },
+                { preserveScroll: true },
+            );
         } else {
             handleOpenUnlockModal({ id: lessonId, title: 'Lección' });
         }
@@ -104,33 +112,95 @@ export default function StudentProgress({
         if (!activeLesson) return;
 
         setIsSubmitting(true);
-        router.post('/admin/curso/lesson/unlock', {
-            user_id: student.id,
-            curso_programado_id: cohort.id,
-            leccion_id: activeLesson.id,
-            until_date: untilDate || null,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setUnlockModalOpen(false);
-                setIsSubmitting(false);
+        router.post(
+            '/admin/curso/lesson/unlock',
+            {
+                user_id: student.id,
+                curso_programado_id: cohort.id,
+                leccion_id: activeLesson.id,
+                until_date: untilDate || null,
             },
-            onError: () => setIsSubmitting(false),
-        });
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setUnlockModalOpen(false);
+                    setIsSubmitting(false);
+                },
+                onError: () => setIsSubmitting(false),
+            },
+        );
     };
 
     const handleResetExam = (examId: number) => {
         if (confirm('¿Estás seguro de reiniciar este examen? El alumno perderá su calificación y tendrá que volver a presentarlo.')) {
             router.delete(`/admin/tracking/exams/${examId}/reset`, {
-                preserveScroll: true
+                preserveScroll: true,
             });
         }
     };
 
     const handleToggleFeedback = (examId: number) => {
-        router.patch(`/admin/tracking/exams/${examId}/feedback`, {}, {
-            preserveScroll: true
-        });
+        router.patch(
+            `/admin/tracking/exams/${examId}/feedback`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    };
+
+    const renderQuizRow = (quiz: { id: number; title: string }) => {
+        const exam = exams[quiz.id];
+        // retro_visualizado: 'no' = Habilitada, 'si' = Consumida
+        const isFeedbackEnabled = exam ? exam.feedback_enabled === 'no' : false;
+
+        return (
+            <div key={quiz.id} className="flex items-center justify-between pl-8 py-2 border-l-2 border-brand-blue/30">
+                <div className="flex items-center gap-2">
+                    <Activity className="size-4 text-brand-blue/70" />
+                    <div>
+                        <p className="text-xs font-medium text-foreground">{quiz.title}</p>
+                        {exam ? (
+                            <p className="text-[11px] text-muted-foreground">
+                                {exam.finalizado === 'si' ? 'Finalizado' : 'En progreso'} • Calificación:{' '}
+                                <span className="font-bold text-foreground">{exam.calificacion}</span>
+                            </p>
+                        ) : (
+                            <p className="text-[11px] text-muted-foreground">No presentado</p>
+                        )}
+                    </div>
+                </div>
+
+                {exam && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => handleToggleFeedback(exam.id)}
+                            title={
+                                isFeedbackEnabled
+                                    ? 'Habilitada: el alumno puede ver la retroalimentación. Clic para marcar como Consumida.'
+                                    : 'Consumida/bloqueada: clic para volver a Habilitar la retroalimentación.'
+                            }
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                                isFeedbackEnabled
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                            }`}
+                        >
+                            {isFeedbackEnabled ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                            {isFeedbackEnabled ? 'Habilitada' : 'Consumida'}
+                        </button>
+                        <button
+                            onClick={() => handleResetExam(exam.id)}
+                            title="Reiniciar Examen"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors"
+                        >
+                            <Trash2 className="size-3.5" />
+                            Reiniciar
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -177,7 +247,7 @@ export default function StudentProgress({
                                 className="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors shadow-sm"
                             >
                                 <Layers className="size-4 text-brand-blue" />
-                                Calificaciones Históricas
+                                Calificaciones e Incidencias
                             </Link>
                         </div>
                     )}
@@ -188,12 +258,15 @@ export default function StudentProgress({
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Progreso Global del Curso</p>
                         <p className="text-3xl font-black text-foreground mt-1">
-                            {progressPercent}% <span className="text-xs font-normal text-muted-foreground">({completedCount} de {totalLessons} lecciones completadas)</span>
+                            {progressPercent}%{' '}
+                            <span className="text-xs font-normal text-muted-foreground">
+                                ({completedCount} de {totalLessons} lecciones completadas)
+                            </span>
                         </p>
                     </div>
                     <div className="w-full sm:w-64 bg-muted rounded-full h-3.5 overflow-hidden">
-                        <div 
-                            className="bg-brand-blue h-full rounded-full transition-all duration-500" 
+                        <div
+                            className="bg-brand-blue h-full rounded-full transition-all duration-500"
                             style={{ width: `${progressPercent}%` }}
                         />
                     </div>
@@ -212,6 +285,12 @@ export default function StudentProgress({
                                     {modulo.lessons.length} lecciones
                                 </span>
                             </div>
+
+                            {modulo.quizzes && modulo.quizzes.length > 0 && (
+                                <div className="bg-indigo-50/30 border-b border-border px-4 py-3 space-y-2">
+                                    {modulo.quizzes.map((quiz) => renderQuizRow(quiz))}
+                                </div>
+                            )}
 
                             <div className="divide-y divide-border">
                                 {modulo.lessons.length === 0 ? (
@@ -233,7 +312,8 @@ export default function StudentProgress({
                                                             <p className="font-medium text-xs text-foreground">{lesson.title}</p>
                                                             {isUnlocked && (
                                                                 <p className="text-[11px] text-amber-600 font-medium">
-                                                                    🔓 Desbloqueo forzado activo {unlocks[lesson.id]?.until_date && `hasta ${unlocks[lesson.id].until_date}`}
+                                                                    Desbloqueo forzado activo{' '}
+                                                                    {unlocks[lesson.id]?.until_date && `hasta ${unlocks[lesson.id].until_date}`}
                                                                 </p>
                                                             )}
                                                         </div>
@@ -250,7 +330,6 @@ export default function StudentProgress({
                                                             </span>
                                                         )}
 
-                                                        {/* Botón de desbloqueo manual */}
                                                         <button
                                                             onClick={() => handleToggleLock(lesson.id, isUnlocked)}
                                                             title={isUnlocked ? 'Bloquear lección' : 'Desbloquear lección manualmente para este alumno'}
@@ -275,54 +354,9 @@ export default function StudentProgress({
                                                     </div>
                                                 </div>
 
-                                                {/* Exámenes de la Lección */}
                                                 {lesson.quizzes && lesson.quizzes.length > 0 && (
                                                     <div className="bg-muted/10 border-t border-border px-4 py-3 space-y-2">
-                                                        {lesson.quizzes.map((quiz) => {
-                                                            const exam = exams[quiz.id];
-                                                            return (
-                                                                <div key={quiz.id} className="flex items-center justify-between pl-8 py-2 border-l-2 border-brand-blue/30">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Activity className="size-4 text-brand-blue/70" />
-                                                                        <div>
-                                                                            <p className="text-xs font-medium text-foreground">{quiz.title}</p>
-                                                                            {exam ? (
-                                                                                <p className="text-[11px] text-muted-foreground">
-                                                                                    {exam.finalizado === 'si' ? 'Finalizado' : 'En progreso'} • Calificación: <span className="font-bold text-foreground">{exam.calificacion}</span>
-                                                                                </p>
-                                                                            ) : (
-                                                                                <p className="text-[11px] text-muted-foreground">No presentado</p>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    {exam && (
-                                                                        <div className="flex items-center gap-2">
-                                                                            <button
-                                                                                onClick={() => handleToggleFeedback(exam.id)}
-                                                                                title={exam.feedback_enabled === 'si' ? 'Ocultar Retroalimentación' : 'Mostrar Retroalimentación'}
-                                                                                className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
-                                                                                    exam.feedback_enabled === 'si' 
-                                                                                    ? 'border-brand-blue/30 bg-brand-blue/10 text-brand-blue'
-                                                                                    : 'border-border bg-card text-muted-foreground hover:bg-muted'
-                                                                                }`}
-                                                                            >
-                                                                                {exam.feedback_enabled === 'si' ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-                                                                                Retroalimentación
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleResetExam(exam.id)}
-                                                                                title="Reiniciar Examen"
-                                                                                className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors"
-                                                                            >
-                                                                                <Trash2 className="size-3.5" />
-                                                                                Reiniciar
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
+                                                        {lesson.quizzes.map((quiz) => renderQuizRow(quiz))}
                                                     </div>
                                                 )}
                                             </div>
@@ -341,7 +375,7 @@ export default function StudentProgress({
                     <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
                         <div className="flex items-center justify-between border-b border-border pb-3">
                             <h3 className="font-bold text-base text-foreground">Desbloquear Lección</h3>
-                            <button 
+                            <button
                                 onClick={() => setUnlockModalOpen(false)}
                                 className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
                             >

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Exam;
-use App\Models\Review;
 use App\Models\Role;
 use App\Models\ScheduledCourse;
 use App\Models\User;
@@ -20,6 +19,7 @@ use Tests\TestCase;
 class StudentAndAdminFixesTest extends TestCase
 {
     protected Role $adminRole;
+
     protected Role $studentRole;
 
     protected function setUp(): void
@@ -32,7 +32,7 @@ class StudentAndAdminFixesTest extends TestCase
 
     protected function createDatabaseSchema(): void
     {
-        if (!Schema::hasTable('users')) {
+        if (! Schema::hasTable('users')) {
             Schema::create('users', function (Blueprint $table) {
                 $table->id();
                 $table->string('nombre')->nullable();
@@ -57,7 +57,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('roles')) {
+        if (! Schema::hasTable('roles')) {
             Schema::create('roles', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
@@ -68,7 +68,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('role_user')) {
+        if (! Schema::hasTable('role_user')) {
             Schema::create('role_user', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('role_id');
@@ -77,7 +77,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('reviews')) {
+        if (! Schema::hasTable('reviews')) {
             Schema::create('reviews', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
@@ -90,7 +90,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('user_strike_histories')) {
+        if (! Schema::hasTable('user_strike_histories')) {
             Schema::create('user_strike_histories', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('user_id');
@@ -100,7 +100,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('cursos')) {
+        if (! Schema::hasTable('cursos')) {
             Schema::create('cursos', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('user_id')->nullable();
@@ -113,7 +113,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('cursos_programados')) {
+        if (! Schema::hasTable('cursos_programados')) {
             Schema::create('cursos_programados', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('curso_id');
@@ -126,7 +126,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('inscripciones')) {
+        if (! Schema::hasTable('inscripciones')) {
             Schema::create('inscripciones', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('user_id');
@@ -139,7 +139,7 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('descuentos')) {
+        if (! Schema::hasTable('descuentos')) {
             Schema::create('descuentos', function (Blueprint $table) {
                 $table->id();
                 $table->string('clave');
@@ -151,14 +151,31 @@ class StudentAndAdminFixesTest extends TestCase
             });
         }
 
-        if (!Schema::hasTable('examenes')) {
+        if (! Schema::hasTable('pruebas')) {
+            Schema::create('pruebas', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('curso_id')->nullable();
+                $table->unsignedBigInteger('leccion_id')->nullable();
+                $table->string('titulo')->nullable();
+                $table->string('tipo')->default('EXANI');
+                $table->string('activo')->default('si');
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('examenes')) {
             Schema::create('examenes', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('inscripcion_id');
                 $table->unsignedBigInteger('prueba_id')->default(1);
+                $table->integer('total_correctas')->default(0);
+                $table->integer('total_preguntas')->default(0);
                 $table->integer('score_total')->default(0);
                 $table->string('finalizado')->default('no');
+                $table->string('retro_visualizado')->default('no');
+                $table->boolean('is_late')->default(false);
                 $table->text('respuestas_json')->nullable();
+                $table->text('eventos')->nullable();
                 $table->timestamps();
             });
         }
@@ -183,7 +200,7 @@ class StudentAndAdminFixesTest extends TestCase
         $user = User::create(array_merge([
             'first_name' => 'Carlos',
             'last_name' => 'Mendoza',
-            'email' => uniqid('user_') . '@sapius.test',
+            'email' => uniqid('user_').'@sapius.test',
             'username' => uniqid('usr_'),
             'password' => Hash::make('password'),
             'strikes' => 0,
@@ -301,44 +318,58 @@ class StudentAndAdminFixesTest extends TestCase
             'status' => 'no',
         ]);
 
-        // Strike 1: Uso de tecla Ctrl
+        // Strike 1: Intento de captura (ImprPant -> +34 pts = 34/100)
         $res1 = $this->actingAs($student)->postJson('/alumno/strike', [
-            'reason' => 'Uso de tecla bloqueada (Ctrl)',
+            'action' => 'PrintScreen',
+            'reason' => 'Intento de captura de pantalla (ImprPant)',
         ]);
         $res1->assertOk()->assertJson([
             'success' => true,
+            'status' => 'warning',
             'blocked' => false,
-            'strikes' => 1,
+            'strikes' => 34,
+            'max_strikes' => 100,
+            'points_added' => 34,
         ]);
 
-        // Strike 2: Combinación Ctrl+Alt+ImprPant
+        // Strike 2: Combinación Ctrl+Alt+ImprPant (+34 pts = 68/100)
         $res2 = $this->actingAs($student->fresh())->postJson('/alumno/strike', [
+            'action' => 'PrintScreen',
             'reason' => 'Intento de captura de pantalla (Ctrl+Alt+ImprPant)',
         ]);
         $res2->assertOk()->assertJson([
             'success' => true,
+            'status' => 'warning',
             'blocked' => false,
-            'strikes' => 2,
+            'strikes' => 68,
+            'max_strikes' => 100,
+            'points_added' => 34,
         ]);
 
-        // Strike 3: Tercer intento -> bloquea cuenta y finaliza examen activo
+        // Strike 3: Tercer intento (+34 pts capped at 100) -> bloquea cuenta y finaliza examen activo
         $res3 = $this->actingAs($student->fresh())->postJson('/alumno/strike', [
+            'action' => 'PrintScreen',
             'reason' => 'Intento de captura de pantalla (ImprPant)',
         ]);
         $res3->assertOk()->assertJson([
             'success' => true,
+            'status' => 'blocked',
             'blocked' => true,
-            'strikes' => 3,
+            'strikes' => 100,
+            'max_strikes' => 100,
+            'points_added' => 34,
             'redirect' => route('alumno.blocked'),
         ]);
 
         $student->refresh();
         $this->assertTrue((bool) $student->is_blocked);
-        $this->assertEquals(3, $student->strikes);
+        $this->assertEquals(100, $student->strikes);
         $this->assertEquals(3, UserStrikeHistory::where('user_id', $student->id)->count());
 
-        // Verificar que el examen en curso fue cerrado automáticamente
-        $this->assertEquals('si', $exam->fresh()->finalizado);
+        // Verificar que el examen en curso fue cerrado automáticamente con retro habilitada
+        $exam->refresh();
+        $this->assertEquals('si', $exam->finalizado);
+        $this->assertEquals('si', $exam->retro_visualizado);
 
         // Verificar que cualquier ruta protegida redirige a /alumno/cuenta-bloqueada
         $blockedRedirect = $this->actingAs($student)->get('/alumno/dashboard');

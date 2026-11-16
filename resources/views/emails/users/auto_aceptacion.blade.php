@@ -1,22 +1,67 @@
+@php
+    $resolvedScheduled = $scheduledCourse ?? null;
+    if (! $resolvedScheduled && isset($inscripcion)) {
+        try {
+            $resolvedScheduled = method_exists($inscripcion, 'scheduledCourse')
+                ? $inscripcion->scheduledCourse
+                : (method_exists($inscripcion, 'CursoProgramado') ? $inscripcion->CursoProgramado : null);
+        } catch (\Throwable) {
+            $resolvedScheduled = null;
+        }
+    }
+
+    $resolvedCourse = $courseModel ?? null;
+    if (! $resolvedCourse && $resolvedScheduled) {
+        try {
+            $resolvedCourse = method_exists($resolvedScheduled, 'course')
+                ? $resolvedScheduled->course
+                : (method_exists($resolvedScheduled, 'Curso') ? $resolvedScheduled->Curso : null);
+        } catch (\Throwable) {
+            $resolvedCourse = null;
+        }
+    }
+
+    $resolvedUser = $studentUser ?? null;
+    if (! $resolvedUser && isset($inscripcion)) {
+        try {
+            $resolvedUser = method_exists($inscripcion, 'user')
+                ? $inscripcion->user
+                : (method_exists($inscripcion, 'User') ? $inscripcion->User : null);
+        } catch (\Throwable) {
+            $resolvedUser = null;
+        }
+    }
+
+    $resolvedTitle = $courseTitle
+        ?? $resolvedCourse?->title
+        ?? $resolvedCourse?->titulo
+        ?? $resolvedScheduled?->identificador
+        ?? $resolvedScheduled?->internal_id
+        ?? 'SAPIUS';
+
+    $studentName = $resolvedUser?->nombre_completo
+        ?: ($resolvedUser?->nombre ?? $resolvedUser?->name ?? 'Estudiante');
+
+    $studentUsername = $resolvedUser?->username ?? '';
+
+    $categoryName = strtolower((string) ($resolvedScheduled?->category?->name ?? ''));
+    $isGuide = str_contains($categoryName, 'guia') || str_contains($categoryName, 'guía');
+    $isSim = str_contains($categoryName, 'simulador');
+
+    $fechaInicio = $resolvedScheduled?->fecha_inicio ?? $resolvedScheduled?->start_date ?? null;
+    $fechaFin = $resolvedScheduled?->fecha_fin ?? $resolvedScheduled?->end_date ?? null;
+@endphp
 <x-mail::message>
-# Curso {{ $inscripcion->course->title ?? $inscripcion->CursoProgramado->identificador ?? 'SAPIUS' }}
+# Curso {{ $resolvedTitle }}
 <div style="text-align: center; color: #cc0000; font-size: 16px; margin-bottom: 20px;">
 **Nosotros sabemos el enorme esfuerzo y compromiso dedicado a tu preparación.**
 </div>
 
-¡Buenos días, **{{ $inscripcion->user->nombre ?? $inscripcion->User->nombre_completo ?? 'Estudiante' }}**!
+¡Buenos días, **{{ $studentName }}**!
 
 Confirmamos la recepción de tu pago o validación de inscripción, por el cual ya cuentas con acceso al curso.
 
-**Usuario:** {{ $inscripcion->user->username ?? $inscripcion->User->username ?? '' }}
-
-@php
-    // Manejo de compatibilidad con Sapius 2 y Sapius 1
-    $isGuide = false;
-    $isSim = false;
-    $fechaInicio = $inscripcion->cohort->fecha_inicio ?? $inscripcion->CursoProgramado->fecha_inicio ?? null;
-    $fechaFin = $inscripcion->cohort->fecha_fin ?? $inscripcion->CursoProgramado->fecha_fin ?? null;
-@endphp
+**Usuario:** {{ $studentUsername }}
 
 @if($isGuide)
 *Esta guía se encuentra disponible para su descarga y consulta inmediata en tu panel de alumno.*<br>
