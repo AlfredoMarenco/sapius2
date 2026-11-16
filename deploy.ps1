@@ -26,7 +26,7 @@ set -e
 cd /home/wwsapi/sapius2
 git config core.filemode false
 git pull origin master
-/opt/cpanel/composer/bin/composer dump-autoload -o --no-interaction
+COMPOSER_ALLOW_SUPERUSER=1 /usr/local/bin/ea-php83 /opt/cpanel/composer/bin/composer dump-autoload -o --no-interaction
 /usr/local/bin/ea-php83 artisan storage:link --force || true
 /usr/local/bin/ea-php83 artisan optimize:clear
 /usr/local/bin/ea-php83 artisan config:cache
