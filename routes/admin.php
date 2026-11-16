@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\InteractivePdfController;
 use App\Http\Controllers\Admin\Landing\LandingReviewController;
 use App\Http\Controllers\Admin\LandingConfigController;
 use App\Http\Controllers\Admin\ManageableController;
+use App\Http\Controllers\Admin\MiniTestConfigController;
 use App\Http\Controllers\Admin\QuizImportController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ScheduledCourseController;
@@ -180,6 +181,11 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 
     // Reviews (Legacy URL: /admin/reviews)
     Route::resource('reviews', LandingReviewController::class);
+
+    // Mini-Test Vocacional Administrable (/admin/mini-test)
+    Route::get('/mini-test', [MiniTestConfigController::class, 'index'])->name('mini-test.index');
+    Route::post('/mini-test', [MiniTestConfigController::class, 'update'])->name('mini-test.update');
+    Route::post('/mini-test/reset', [MiniTestConfigController::class, 'reset'])->name('mini-test.reset');
 
     // Users Management & Verification (Legacy URLs)
     Route::get('/users/search', [UserController::class, 'search'])->name('users.search');

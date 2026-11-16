@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\MiniTestConfigService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
@@ -107,6 +108,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'recaptcha_site_key' => config('elearning.captcha_data_sitekey'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'miniTestConfig' => fn (): array => app(MiniTestConfigService::class)->getConfig(),
         ];
     }
 }

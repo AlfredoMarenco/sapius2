@@ -1,10 +1,11 @@
 import { Link } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 
-export function LandingAdminNav({ active }: { active: 'slides' | 'prides' | 'teachers' | 'reviews' }) {
+export function LandingAdminNav({ active }: { active: 'slides' | 'prides' | 'teachers' | 'reviews' | 'mini-test' }) {
     const navItems = [
         { id: 'slides', title: 'Configuraciones Landing (Slides, Orgullos y Docentes)', href: '/admin/configuraciones' },
         { id: 'reviews', title: 'Reseñas de Alumnos', href: '/admin/reviews' },
+        { id: 'mini-test', title: 'Mini-Test Vocacional', href: '/admin/mini-test' },
     ];
 
     return (
