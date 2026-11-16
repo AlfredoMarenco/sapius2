@@ -141,6 +141,10 @@ class InteractivePdfController extends Controller
         $roots = [
             storage_path('app/files/interactive_pdfs'),
             storage_path('app/public/files/interactive_pdfs'),
+            '/home/wwsapi/SapiusProduction/storage/app/files/interactive_pdfs',
+            '/home/wwsapi/SapiusProduction/storage/app/public/files/interactive_pdfs',
+            base_path('../Sapius/storage/app/files/interactive_pdfs'),
+            base_path('../SapiusProduction/storage/app/files/interactive_pdfs'),
         ];
 
         foreach ($roots as $root) {

@@ -891,9 +891,12 @@ class CourseLearningController extends Controller
     protected function getReadOnlyProductionBasePaths(): array
     {
         $candidates = [
+            '/home/wwsapi/SapiusProduction',
             '/home/wwsapi/public_html',
+            '/home/wwsapi/Sapius',
             '/home/wwsapi/sapius',
             base_path('../Sapius'),
+            base_path('../SapiusProduction'),
             base_path('../public_html'),
         ];
 
@@ -934,6 +937,8 @@ class CourseLearningController extends Controller
             storage_path('app/public/calendars'),
             storage_path('app/images'),
             storage_path('app/images/cursos'),
+            storage_path('app/images/lecciones'),
+            storage_path('app/images/usuarios'),
             storage_path('app/images/slides'),
             storage_path('app/images/prides'),
             storage_path('app/images/teachers'),
@@ -956,8 +961,13 @@ class CourseLearningController extends Controller
                 $prodBase.'/storage/app/public/simuladores',
                 $prodBase.'/storage/app/public/guias',
                 $prodBase.'/storage/app/public/calendars',
+                $prodBase.'/storage/app/prides',
+                $prodBase.'/storage/app/slider-index',
+                $prodBase.'/storage/app/teachers',
                 $prodBase.'/storage/app/images',
                 $prodBase.'/storage/app/images/cursos',
+                $prodBase.'/storage/app/images/lecciones',
+                $prodBase.'/storage/app/images/usuarios',
                 $prodBase.'/storage/app/images/slides',
                 $prodBase.'/storage/app/images/prides',
                 $prodBase.'/storage/app/images/teachers',
@@ -1000,6 +1010,9 @@ class CourseLearningController extends Controller
                 'https://sapius.com.mx/storage/'.$strippedFilename,
                 'https://sapius.com.mx/cursos/image/'.$basename,
             ];
+            if (! str_contains((string) request()->getHost(), 'test.sapius.com.mx')) {
+                $remoteUrls[] = 'https://test.sapius.com.mx/media/stream/'.$strippedFilename;
+            }
 
             foreach ($remoteUrls as $remoteUrl) {
                 try {

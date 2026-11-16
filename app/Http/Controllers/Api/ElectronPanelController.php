@@ -100,7 +100,27 @@ class ElectronPanelController extends Controller
             return null;
         }
 
+        $storageRoot = rtrim(str_replace('\\', '/', storage_path()), '/');
+        $prodStorageCandidates = array_filter([
+            '/home/wwsapi/SapiusProduction/storage',
+            '/home/wwsapi/public_html/storage',
+            '/home/wwsapi/Sapius/storage',
+            base_path('../Sapius/storage'),
+            base_path('../SapiusProduction/storage'),
+        ], fn (string $dir) => is_dir($dir));
+
+        $expandedDirs = $baseDirs;
         foreach ($baseDirs as $dir) {
+            $normalizedDir = str_replace('\\', '/', $dir);
+            if (str_starts_with($normalizedDir, $storageRoot.'/')) {
+                $sub = substr($normalizedDir, strlen($storageRoot));
+                foreach ($prodStorageCandidates as $prodStorage) {
+                    $expandedDirs[] = $prodStorage.$sub;
+                }
+            }
+        }
+
+        foreach ($expandedDirs as $dir) {
             $baseReal = realpath($dir);
             if (! $baseReal) {
                 continue;
