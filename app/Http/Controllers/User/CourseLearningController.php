@@ -22,6 +22,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 
 class CourseLearningController extends Controller
@@ -428,6 +429,21 @@ class CourseLearningController extends Controller
                 storage_path('app/uploads/'.$cleanUrl),
                 storage_path('app/uploads/'.$basename),
             ];
+
+            foreach ($this->getReadOnlyProductionBasePaths() as $prodBase) {
+                $allowedRoots[] = $prodBase.'/storage/app/files/medias';
+                $allowedRoots[] = $prodBase.'/storage/app/public/files/medias';
+                $allowedRoots[] = $prodBase.'/storage/app/public';
+                $allowedRoots[] = $prodBase.'/storage/app/uploads';
+
+                $candidates[] = $prodBase.'/storage/app/files/medias/'.$cleanUrl;
+                $candidates[] = $prodBase.'/storage/app/files/medias/'.$basename;
+                $candidates[] = $prodBase.'/storage/app/public/files/medias/'.$cleanUrl;
+                $candidates[] = $prodBase.'/storage/app/public/files/medias/'.$basename;
+                $candidates[] = $prodBase.'/storage/app/public/'.$cleanUrl;
+                $candidates[] = $prodBase.'/storage/app/uploads/'.$cleanUrl;
+                $candidates[] = $prodBase.'/storage/app/uploads/'.$basename;
+            }
 
             $resolved = $this->resolveSafeFile($candidates, $allowedRoots);
             if (! $resolved) {
@@ -868,6 +884,23 @@ class CourseLearningController extends Controller
     }
 
     /**
+     * Rutas base del sitio de producción en el mismo servidor (solo lectura).
+     *
+     * @return array<int, string>
+     */
+    protected function getReadOnlyProductionBasePaths(): array
+    {
+        $candidates = [
+            '/home/wwsapi/public_html',
+            '/home/wwsapi/sapius',
+            base_path('../Sapius'),
+            base_path('../public_html'),
+        ];
+
+        return array_values(array_filter($candidates, fn (string $dir) => is_dir($dir)));
+    }
+
+    /**
      * Stream público restringido EXCLUSIVAMENTE a imágenes de catálogo/landing permitidas.
      */
     public function publicMediaStream($filename)
@@ -877,19 +910,29 @@ class CourseLearningController extends Controller
             abort(404);
         }
 
-        $ext = strtolower(pathinfo($cleanFilename, PATHINFO_EXTENSION));
+        $strippedFilename = ltrim((string) preg_replace('#^(?:public/)?storage/+#i', '', $cleanFilename), '/');
+        if ($strippedFilename === '') {
+            $strippedFilename = $cleanFilename;
+        }
+
+        $ext = strtolower(pathinfo($strippedFilename, PATHINFO_EXTENSION));
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         if (! in_array($ext, $allowedExtensions, true)) {
             abort(403, 'Archivo no permitido en ruta pública.');
         }
 
-        $basename = basename($cleanFilename);
+        $basename = basename($strippedFilename);
 
         $allowedRoots = [
+            storage_path('app/public'),
             storage_path('app/public/courses'),
             storage_path('app/public/slider-index'),
             storage_path('app/public/prides'),
             storage_path('app/public/teachers'),
+            storage_path('app/public/simuladores'),
+            storage_path('app/public/guias'),
+            storage_path('app/public/calendars'),
+            storage_path('app/images'),
             storage_path('app/images/cursos'),
             storage_path('app/images/slides'),
             storage_path('app/images/prides'),
@@ -898,8 +941,39 @@ class CourseLearningController extends Controller
 
         $candidatePaths = [
             storage_path('app/public/'.$cleanFilename),
+            storage_path('app/public/'.$strippedFilename),
             storage_path('app/images/'.$cleanFilename),
+            storage_path('app/images/'.$strippedFilename),
         ];
+
+        foreach ($this->getReadOnlyProductionBasePaths() as $prodBase) {
+            $prodRoots = [
+                $prodBase.'/storage/app/public',
+                $prodBase.'/storage/app/public/courses',
+                $prodBase.'/storage/app/public/slider-index',
+                $prodBase.'/storage/app/public/prides',
+                $prodBase.'/storage/app/public/teachers',
+                $prodBase.'/storage/app/public/simuladores',
+                $prodBase.'/storage/app/public/guias',
+                $prodBase.'/storage/app/public/calendars',
+                $prodBase.'/storage/app/images',
+                $prodBase.'/storage/app/images/cursos',
+                $prodBase.'/storage/app/images/slides',
+                $prodBase.'/storage/app/images/prides',
+                $prodBase.'/storage/app/images/teachers',
+                $prodBase.'/public/storage',
+                $prodBase.'/storage',
+            ];
+
+            foreach ($prodRoots as $prodRoot) {
+                $allowedRoots[] = $prodRoot;
+            }
+
+            $candidatePaths[] = $prodBase.'/storage/app/public/'.$strippedFilename;
+            $candidatePaths[] = $prodBase.'/storage/app/images/'.$strippedFilename;
+            $candidatePaths[] = $prodBase.'/public/storage/'.$strippedFilename;
+            $candidatePaths[] = $prodBase.'/storage/'.$strippedFilename;
+        }
 
         foreach ($allowedRoots as $dir) {
             $candidatePaths[] = $dir.DIRECTORY_SEPARATOR.$basename;
@@ -918,6 +992,49 @@ class CourseLearningController extends Controller
                 'Content-Type' => mime_content_type($resolved) ?: 'image/png',
                 'Cache-Control' => 'public, max-age=86400',
             ]);
+        }
+
+        // Respaldo remoto de solo lectura hacia producción (sin modificar nada en producción)
+        if (preg_match('/^[a-zA-Z0-9_\-\/\.]+\.(jpg|jpeg|png|webp|gif)$/i', $strippedFilename)) {
+            $remoteUrls = [
+                'https://sapius.com.mx/storage/'.$strippedFilename,
+                'https://sapius.com.mx/cursos/image/'.$basename,
+            ];
+
+            foreach ($remoteUrls as $remoteUrl) {
+                try {
+                    $resp = Http::timeout(5)->get($remoteUrl);
+                    $contentType = strtolower((string) $resp->header('Content-Type'));
+                    $body = $resp->body();
+
+                    if ($resp->successful() && str_starts_with($contentType, 'image/') && strlen($body) > 100) {
+                        $cachePath = storage_path('app/public/'.$strippedFilename);
+                        $cacheDir = dirname($cachePath);
+
+                        if (! is_dir($cacheDir)) {
+                            @mkdir($cacheDir, 0775, true);
+                        }
+
+                        if (@file_put_contents($cachePath, $body) !== false && is_file($cachePath)) {
+                            $this->closeSessionForStream();
+
+                            return response()->file($cachePath, [
+                                'Content-Type' => mime_content_type($cachePath) ?: $contentType,
+                                'Cache-Control' => 'public, max-age=86400',
+                            ]);
+                        }
+
+                        $this->closeSessionForStream();
+
+                        return response($body, 200, [
+                            'Content-Type' => $contentType,
+                            'Cache-Control' => 'public, max-age=86400',
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    // Continuar al siguiente origen o fallback
+                }
+            }
         }
 
         $fallbackImage = public_path('img/brand2026/card-simuladores.png');
@@ -1026,6 +1143,22 @@ class CourseLearningController extends Controller
             storage_path('app/public/courses/'.$basename),
         ];
 
+        foreach ($this->getReadOnlyProductionBasePaths() as $prodBase) {
+            $allowedRoots[] = $prodBase.'/storage/app/uploads';
+            $allowedRoots[] = $prodBase.'/storage/app/files/medias';
+            $allowedRoots[] = $prodBase.'/storage/app/images/medias';
+            $allowedRoots[] = $prodBase.'/storage/app/public';
+
+            $candidatePaths[] = $prodBase.'/storage/app/uploads/'.$cleanFilename;
+            $candidatePaths[] = $prodBase.'/storage/app/uploads/'.$basename;
+            $candidatePaths[] = $prodBase.'/storage/app/files/medias/'.$cleanFilename;
+            $candidatePaths[] = $prodBase.'/storage/app/files/medias/'.$basename;
+            $candidatePaths[] = $prodBase.'/storage/app/images/medias/'.$cleanFilename;
+            $candidatePaths[] = $prodBase.'/storage/app/images/medias/'.$basename;
+            $candidatePaths[] = $prodBase.'/storage/app/public/'.$cleanFilename;
+            $candidatePaths[] = $prodBase.'/storage/app/public/courses/'.$basename;
+        }
+
         $resolved = $this->resolveSafeFile($candidatePaths, $allowedRoots);
         if ($resolved) {
             $this->closeSessionForStream();
@@ -1066,6 +1199,11 @@ class CourseLearningController extends Controller
 
         $allowedRoots = [storage_path('app/images/preguntas')];
         $candidates = [storage_path('app/images/preguntas/'.$cleanName)];
+
+        foreach ($this->getReadOnlyProductionBasePaths() as $prodBase) {
+            $allowedRoots[] = $prodBase.'/storage/app/images/preguntas';
+            $candidates[] = $prodBase.'/storage/app/images/preguntas/'.$cleanName;
+        }
 
         $resolved = $this->resolveSafeFile($candidates, $allowedRoots);
         if (! $resolved) {

@@ -29,7 +29,7 @@ class CourseCalendarController extends Controller
             'calendars' => $calendars->map(function ($c) {
                 return [
                     'id' => $c->id,
-                    'image_url' => asset('storage/'.$c->image_path),
+                    'image_url' => '/media/stream/'.ltrim($c->image_path, '/'),
                     'start_date' => $c->start_date ? $c->start_date->format('Y-m-d') : null,
                     'end_date' => $c->end_date ? $c->end_date->format('Y-m-d') : null,
                     'group_name' => $c->group_name,
