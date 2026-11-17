@@ -96,198 +96,218 @@ export default function Show({ course, instructors }: Props) {
     };
 
     return (
-        <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-10">
+        <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
             <Head title={`Admin: ${course.title}`} />
 
             {/* Breadcrumb & Navigation */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-4">
-                    <Link 
-                        href="/admin/courses" 
-                        className="inline-flex items-center gap-2 text-muted-foreground hover:text-brand-navy transition-colors text-xs font-black uppercase tracking-widest"
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                    <Link
+                        href="/admin/courses"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-[#101E33] transition-colors dark:hover:text-neutral-200"
                     >
                         <ChevronLeft className="w-4 h-4" />
                         Regresar a Cursos
                     </Link>
                     <div className="space-y-1">
-                        <h1 className="text-3xl font-black text-brand-navy tracking-tighter uppercase leading-none">{course.title}</h1>
-                        <div className="flex items-center gap-3">
-                            <Badge variant="outline" className="rounded-full bg-brand-blue/5 text-brand-blue border-brand-blue/20 text-[10px] uppercase font-black px-3">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
+                            {course.title}
+                        </h1>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <Badge variant="outline" className="text-xs font-medium">
                                 {course.category?.name || 'General'}
                             </Badge>
-                            <span className="text-gray-400 text-xs font-bold uppercase tracking-widest flex items-center gap-1">
+                            <span className="text-xs text-neutral-500 flex items-center gap-1">
                                 <Layers className="w-3.5 h-3.5" />
-                                {course.modules_count} Módulos creados
+                                {course.modules_count} módulos creados
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                    <Link href={`/admin/courses/${course.id}/builder`}>
-                        <Button variant="outline" className="rounded-2xl border-2 font-black uppercase tracking-widest text-[10px] h-12 gap-2 hover:bg-brand-navy hover:text-white transition-all shadow-lg shadow-gray-200">
+                <div className="flex flex-wrap gap-2">
+                    <Button asChild variant="outline" size="sm" className="h-9 rounded-lg px-3.5 text-xs font-medium gap-1.5">
+                        <Link href={`/admin/courses/${course.id}/builder`}>
                             <Settings className="w-4 h-4" />
-                            Gestionar Contenido
-                        </Button>
-                    </Link>
-                    <Link href={`/admin/courses/${course.id}/edit`}>
-                        <Button variant="outline" className="rounded-2xl border-2 font-black uppercase tracking-widest text-[10px] h-12 gap-2 hover:bg-brand-navy hover:text-white transition-all shadow-lg shadow-gray-200">
+                            Contenido
+                        </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="h-9 rounded-lg px-3.5 text-xs font-medium gap-1.5">
+                        <Link href={`/admin/courses/${course.id}/edit`}>
                             <Edit3 className="w-4 h-4" />
-                            Editar Información
-                        </Button>
-                    </Link>
-                    <Link href={`/admin/courses/${course.id}/calendars`}>
-                        <Button variant="outline" className="rounded-2xl border-2 border-brand-cyan text-brand-cyan font-black uppercase tracking-widest text-[10px] h-12 gap-2 hover:bg-brand-cyan hover:text-white transition-all shadow-lg shadow-brand-cyan/20">
-                            <CalendarDays className="w-4 h-4" />
+                            Editar
+                        </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="h-9 rounded-lg px-3.5 text-xs font-medium gap-1.5">
+                        <Link href={`/admin/courses/${course.id}/calendars`}>
+                            <CalendarDays className="w-4 h-4 text-blue-600" />
                             Calendarios
-                        </Button>
-                    </Link>
-                    <Button 
+                        </Link>
+                    </Button>
+                    <Button
+                        size="sm"
                         onClick={() => {
                             setEditingSchedule(null);
                             setIsModalOpen(true);
                         }}
-                        className="rounded-2xl bg-brand-navy hover:bg-brand-blue font-black uppercase tracking-widest text-[10px] h-12 gap-2 shadow-xl shadow-brand-navy/20"
+                        className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold shadow-xs gap-1.5"
                     >
                         <Plus className="w-4 h-4" />
-                        Activar Nueva Programación
+                        Nueva Programación
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content: Schedules (Programación) */}
-                <div className="lg:col-span-2 space-y-8">
-                    <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-2xl shadow-gray-200/50 overflow-hidden">
-                        <CardHeader className="p-8 border-b border-gray-50 bg-gray-50/50">
-                            <div className="flex justify-between items-center">
+                <div className="lg:col-span-2 space-y-5">
+                    <Card className="rounded-xl border border-neutral-200/80 shadow-xs overflow-hidden dark:border-neutral-800">
+                        <CardHeader className="p-4 sm:p-5 border-b border-neutral-100 bg-neutral-50/50 dark:border-neutral-800 dark:bg-neutral-900/50">
+                            <div className="flex justify-between items-center gap-3">
                                 <div>
-                                    <CardTitle className="text-xl font-black text-brand-navy uppercase tracking-tight">Programación (Fechas y Horarios)</CardTitle>
-                                    <CardDescription className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1 italic">
-                                        Gestiona las activaciones del curso en el marketplace.
+                                    <CardTitle className="text-base sm:text-lg font-bold text-[#101E33] dark:text-neutral-100">
+                                        Programación (Fechas y Horarios)
+                                    </CardTitle>
+                                    <CardDescription className="text-xs text-neutral-500 mt-0.5">
+                                        Gestiona las cohortes activas del curso y sus fechas de apertura.
                                     </CardDescription>
                                 </div>
-                                <Calendar className="w-8 h-8 text-brand-blue/20" />
+                                <Calendar className="w-6 h-6 text-[#101E33]/25 dark:text-neutral-600 shrink-0" />
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
                             {course.scheduled_courses.length > 0 ? (
-                                <div className="divide-y divide-gray-50">
+                                <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
                                     {course.scheduled_courses.map((schedule) => (
-                                        <div key={schedule.id} className="p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 hover:bg-gray-50/30 transition-colors group">
-                                            <div className="flex items-center gap-6">
-                                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 ${schedule.is_active ? 'bg-brand-blue/10 text-brand-blue rotate-3 shadow-lg shadow-brand-blue/10' : 'bg-gray-100 text-gray-400 grayscale'}`}>
-                                                    <Tag className="w-6 h-6" />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-3">
-                                                        <h4 className="font-black text-brand-navy uppercase tracking-tight text-lg leading-none">
-                                                            {schedule.internal_id || `ID: ${schedule.id}`}
-                                                        </h4>
-                                                        {schedule.is_active ? (
-                                                            <Badge className="rounded-full bg-brand-cyan/20 text-brand-cyan hover:bg-brand-cyan/20 border-none text-[8px] font-black uppercase px-2 py-0.5">Activo</Badge>
-                                                        ) : (
-                                                            <Badge variant="outline" className="rounded-full text-gray-400 text-[8px] font-black uppercase px-2 py-0.5 border-gray-200">Borrador</Badge>
-                                                        )}
+                                        <div
+                                            key={schedule.id}
+                                            className="p-4 sm:p-5 flex flex-col gap-4 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors"
+                                        >
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div className="flex items-start gap-3.5">
+                                                    <div
+                                                        className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${
+                                                            schedule.is_active
+                                                                ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'
+                                                                : 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800'
+                                                        }`}
+                                                    >
+                                                        <Tag className="w-4 h-4" />
                                                     </div>
-                                                    <div className="flex flex-wrap gap-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.1em]">
-                                                        <span className="flex items-center gap-1.5 pt-1">
-                                                            <Calendar className="w-3.5 h-3.5" />
-                                                            {new Date(schedule.start_date).toLocaleDateString()} - {new Date(schedule.end_date).toLocaleDateString()}
-                                                        </span>
-                                                        <span className="flex items-center gap-1.5 pt-1">
-                                                            <UserIcon className="w-3.5 h-3.5" />
-                                                            {schedule.instructor ? `${schedule.instructor.first_name} ${schedule.instructor.last_name}` : 'Docente Asignado'}
-                                                        </span>
-                                                        <span className="flex items-center gap-1.5 pt-1 text-brand-navy font-black">
-                                                            <DollarSign className="w-3.5 h-3.5" />
-                                                            ${schedule.price} MXN
-                                                        </span>
+                                                    <div className="space-y-1 min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <h4 className="font-semibold text-sm sm:text-base text-[#101E33] dark:text-neutral-100">
+                                                                {schedule.internal_id || `Cohorte #${schedule.id}`}
+                                                            </h4>
+                                                            {schedule.is_active ? (
+                                                                <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[11px]">
+                                                                    Activo
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="outline" className="text-neutral-500 text-[11px]">
+                                                                    Borrador
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Calendar className="w-3.5 h-3.5" />
+                                                                {new Date(schedule.start_date).toLocaleDateString()} - {new Date(schedule.end_date).toLocaleDateString()}
+                                                            </span>
+                                                            <span className="flex items-center gap-1.5">
+                                                                <UserIcon className="w-3.5 h-3.5" />
+                                                                {schedule.instructor ? `${schedule.instructor.first_name} ${schedule.instructor.last_name}` : 'Docente Asignado'}
+                                                            </span>
+                                                            <span className="flex items-center gap-1 text-[#101E33] font-semibold dark:text-neutral-200">
+                                                                <DollarSign className="w-3.5 h-3.5" />
+                                                                ${schedule.price} MXN
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                                                <Link href={`/admin/registro/contenido?cp_id=${schedule.id}`}>
-                                                    <Button 
-                                                        variant="outline" 
-                                                        size="sm"
-                                                        className="rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border-blue-200 text-blue-700 hover:bg-blue-50 transition-all"
-                                                        title="Programar calendario y apertura de clases"
-                                                    >
-                                                        <BookOpen className="w-3.5 h-3.5 text-blue-600" /> Contenido
-                                                    </Button>
-                                                </Link>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <Button
+                                                    asChild
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 rounded-lg px-2.5 text-xs gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50"
+                                                >
+                                                    <Link href={`/admin/registro/contenido?cp_id=${schedule.id}`}>
+                                                        <BookOpen className="w-3.5 h-3.5" /> Contenido
+                                                    </Link>
+                                                </Button>
 
-                                                <Link href={`/admin/curso/${schedule.id}`}>
-                                                    <Button 
-                                                        variant="outline" 
-                                                        size="sm"
-                                                        className="rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border-gray-200 text-gray-700 hover:bg-gray-100 transition-all"
-                                                        title="Ver alumnos inscritos en esta cohorte"
-                                                    >
-                                                        <Users className="w-3.5 h-3.5 text-gray-600" /> Alumnos
-                                                    </Button>
-                                                </Link>
+                                                <Button
+                                                    asChild
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 rounded-lg px-2.5 text-xs gap-1.5"
+                                                >
+                                                    <Link href={`/admin/curso/${schedule.id}`}>
+                                                        <Users className="w-3.5 h-3.5" /> Alumnos
+                                                    </Link>
+                                                </Button>
 
-                                                <Link href={`/admin/scheduled-courses/${schedule.id}/discounts`}>
-                                                    <Button 
-                                                        variant="outline" 
-                                                        size="sm"
-                                                        className="rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border-orange-200 text-orange-700 hover:bg-orange-50 transition-all"
-                                                        title="Gestionar cupones de descuento"
-                                                    >
-                                                        <Ticket className="w-3.5 h-3.5 text-orange-600" /> Descuentos
-                                                    </Button>
-                                                </Link>
+                                                <Button
+                                                    asChild
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 rounded-lg px-2.5 text-xs gap-1.5 text-orange-700 border-orange-200 hover:bg-orange-50"
+                                                >
+                                                    <Link href={`/admin/scheduled-courses/${schedule.id}/discounts`}>
+                                                        <Ticket className="w-3.5 h-3.5" /> Descuentos
+                                                    </Link>
+                                                </Button>
 
-                                                <Button 
-                                                    variant="ghost" 
-                                                    className={`rounded-xl px-3 font-black uppercase text-[10px] tracking-widest gap-1.5 h-10 border transition-all ${schedule.is_active ? 'border-brand-cyan/20 text-brand-cyan hover:bg-brand-cyan/5' : 'border-gray-200 text-gray-400 hover:bg-gray-100'}`}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 rounded-lg px-2.5 text-xs gap-1.5"
                                                     onClick={() => handleToggle(schedule.id)}
                                                 >
                                                     {schedule.is_active ? (
-                                                        <><CheckCircle2 className="w-3.5 h-3.5" /> Pausar</>
+                                                        <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Pausar</>
                                                     ) : (
-                                                        <><XCircle className="w-3.5 h-3.5" /> Activar</>
+                                                        <><XCircle className="w-3.5 h-3.5 text-neutral-400" /> Activar</>
                                                     )}
                                                 </Button>
 
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border border-gray-100">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg border border-neutral-200 dark:border-neutral-700">
                                                             <MoreVertical className="w-4 h-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="rounded-2xl border-2 p-2 w-52">
+                                                    <DropdownMenuContent align="end" className="rounded-xl p-1.5 w-48">
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/admin/registro/contenido?cp_id=${schedule.id}`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
+                                                            <Link href={`/admin/registro/contenido?cp_id=${schedule.id}`} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
                                                                 <BookOpen className="w-3.5 h-3.5 text-blue-600" /> Programar Contenido
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/admin/curso/${schedule.id}`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
-                                                                <Users className="w-3.5 h-3.5 text-gray-600" /> Lista de Alumnos
+                                                            <Link href={`/admin/curso/${schedule.id}`} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                                                                <Users className="w-3.5 h-3.5 text-neutral-600" /> Lista de Alumnos
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/admin/scheduled-courses/${schedule.id}/discounts`} className="flex items-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer">
+                                                            <Link href={`/admin/scheduled-courses/${schedule.id}/discounts`} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
                                                                 <Percent className="w-3.5 h-3.5 text-emerald-600" /> Códigos Descuento
                                                             </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem 
+                                                        <DropdownMenuItem
                                                             onClick={() => {
                                                                 setEditingSchedule(schedule);
                                                                 setIsModalOpen(true);
                                                             }}
-                                                            className="rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer gap-2"
+                                                            className="text-xs font-medium cursor-pointer gap-2"
                                                         >
                                                             <Edit3 className="w-3.5 h-3.5" /> Editar Datos
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem 
+                                                        <DropdownMenuItem
                                                             onClick={() => handleDelete(schedule.id)}
-                                                            className="rounded-xl font-bold text-xs uppercase tracking-widest text-destructive cursor-pointer gap-2"
+                                                            className="text-xs font-medium text-red-600 cursor-pointer gap-2"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" /> Eliminar Permanente
                                                         </DropdownMenuItem>
@@ -298,18 +318,22 @@ export default function Show({ course, instructors }: Props) {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="py-24 text-center space-y-8">
-                                    <div className="h-24 w-24 rounded-full bg-brand-navy/5 flex items-center justify-center mx-auto">
-                                        <Clock className="w-10 h-10 text-brand-navy/20" />
+                                <div className="py-12 px-4 text-center space-y-4">
+                                    <div className="h-14 w-14 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
+                                        <Clock className="w-7 h-7" />
                                     </div>
-                                    <div className="max-w-xs mx-auto space-y-2">
-                                        <h3 className="text-xl font-black text-brand-navy uppercase">Sin Programación Activa</h3>
-                                        <p className="text-gray-400 text-sm font-medium italic">Agrega una programación para que este curso sea visible para los alumnos en el catálogo.</p>
+                                    <div className="max-w-xs mx-auto space-y-1">
+                                        <h3 className="text-base font-bold text-[#101E33] dark:text-neutral-100">
+                                            Sin Programación Activa
+                                        </h3>
+                                        <p className="text-xs text-neutral-500">
+                                            Agrega una programación para que este curso sea visible para los alumnos.
+                                        </p>
                                     </div>
-                                    <Button 
+                                    <Button
                                         onClick={() => setIsModalOpen(true)}
-                                        variant="outline" 
-                                        className="rounded-2xl border-2 font-black uppercase tracking-widest text-[10px] h-12"
+                                        size="sm"
+                                        className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold text-xs"
                                     >
                                         Crear Primera Programación
                                     </Button>
@@ -320,60 +344,56 @@ export default function Show({ course, instructors }: Props) {
                 </div>
 
                 {/* Sidebar: Course Overview & Media */}
-                <div className="lg:col-span-1 space-y-8">
-                    <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-2xl shadow-gray-200/50 overflow-hidden">
-                        <div className="aspect-video bg-gray-100 overflow-hidden relative">
-                            <img 
-                                src={course.image ? (course.image.startsWith('http') ? course.image : `/media/stream/${course.image}`) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=2070'} 
+                <div className="lg:col-span-1 space-y-5">
+                    <Card className="rounded-xl border border-neutral-200/80 shadow-xs overflow-hidden dark:border-neutral-800">
+                        <div className="aspect-video bg-neutral-100 overflow-hidden relative">
+                            <img
+                                src={course.image ? (course.image.startsWith('http') ? course.image : `/media/stream/${course.image}`) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=2070'}
                                 alt={course.title}
                                 className="w-full h-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-brand-navy/10" />
                         </div>
-                        <CardContent className="p-8 space-y-8">
-                            <div className="space-y-4">
-                                <h4 className="text-sm font-black text-brand-navy uppercase tracking-widest flex items-center gap-2">
-                                    <Plus className="w-4 h-4 text-brand-blue" />
+                        <CardContent className="p-5 space-y-4">
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-[#101E33] dark:text-neutral-100 flex items-center gap-2">
+                                    <Plus className="w-4 h-4 text-[#FF6B52]" />
                                     Resumen del Curso
                                 </h4>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                        <span className="text-gray-400">Total Programaciones</span>
-                                        <span className="text-brand-navy">{course.scheduled_courses.length}</span>
+                                <div className="space-y-2 text-xs">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-neutral-500">Total Programaciones</span>
+                                        <span className="font-semibold text-[#101E33] dark:text-neutral-100">{course.scheduled_courses.length}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                        <span className="text-gray-400">Estado Marketplace</span>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-neutral-500">Estado en Catálogo</span>
                                         {course.scheduled_courses.some(s => s.is_active) ? (
-                                            <span className="text-brand-cyan">Visible</span>
+                                            <span className="font-semibold text-emerald-600">Visible</span>
                                         ) : (
-                                            <span className="text-destructive">Invisible</span>
+                                            <span className="font-semibold text-neutral-500">Oculto</span>
                                         )}
                                     </div>
                                 </div>
                             </div>
 
-                            <Link href={`/admin/courses/${course.id}/builder`} className="block">
-                                <Button className="w-full h-14 rounded-2xl bg-brand-navy hover:bg-brand-blue text-white font-black uppercase tracking-widest text-[10px] group shadow-xl shadow-brand-navy/10">
+                            <Button asChild className="w-full h-9 rounded-lg bg-[#101E33] hover:bg-[#192B47] text-white text-xs sm:text-sm font-semibold">
+                                <Link href={`/admin/courses/${course.id}/builder`}>
                                     Abrir Constructor de Curso
-                                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                </Button>
-                            </Link>
+                                    <ArrowRight className="ml-2 w-4 h-4" />
+                                </Link>
+                            </Button>
                         </CardContent>
                     </Card>
 
-                    <div className="bg-brand-coral/5 rounded-[2.5rem] p-8 border-2 border-brand-coral/10 space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-brand-coral/10 text-brand-coral flex items-center justify-center font-black">?</div>
-                            <h4 className="text-xs font-black text-brand-navy uppercase tracking-tight italic">Guía Sapius 2.0</h4>
-                        </div>
-                        <p className="text-[10px] font-bold text-gray-500 uppercase leading-relaxed tracking-widest">
-                            Para que un curso sea visible por alumnos, debe tener al menos una <span className="text-brand-navy">Programación Activa</span>. Cada programación puede tener su propio precio y fechas.
+                    <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-4 space-y-2 dark:border-amber-900/40 dark:bg-amber-950/20">
+                        <h4 className="text-xs font-bold text-[#101E33] dark:text-amber-100">Guía rápida</h4>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                            Para que un curso sea visible por alumnos, debe tener al menos una <strong>Programación Activa</strong> con fechas y precio configurados.
                         </p>
                     </div>
                 </div>
             </div>
 
-            <ScheduleModal 
+            <ScheduleModal
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false);

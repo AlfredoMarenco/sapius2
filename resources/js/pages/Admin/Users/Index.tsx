@@ -154,28 +154,30 @@ export default function UsersIndex({
         <>
             <Head title="Gestión de Usuarios" />
 
-            <div className="max-w-8xl mx-auto space-y-6 p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
                             Administración de Usuarios
                         </h1>
-                        <p className="mt-1 text-sm text-neutral-500">
+                        <p className="mt-0.5 text-xs sm:text-sm text-neutral-500">
                             Control de cuentas ({users.total} en total), validación de
                             expedientes y seguridad de hardware.
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+                    <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
                         {/* Filter Tabs */}
-                        <div className="flex items-center gap-2 rounded-xl bg-neutral-100 p-1.5 dark:bg-neutral-800">
+                        <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
                             <Button
                                 asChild
                                 variant={activeFilter === 'enable' ? 'default' : 'ghost'}
                                 size="sm"
-                                className={
-                                    activeFilter === 'enable' ? 'bg-blue-600 text-white' : ''
-                                }
+                                className={`h-8 rounded-md text-xs ${
+                                    activeFilter === 'enable'
+                                        ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90'
+                                        : ''
+                                }`}
                             >
                                 <Link href="/admin/users/enable">Activos</Link>
                             </Button>
@@ -183,9 +185,11 @@ export default function UsersIndex({
                                 asChild
                                 variant={activeFilter === 'disable' ? 'default' : 'ghost'}
                                 size="sm"
-                                className={
-                                    activeFilter === 'disable' ? 'bg-blue-600 text-white' : ''
-                                }
+                                className={`h-8 rounded-md text-xs ${
+                                    activeFilter === 'disable'
+                                        ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90'
+                                        : ''
+                                }`}
                             >
                                 <Link href="/admin/users/disable">Inactivos</Link>
                             </Button>
@@ -193,9 +197,11 @@ export default function UsersIndex({
                                 asChild
                                 variant={activeFilter === 'blocked' ? 'default' : 'ghost'}
                                 size="sm"
-                                className={
-                                    activeFilter === 'blocked' ? 'bg-blue-600 text-white' : ''
-                                }
+                                className={`h-8 rounded-md text-xs ${
+                                    activeFilter === 'blocked'
+                                        ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90'
+                                        : ''
+                                }`}
                             >
                                 <Link href="/admin/users/blocked">Bloqueados</Link>
                             </Button>
@@ -203,8 +209,9 @@ export default function UsersIndex({
 
                         <Button
                             type="button"
+                            size="sm"
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="gap-2 bg-brand-navy text-white hover:bg-brand-blue"
+                            className="h-9 rounded-lg gap-2 bg-[#FF6B52] text-white hover:bg-[#F0563C] px-4 text-xs sm:text-sm font-semibold shadow-xs"
                         >
                             <UserPlus className="h-4 w-4" />
                             Nuevo Usuario
@@ -213,23 +220,25 @@ export default function UsersIndex({
                 </div>
 
                 {/* Search Bar */}
-                <form onSubmit={handleSearchSubmit} className="flex max-w-md gap-2">
+                <form onSubmit={handleSearchSubmit} className="flex w-full max-w-md gap-2">
                     <div className="relative flex-1">
-                        <Search className="absolute top-3 left-3 h-4 w-4 text-neutral-400" />
+                        <Search className="absolute top-2.5 left-3 h-4 w-4 text-neutral-400" />
                         <Input
                             placeholder="Buscar por nombre, correo, usuario o folio..."
-                            className="pl-9"
+                            className="h-9 pl-9 rounded-lg"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <Button type="submit" variant="secondary" size="default">
+                    <Button type="submit" variant="secondary" size="sm" className="h-9 rounded-lg">
                         Buscar
                     </Button>
                     {searchTerm && (
                         <Button
                             type="button"
                             variant="ghost"
+                            size="sm"
+                            className="h-9 rounded-lg"
                             onClick={() => {
                                 setSearch('');
                                 router.get(`/admin/users/${activeFilter}`);
@@ -240,16 +249,144 @@ export default function UsersIndex({
                     )}
                 </form>
 
-                <Card className="overflow-hidden border-neutral-200/80 shadow-sm dark:border-neutral-800">
+                {/* Mobile Cards View */}
+                <div className="space-y-3 md:hidden">
+                    {users.data.length === 0 ? (
+                        <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
+                            No se encontraron usuarios con los criterios especificados.
+                        </div>
+                    ) : (
+                        users.data.map((user) => (
+                            <div
+                                key={user.id}
+                                className={`rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs space-y-3 dark:border-neutral-800 dark:bg-neutral-900 ${
+                                    user.is_blocked ? 'bg-red-50/40 dark:bg-red-950/15' : ''
+                                }`}
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="font-mono text-[11px] text-neutral-400">#{user.id}</span>
+                                            <span className="font-semibold text-sm text-[#101E33] dark:text-neutral-100 truncate">
+                                                {user.name}
+                                            </span>
+                                            <Badge variant="outline" className="text-[11px] capitalize">
+                                                {user.role}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-xs text-neutral-500 truncate mt-0.5">
+                                            @{user.username} · {user.email}
+                                        </p>
+                                    </div>
+                                    <Badge
+                                        variant={user.is_active ? 'outline' : 'destructive'}
+                                        className={user.is_active ? 'border-emerald-300 text-emerald-700 text-[11px]' : 'text-[11px]'}
+                                    >
+                                        {user.is_active ? 'Activo' : 'Inactivo'}
+                                    </Badge>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    {user.is_validated ? (
+                                        <Badge
+                                            className="cursor-pointer bg-emerald-600 text-[11px] text-white"
+                                            onClick={() => handleUnapprove(user.id)}
+                                        >
+                                            Validado
+                                        </Badge>
+                                    ) : (
+                                        <Badge
+                                            variant="secondary"
+                                            className="cursor-pointer bg-amber-100 text-[11px] text-amber-800"
+                                            onClick={() => handleApprove(user.id)}
+                                        >
+                                            Pendiente validación
+                                        </Badge>
+                                    )}
+
+                                    {user.is_blocked && (
+                                        <Badge variant="destructive" className="text-[11px]">
+                                            Bloqueado ({user.strikes} pts)
+                                        </Badge>
+                                    )}
+
+                                    {user.pending_mac_address ? (
+                                        <Link href={`/admin/users/${user.id}/verify`}>
+                                            <Badge className="bg-amber-500 text-[11px] text-white gap-1">
+                                                <AlertTriangle className="h-3 w-3" /> Cambio MAC
+                                            </Badge>
+                                        </Link>
+                                    ) : user.mac_address ? (
+                                        <span className="font-mono text-[11px] text-neutral-500 truncate max-w-[160px]">
+                                            MAC: {user.mac_address}
+                                        </span>
+                                    ) : null}
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                    {user.is_blocked && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 gap-1 rounded-lg border-amber-200 px-2.5 text-xs text-amber-600"
+                                            onClick={() => handleUnlock(user.id)}
+                                        >
+                                            <Unlock className="h-3.5 w-3.5" /> Desbloquear
+                                        </Button>
+                                    )}
+                                    {user.mac_address && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 gap-1 rounded-lg border-neutral-200 px-2.5 text-xs text-neutral-600"
+                                            onClick={() => handleClearMac(user.id)}
+                                        >
+                                            <Laptop className="h-3.5 w-3.5" /> Reset MAC
+                                        </Button>
+                                    )}
+                                    <Button asChild size="sm" variant="outline" className="h-8 gap-1 rounded-lg border-orange-200 px-2.5 text-xs text-orange-600">
+                                        <Link href={`/admin/users/${user.id}/edit`}>
+                                            <Edit3 className="h-3.5 w-3.5" /> Editar
+                                        </Link>
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline" className="h-8 gap-1 rounded-lg border-blue-200 px-2.5 text-xs text-blue-600">
+                                        <Link href={`/admin/users/${user.id}/verify`}>
+                                            <FileCheck className="h-3.5 w-3.5" /> Validar
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={`h-8 gap-1 rounded-lg px-2.5 text-xs ${
+                                            user.is_active ? 'border-red-200 text-red-600' : 'border-emerald-200 text-emerald-600'
+                                        }`}
+                                        onClick={() => handleToggleActive(user.id)}
+                                    >
+                                        {user.is_active ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                                        {user.is_active ? 'Desactivar' : 'Activar'}
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline" className="h-8 gap-1 rounded-lg px-2.5 text-xs">
+                                        <Link href={`/admin/users/${user.id}/view`}>
+                                            <Eye className="h-3.5 w-3.5" /> Detalles
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Desktop & Laptop Table Card */}
+                <Card className="hidden md:block overflow-hidden rounded-xl border-neutral-200/80 shadow-xs dark:border-neutral-800">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-neutral-50/50 dark:bg-neutral-900/50">
+                            <TableRow className="bg-neutral-50/70 dark:bg-neutral-900/50">
                                 <TableHead className="w-12">ID</TableHead>
                                 <TableHead>Nombre / Usuario</TableHead>
                                 <TableHead>Correo</TableHead>
                                 <TableHead>Rol</TableHead>
                                 <TableHead>Validación</TableHead>
-                                <TableHead>Dispositivo MAC</TableHead>
+                                <TableHead>MAC</TableHead>
                                 <TableHead>Estatus</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
@@ -482,11 +619,11 @@ export default function UsersIndex({
 
                     {/* Pagination */}
                     {users.links && users.links.length > 3 && (
-                        <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50/50 px-6 py-4 dark:border-neutral-800 dark:bg-neutral-900/50">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-neutral-100 bg-neutral-50/50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50">
                             <span className="text-xs text-neutral-500">
-                                Mostrando página {users.current_page} de {users.last_page}
+                                Página {users.current_page} de {users.last_page}
                             </span>
-                            <div className="flex gap-1">
+                            <div className="flex flex-wrap gap-1">
                                 {users.links.map((link, idx) => (
                                     <Button
                                         key={idx}
@@ -494,7 +631,7 @@ export default function UsersIndex({
                                         disabled={!link.url}
                                         variant={link.active ? 'default' : 'outline'}
                                         size="sm"
-                                        className="h-8 px-3 text-xs"
+                                        className={`h-8 px-2.5 text-xs ${link.active ? 'bg-[#101E33] text-white' : ''}`}
                                     >
                                         {link.url ? (
                                             <Link
@@ -512,6 +649,38 @@ export default function UsersIndex({
                         </div>
                     )}
                 </Card>
+
+                {/* Mobile Pagination */}
+                {users.links && users.links.length > 3 && (
+                    <div className="flex md:hidden flex-col gap-2 items-center rounded-xl border border-neutral-200/80 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                        <span className="text-xs text-neutral-500">
+                            Página {users.current_page} de {users.last_page}
+                        </span>
+                        <div className="flex flex-wrap justify-center gap-1">
+                            {users.links.map((link, idx) => (
+                                <Button
+                                    key={idx}
+                                    asChild={Boolean(link.url)}
+                                    disabled={!link.url}
+                                    variant={link.active ? 'default' : 'outline'}
+                                    size="sm"
+                                    className={`h-8 px-2.5 text-xs ${link.active ? 'bg-[#101E33] text-white' : ''}`}
+                                >
+                                    {link.url ? (
+                                        <Link
+                                            href={link.url}
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                        />
+                                    ) : (
+                                        <span
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                        />
+                                    )}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Modal de Alta Manual de Usuario */}
@@ -695,7 +864,7 @@ export default function UsersIndex({
                             <Button
                                 type="submit"
                                 disabled={createForm.processing}
-                                className="bg-brand-navy text-white hover:bg-brand-blue"
+                                className="h-9 rounded-lg bg-[#FF6B52] text-white hover:bg-[#F0563C] font-semibold"
                             >
                                 {createForm.processing ? 'Creando...' : 'Registrar Usuario'}
                             </Button>

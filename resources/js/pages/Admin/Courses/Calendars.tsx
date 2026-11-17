@@ -102,19 +102,19 @@ return;
         <>
             <Head title={`Calendarios - ${course.title}`} />
 
-            <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-                <div className="flex items-center gap-4">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+                <div className="flex items-center gap-3">
                     <Link
                         href={`/admin/cursos/${course.id}`}
-                        className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
-                        <ChevronLeft className="size-5" />
+                        <ChevronLeft className="size-4" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
                             Calendarios de Programación
                         </h1>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-neutral-500">
                             Administra los cronogramas en imagen para el curso:{' '}
                             <span className="font-semibold text-foreground">
                                 {course.title}
@@ -228,7 +228,7 @@ return;
 
                             <Button
                                 type="submit"
-                                className="w-full bg-brand-blue font-semibold text-white hover:bg-brand-blue/90"
+                                className="w-full h-9 rounded-lg bg-[#FF6B52] font-semibold text-white hover:bg-[#F0563C] shadow-xs"
                                 disabled={processing || uploading || data.images.length === 0}
                             >
                                 <UploadCloud className="mr-2 size-4" />

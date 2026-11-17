@@ -36,25 +36,27 @@ export default function CopyPage({ courses }: Props) {
         <>
             <Head title="Copiar Contenido de Curso" />
 
-            <div className="max-w-4xl mx-auto p-6 space-y-6">
+            <div className="mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     <Link
                         href="/admin/cursos"
-                        className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
-                        <ChevronLeft className="size-5" />
+                        <ChevronLeft className="size-4" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Clonador de Cursos y Contenidos</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
+                            Clonador de Cursos y Contenidos
+                        </h1>
+                        <p className="text-xs sm:text-sm text-neutral-500">
                             Duplica la estructura de módulos, clases, exámenes y materiales de un curso existente.
                         </p>
                     </div>
                 </div>
 
                 {/* Card de Formulario */}
-                <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+                <div className="rounded-xl border border-neutral-200/80 bg-white p-5 sm:p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Selector de Curso Origen */}
                         <div>
@@ -132,17 +134,17 @@ export default function CopyPage({ courses }: Props) {
                         </div>
 
                         {/* Botón de Enviar */}
-                        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 pt-4 border-t border-border">
                             <Link
                                 href="/admin/cursos"
-                                className="rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-4 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                             >
                                 Cancelar
                             </Link>
                             <button
                                 type="submit"
                                 disabled={!selectedCourseId || isSubmitting}
-                                className="inline-flex items-center gap-2 rounded-xl bg-brand-blue px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-blue/90 disabled:opacity-50 transition-all"
+                                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#FF6B52] px-5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-[#F0563C] disabled:opacity-50 transition-all"
                             >
                                 {isSubmitting ? (
                                     'Procesando...'

@@ -148,20 +148,21 @@ return;
         <>
             <Head title="Contenido Administrable (Landing)" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                            <Layers className="w-8 h-8 text-blue-600" /> Secciones Administrables
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100 flex items-center gap-2">
+                            <Layers className="w-6 h-6 text-blue-600 shrink-0" /> Secciones Administrables
                         </h1>
-                        <p className="text-sm text-neutral-500 mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
                             Gestión de tarjetas informativas para Simuladores y Guías de Estudio mostradas en la landing pública.
                         </p>
                     </div>
 
                     {selectedType !== 'criterios' && (
                         <Button
+                            size="sm"
                             onClick={() => {
                                 setCreateForm({
                                     titulo: '',
@@ -171,7 +172,7 @@ return;
                                 });
                                 setIsCreateOpen(true);
                             }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm"
+                            className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold gap-2 shadow-xs self-start sm:self-auto"
                         >
                             <Plus className="w-4 h-4" /> Nueva Tarjeta
                         </Button>
@@ -179,64 +180,64 @@ return;
                 </div>
 
                 {/* Filters Row */}
-                <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 shadow-xs">
                     {/* Type Filter */}
-                    <div className="flex flex-wrap items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                    <div className="flex flex-wrap items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
                         <Button
                             variant={selectedType === 'simuladores' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setSelectedType('simuladores')}
-                            className={selectedType === 'simuladores' ? 'bg-blue-600 text-white' : ''}
+                            className={`h-8 rounded-md text-xs ${selectedType === 'simuladores' ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90' : ''}`}
                         >
-                            <Gamepad2 className="w-4 h-4 mr-1.5" /> Simuladores
+                            <Gamepad2 className="w-3.5 h-3.5 mr-1.5" /> Simuladores
                         </Button>
                         <Button
                             variant={selectedType === 'guias' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setSelectedType('guias')}
-                            className={selectedType === 'guias' ? 'bg-blue-600 text-white' : ''}
+                            className={`h-8 rounded-md text-xs ${selectedType === 'guias' ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90' : ''}`}
                         >
-                            <FileText className="w-4 h-4 mr-1.5" /> Guías de Estudio
+                            <FileText className="w-3.5 h-3.5 mr-1.5" /> Guías de Estudio
                         </Button>
                         <Button
                             variant={selectedType === 'criterios' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setSelectedType('criterios')}
-                            className={selectedType === 'criterios' ? 'bg-indigo-600 text-white' : ''}
+                            className={`h-8 rounded-md text-xs ${selectedType === 'criterios' ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90' : ''}`}
                         >
-                            <Layers className="w-4 h-4 mr-1.5" /> Tablas de Puntaje (EGEL / EXANI / ENARM)
+                            <Layers className="w-3.5 h-3.5 mr-1.5" /> Tablas de Puntaje (EGEL / EXANI / ENARM)
                         </Button>
                     </div>
 
                     {/* Category Filter */}
                     {selectedType !== 'criterios' ? (
-                        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                        <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
                             <Button
                                 variant={selectedCategory === 'medicina' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => setSelectedCategory('medicina')}
-                                className={selectedCategory === 'medicina' ? 'bg-emerald-600 text-white' : ''}
+                                className={`h-8 rounded-md text-xs ${selectedCategory === 'medicina' ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90' : ''}`}
                             >
-                                <Stethoscope className="w-4 h-4 mr-1.5" /> Medicina (ENARM / EGEL)
+                                <Stethoscope className="w-3.5 h-3.5 mr-1.5" /> Medicina (ENARM / EGEL)
                             </Button>
                             <Button
                                 variant={selectedCategory === 'nutricion' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => setSelectedCategory('nutricion')}
-                                className={selectedCategory === 'nutricion' ? 'bg-emerald-600 text-white' : ''}
+                                className={`h-8 rounded-md text-xs ${selectedCategory === 'nutricion' ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90' : ''}`}
                             >
-                                <Apple className="w-4 h-4 mr-1.5" /> Nutrición
+                                <Apple className="w-3.5 h-3.5 mr-1.5" /> Nutrición
                             </Button>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                        <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
                             {(['EGEL', 'EXANI', 'ENARM'] as const).map((etype) => (
                                 <Button
                                     key={etype}
                                     variant={selectedExamType === etype ? 'default' : 'ghost'}
                                     size="sm"
                                     onClick={() => setSelectedExamType(etype)}
-                                    className={selectedExamType === etype ? 'bg-indigo-600 text-white' : ''}
+                                    className={`h-8 rounded-md text-xs ${selectedExamType === etype ? 'bg-[#101E33] text-white hover:bg-[#101E33]/90' : ''}`}
                                 >
                                     {etype}
                                 </Button>
@@ -287,7 +288,7 @@ return;
                                     type="button"
                                     size="sm"
                                     disabled={savingCriteria}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold"
                                     onClick={() => {
                                         setSavingCriteria(true);
                                         router.post('/admin/manageable/exam-criteria', { criteria: criteriaState as any }, {
@@ -534,10 +535,10 @@ return;
                                 </div>
 
                                 <div className="flex justify-end gap-2 pt-2">
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)}>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)} className="h-9 rounded-lg">
                                         Cancelar
                                     </Button>
-                                    <Button type="submit" size="sm" className="bg-blue-600 text-white">
+                                    <Button type="submit" size="sm" className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                         <Save className="w-4 h-4 mr-1.5" /> Guardar
                                     </Button>
                                 </div>
@@ -577,10 +578,10 @@ return;
                                 </div>
 
                                 <div className="flex justify-end gap-2 pt-2">
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(false)}>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(false)} className="h-9 rounded-lg">
                                         Cancelar
                                     </Button>
-                                    <Button type="submit" size="sm" className="bg-blue-600 text-white">
+                                    <Button type="submit" size="sm" className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                         <Save className="w-4 h-4 mr-1.5" /> Actualizar
                                     </Button>
                                 </div>

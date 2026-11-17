@@ -105,47 +105,49 @@ export default function Index({ reviews = [], courses = [] }: { reviews: Review[
         <>
             <Head title="Gestión de Reseñas" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
-                <div className="flex items-center justify-between">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Administración de Reseñas y Testimonios</h1>
-                        <p className="text-sm text-gray-500">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
+                            Administración de Reseñas y Testimonios
+                        </h1>
+                        <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
                             Aprueba, oculta o edita las opiniones enviadas por los alumnos para mostrarlas en la página principal.
                         </p>
                     </div>
                     <Dialog open={isOpen} onOpenChange={(val) => { setIsOpen(val); if (!val) setIsEditing(null); }}>
                         <DialogTrigger asChild>
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6">
+                            <Button size="sm" className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold shadow-xs self-start sm:self-auto">
                                 <Plus className="mr-2 h-4 w-4" /> Nueva Reseña
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
+                        <DialogContent className="sm:max-w-[500px] rounded-xl">
                             <DialogHeader>
                                 <DialogTitle>{isEditing ? 'Editar Reseña' : 'Crear Nueva Reseña'}</DialogTitle>
                             </DialogHeader>
-                            <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                                <div className="space-y-2">
+                            <form onSubmit={handleSubmit} className="space-y-4 py-2">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="user_name">Nombre del Estudiante</Label>
-                                    <Input id="user_name" value={data.user_name} onChange={e => setData('user_name', e.target.value)} required />
-                                    {errors.user_name && <p className="text-sm text-red-500">{errors.user_name}</p>}
+                                    <Input id="user_name" value={data.user_name} onChange={e => setData('user_name', e.target.value)} required className="h-9 rounded-lg" />
+                                    {errors.user_name && <p className="text-xs text-red-500">{errors.user_name}</p>}
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="content">Contenido de la reseña</Label>
-                                    <Textarea id="content" value={data.content} onChange={e => setData('content', e.target.value)} className="min-h-[100px]" required />
-                                    {errors.content && <p className="text-sm text-red-500">{errors.content}</p>}
+                                    <Textarea id="content" value={data.content} onChange={e => setData('content', e.target.value)} className="min-h-[100px] rounded-lg" required />
+                                    {errors.content && <p className="text-xs text-red-500">{errors.content}</p>}
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 items-center">
-                                    <div className="space-y-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                                    <div className="space-y-1.5">
                                         <Label htmlFor="rating">Calificación (1-5)</Label>
-                                        <Input id="rating" type="number" min="1" max="5" value={data.rating} onChange={e => setData('rating', parseInt(e.target.value))} />
+                                        <Input id="rating" type="number" min="1" max="5" value={data.rating} onChange={e => setData('rating', parseInt(e.target.value))} className="h-9 rounded-lg" />
                                     </div>
-                                    <div className="flex items-center gap-3 pt-6">
+                                    <div className="flex items-center gap-3 sm:pt-6">
                                         <Switch checked={data.visible} onCheckedChange={(val) => setData('visible', val)} />
                                         <Label>Visible en Landing</Label>
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <Button type="submit" disabled={processing} className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8">
+                                    <Button type="submit" disabled={processing} className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-6 font-semibold">
                                         {isEditing ? 'Actualizar' : 'Guardar'}
                                     </Button>
                                 </DialogFooter>
@@ -156,7 +158,50 @@ export default function Index({ reviews = [], courses = [] }: { reviews: Review[
 
                 <LandingAdminNav active="reviews" />
 
-                <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+                {/* Mobile Cards */}
+                <div className="space-y-3 md:hidden">
+                    {reviews.length === 0 ? (
+                        <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900">
+                            No hay reseñas registradas aún.
+                        </div>
+                    ) : (
+                        reviews.map((review) => (
+                            <div key={review.id} className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs space-y-2.5 dark:border-neutral-800 dark:bg-neutral-900">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div className="font-semibold text-sm text-[#101E33] dark:text-neutral-100">{review.user_name}</div>
+                                        <div className="flex gap-0.5 mt-1">
+                                            {[...Array(5)].map((_, i) => (
+                                                <Star key={i} className={`h-3.5 w-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button type="button" onClick={() => handleToggleVisibility(review)}>
+                                        {review.visible ? (
+                                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[11px]">Visible</Badge>
+                                        ) : (
+                                            <Badge variant="secondary" className="text-[11px]">Oculta</Badge>
+                                        )}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-neutral-600 dark:text-neutral-300 line-clamp-3">{review.content}</p>
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                    <span className="text-[11px] text-neutral-400">{review.created_at || '—'}</span>
+                                    <div className="flex gap-1">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleEdit(review)}>
+                                            <Pencil className="h-4 w-4 text-blue-600" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDelete(review.id)}>
+                                            <Trash2 className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="hidden md:block rounded-xl border border-neutral-200/80 bg-white shadow-xs overflow-hidden dark:border-neutral-800 dark:bg-neutral-900">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-neutral-50/60">

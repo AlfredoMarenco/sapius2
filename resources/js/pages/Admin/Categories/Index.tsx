@@ -92,77 +92,128 @@ export default function Index({ categories }: Props) {
         <>
             <Head title="Gestión de Categorías" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 p-8">
-                <div className="flex items-center justify-between">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-3xl font-black text-brand-navy tracking-tight uppercase">Categorías</h1>
-                        <p className="text-muted-foreground font-medium italic">Gestiona las áreas temáticas de tus cursos.</p>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
+                                Categorías
+                            </h1>
+                            <Badge variant="outline" className="text-xs font-medium">
+                                {categories.length} registradas
+                            </Badge>
+                        </div>
+                        <p className="mt-0.5 text-xs sm:text-sm text-neutral-500">
+                            Gestiona las áreas temáticas de tus cursos y evaluaciones.
+                        </p>
                     </div>
-                    <Button 
+                    <Button
+                        size="sm"
                         onClick={() => setIsModalOpen(true)}
-                        className="bg-brand-blue hover:bg-brand-blue/90 text-white rounded-2xl shadow-lg shadow-brand-blue/20 font-black uppercase tracking-widest gap-2"
+                        className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold shadow-xs gap-2 self-start sm:self-auto"
                     >
-                        <Plus className="h-5 w-5" /> Nueva Categoría
+                        <Plus className="h-4 w-4" /> Nueva Categoría
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-2">
-                    <div className="md:col-span-1 bg-brand-navy p-6 rounded-[2rem] text-white shadow-xl flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-black uppercase tracking-widest opacity-60 mb-1">Total</p>
-                            <h3 className="text-3xl font-black">{categories.length}</h3>
+                {/* Mobile Cards */}
+                <div className="space-y-3 md:hidden">
+                    {categories.length === 0 ? (
+                        <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
+                            No hay categorías registradas.
                         </div>
-                        <Tag className="h-10 w-10 opacity-20" />
-                    </div>
+                    ) : (
+                        categories.map((category) => (
+                            <div
+                                key={category.id}
+                                className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs flex items-center justify-between gap-3 dark:border-neutral-800 dark:bg-neutral-900"
+                            >
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-sm text-[#101E33] dark:text-neutral-100 truncate">
+                                            {category.name}
+                                        </span>
+                                        <Badge variant="secondary" className="text-[11px] shrink-0">
+                                            {category.courses_count} cursos
+                                        </Badge>
+                                    </div>
+                                    <p className="text-xs text-neutral-500 truncate">
+                                        {category.description || 'Sin descripción'}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => openEditModal(category)}
+                                        className="h-8 w-8 rounded-lg hover:bg-orange-50 hover:text-orange-600"
+                                    >
+                                        <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleDelete(category.id)}
+                                        className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
 
-                <div className="rounded-[2.5rem] border-2 border-brand-navy/5 bg-white shadow-xl shadow-brand-navy/5 overflow-hidden">
+                {/* Desktop & Laptop Compact Table */}
+                <div className="hidden md:block rounded-xl border border-neutral-200/80 bg-white shadow-xs overflow-hidden dark:border-neutral-800 dark:bg-neutral-900">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-gray-50/50 hover:bg-gray-50/50 border-b-2">
-                                <TableHead className="py-6 px-8 text-brand-navy font-black uppercase tracking-widest text-xs">Categoría</TableHead>
-                                <TableHead className="text-center font-black uppercase tracking-widest text-xs">Cursos</TableHead>
-                                <TableHead className="text-right py-6 px-8 font-black uppercase tracking-widest text-xs">Acciones</TableHead>
+                            <TableRow className="bg-neutral-50/70 dark:bg-neutral-800/50">
+                                <TableHead>Categoría</TableHead>
+                                <TableHead className="text-center">Cursos</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {categories.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="h-48 text-center text-muted-foreground italic">
+                                    <TableCell colSpan={3} className="h-32 text-center text-neutral-400 text-sm">
                                         No hay categorías registradas.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 categories.map((category) => (
-                                    <TableRow key={category.id} className="group hover:bg-brand-blue/[0.02] transition-colors border-b">
-                                        <TableCell className="py-6 px-8">
+                                    <TableRow key={category.id} className="group">
+                                        <TableCell>
                                             <div className="flex flex-col">
-                                                <span className="text-md font-bold text-brand-navy group-hover:text-brand-blue transition-colors">{category.name}</span>
-                                                <span className="text-xs text-muted-foreground font-medium truncate max-w-[400px]">
+                                                <span className="text-sm font-semibold text-[#101E33] dark:text-neutral-100">
+                                                    {category.name}
+                                                </span>
+                                                <span className="text-xs text-neutral-500 truncate max-w-[420px]">
                                                     {category.description || 'Sin descripción'}
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="outline" className="rounded-full px-4 border-2 border-brand-blue/10 text-brand-blue font-bold">
-                                                <BookOpen className="h-3 w-3 mr-2" /> {category.courses_count}
+                                            <Badge variant="outline" className="text-xs font-medium gap-1.5">
+                                                <BookOpen className="h-3.5 w-3.5 text-blue-600" /> {category.courses_count}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-right py-6 px-8">
-                                            <div className="flex justify-end gap-2">
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={() => openEditModal(category)}
-                                                    className="h-10 w-10 rounded-full hover:bg-brand-orange/10 hover:text-brand-orange"
+                                                    className="h-8 w-8 rounded-lg hover:bg-orange-50 hover:text-orange-600"
                                                 >
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={() => handleDelete(category.id)}
-                                                    className="h-10 w-10 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                                                    className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -177,51 +228,51 @@ export default function Index({ categories }: Props) {
             </div>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="rounded-[2.5rem] border-2 shadow-2xl p-0 overflow-hidden max-w-md">
-                    <div className="bg-brand-navy p-8 text-white">
+                <DialogContent className="rounded-xl p-0 overflow-hidden max-w-md">
+                    <div className="bg-[#101E33] px-5 py-4 text-white">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
-                                <Tag className="h-6 w-6 text-brand-coral" />
+                            <DialogTitle className="text-base font-bold flex items-center gap-2 text-white">
+                                <Tag className="h-4 w-4 text-[#FF6B52]" />
                                 {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
                             </DialogTitle>
                         </DialogHeader>
                     </div>
-                    <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="name" className="text-brand-navy font-bold">Nombre de la Categoría</Label>
-                            <Input 
+                    <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="name" className="text-xs font-semibold">Nombre de la Categoría</Label>
+                            <Input
                                 id="name"
                                 value={data.name}
                                 onChange={e => setData('name', e.target.value)}
-                                className="h-12 border-2 focus-visible:ring-brand-blue rounded-2xl"
+                                className="h-9 rounded-lg"
                                 placeholder="Ej: Ciencias Médicas"
                             />
-                            {errors.name && <p className="text-xs text-destructive font-black uppercase">{errors.name}</p>}
+                            {errors.name && <p className="text-xs text-red-600 font-medium">{errors.name}</p>}
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="description" className="text-brand-navy font-bold">Descripción (Opcional)</Label>
-                            <Textarea 
+                        <div className="space-y-1.5">
+                            <Label htmlFor="description" className="text-xs font-semibold">Descripción (Opcional)</Label>
+                            <Textarea
                                 id="description"
                                 value={data.description}
                                 onChange={e => setData('description', e.target.value)}
-                                className="min-h-[100px] border-2 focus-visible:ring-brand-blue rounded-2xl"
+                                className="min-h-[90px] rounded-lg"
                                 placeholder="Escribe algo sobre esta categoría..."
                             />
-                            {errors.description && <p className="text-xs text-destructive font-black uppercase">{errors.description}</p>}
+                            {errors.description && <p className="text-xs text-red-600 font-medium">{errors.description}</p>}
                         </div>
-                        <DialogFooter className="pt-4">
-                            <Button 
-                                type="button" 
-                                variant="ghost" 
+                        <DialogFooter className="pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
                                 onClick={closeModal}
-                                className="font-bold text-muted-foreground"
+                                className="h-9 rounded-lg"
                             >
                                 Cancelar
                             </Button>
-                            <Button 
-                                type="submit" 
+                            <Button
+                                type="submit"
                                 disabled={processing}
-                                className="bg-brand-blue hover:bg-brand-blue/90 text-white rounded-2xl px-8 h-12 font-black uppercase tracking-widest"
+                                className="bg-[#FF6B52] hover:bg-[#F0563C] text-white rounded-lg px-5 h-9 text-xs sm:text-sm font-semibold"
                             >
                                 {editingCategory ? 'Actualizar' : 'Crear Categoría'}
                             </Button>

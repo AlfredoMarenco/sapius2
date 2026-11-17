@@ -29,9 +29,9 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
         <>
             <Head title="Reporte de Inscripciones" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
                 <div>
-                    <Button asChild variant="ghost" size="sm" className="-ml-3 text-neutral-600">
+                    <Button asChild variant="ghost" size="sm" className="-ml-2 text-neutral-600 h-8">
                         <Link href="/admin/reports">
                             <ArrowLeft className="w-4 h-4 mr-1.5" /> Volver a Reportes
                         </Link>
@@ -39,18 +39,55 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                 </div>
 
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
                         Reporte Detallado de Inscripciones
                     </h1>
-                    <p className="text-sm text-neutral-500 mt-1">
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
                         Historial de alumnos inscritos, referencias de pago y estado de validación.
                     </p>
                 </div>
 
-                <Card className="border-neutral-200/80 dark:border-neutral-800 shadow-sm overflow-hidden">
+                {/* Mobile Cards */}
+                <div className="space-y-3 md:hidden">
+                    {inscriptions.data.length === 0 ? (
+                        <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900">
+                            No se encontraron registros de inscripciones.
+                        </div>
+                    ) : (
+                        inscriptions.data.map((item) => (
+                            <div key={item.id} className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs space-y-2.5 dark:border-neutral-800 dark:bg-neutral-900">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <div className="font-semibold text-sm text-[#101E33] dark:text-neutral-100 truncate">
+                                            #{item.id} · {item.user_name}
+                                        </div>
+                                        <div className="text-xs text-neutral-500 truncate">{item.user_email}</div>
+                                    </div>
+                                    <Badge variant={item.status === 'si' ? 'default' : 'secondary'} className={`shrink-0 text-[11px] ${item.status === 'si' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'}`}>
+                                        {item.status === 'si' ? 'Aprobado' : 'Pendiente'}
+                                    </Badge>
+                                </div>
+                                <div className="text-xs space-y-0.5 text-neutral-600 dark:text-neutral-300">
+                                    <div className="font-medium text-blue-600">{item.course_title}</div>
+                                    <div className="text-neutral-500">Ref: <span className="font-mono">{item.reference}</span> · {item.payment_type || 'N/A'}</div>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                    <span className="text-[11px] text-neutral-400">{item.created_at}</span>
+                                    <Button asChild size="sm" variant="outline" className="h-8 rounded-lg text-xs">
+                                        <Link href={`/admin/reports/inscriptions/${item.id}`}>
+                                            Ver Detalles
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <Card className="hidden md:block rounded-xl border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-neutral-50/50 dark:bg-neutral-900/50">
+                            <TableRow className="bg-neutral-50/70 dark:bg-neutral-900/50">
                                 <TableHead>ID</TableHead>
                                 <TableHead>Alumno</TableHead>
                                 <TableHead>Curso</TableHead>
@@ -98,7 +135,7 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                                             {item.created_at}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button asChild size="sm" variant="outline" className="text-xs">
+                                            <Button asChild size="sm" variant="outline" className="h-8 rounded-lg text-xs">
                                                 <Link href={`/admin/reports/inscriptions/${item.id}`}>
                                                     Ver Detalles
                                                 </Link>
@@ -118,7 +155,7 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                                         asChild
                                         size="sm"
                                         variant={link.active ? 'default' : 'outline'}
-                                        className={link.active ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-xs'}
+                                        className={link.active ? 'bg-[#101E33] hover:bg-[#192B47] text-white h-8' : 'text-xs h-8'}
                                     >
                                         <Link
                                             href={link.url}
@@ -129,7 +166,7 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                                 ) : (
                                     <span
                                         key={index}
-                                        className="px-3 py-1.5 text-xs text-neutral-400 select-none"
+                                        className="px-2.5 py-1 text-xs text-neutral-400 select-none"
                                         dangerouslySetInnerHTML={{ __html: link.label }}
                                     />
                                 )
@@ -137,6 +174,35 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                         </div>
                     )}
                 </Card>
+
+                {/* Mobile Pagination */}
+                {inscriptions.links && inscriptions.links.length > 3 && (
+                    <div className="flex md:hidden flex-wrap justify-center gap-1 rounded-xl border border-neutral-200/80 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                        {inscriptions.links.map((link: any, index: number) => (
+                            link.url ? (
+                                <Button
+                                    key={index}
+                                    asChild
+                                    size="sm"
+                                    variant={link.active ? 'default' : 'outline'}
+                                    className={link.active ? 'bg-[#101E33] text-white h-8' : 'text-xs h-8'}
+                                >
+                                    <Link
+                                        href={link.url}
+                                        preserveScroll
+                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                    />
+                                </Button>
+                            ) : (
+                                <span
+                                    key={index}
+                                    className="px-2.5 py-1 text-xs text-neutral-400 select-none"
+                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                />
+                            )
+                        ))}
+                    </div>
+                )}
             </div>
         </>
     );

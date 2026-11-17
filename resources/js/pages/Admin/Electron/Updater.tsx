@@ -64,21 +64,21 @@ export default function ElectronUpdater({ files = [], currentVersion = 'No regis
         <>
             <Head title="Actualizador de Aplicación de Escritorio" />
 
-            <div className="p-6 max-w-6xl mx-auto space-y-6">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                            <Cpu className="w-8 h-8 text-blue-600" /> Servidor de Actualizaciones Electron
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100 flex items-center gap-2">
+                            <Cpu className="w-6 h-6 text-blue-600 shrink-0" /> Servidor de Actualizaciones Electron
                         </h1>
-                        <p className="text-sm text-neutral-500 mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
                             Distribución de instaladores y parches automáticos para la aplicación de escritorio de Sapius.
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3.5 py-2 rounded-xl">
+                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-lg self-start sm:self-auto">
                         <span className="text-xs text-neutral-500">Versión Publicada:</span>
-                        <Badge className="bg-blue-600 text-white font-mono text-xs">
+                        <Badge className="bg-[#101E33] text-white font-mono text-xs">
                             v{currentVersion}
                         </Badge>
                     </div>
@@ -135,7 +135,7 @@ export default function ElectronUpdater({ files = [], currentVersion = 'No regis
                                 <Button
                                     type="submit"
                                     disabled={isUploading}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2 mt-2"
+                                    className="w-full h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold gap-2 mt-2"
                                 >
                                     <Upload className="w-4 h-4" />
                                     {isUploading ? 'Subiendo archivos...' : 'Subir y Desplegar Release'}

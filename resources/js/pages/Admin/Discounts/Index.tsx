@@ -95,83 +95,93 @@ export default function DiscountsIndex({ scheduledCourse, discounts }: Props) {
         <>
             <Head title={`Descuentos - ${scheduledCourse.course.title}`} />
 
-            <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <Button asChild variant="outline" size="icon" className="h-10 w-10 rounded-full shrink-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-lg shrink-0">
                             <Link href={`/admin/courses/${scheduledCourse.course_id}`}>
                                 <ArrowLeft className="h-4 w-4" />
                             </Link>
                         </Button>
                         <div>
-                            <h1 className="text-2xl font-black tracking-tight text-brand-navy dark:text-neutral-100 flex items-center gap-2">
-                                <Ticket className="w-6 h-6 text-brand-cyan" />
+                            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100 flex items-center gap-2">
+                                <Ticket className="w-5 h-5 text-blue-600 shrink-0" />
                                 Códigos de Descuento
                             </h1>
-                            <p className="text-sm text-neutral-500 font-medium">
+                            <p className="text-xs sm:text-sm text-neutral-500">
                                 {scheduledCourse.course.title} — {scheduledCourse.internal_id || `Cohorte #${scheduledCourse.id}`}
                             </p>
                         </div>
                     </div>
-                    <Button onClick={openCreateModal} className="bg-brand-navy hover:bg-brand-blue text-white gap-2 rounded-xl">
+                    <Button
+                        size="sm"
+                        onClick={openCreateModal}
+                        className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold shadow-xs gap-2 self-start sm:self-auto"
+                    >
                         <Plus className="w-4 h-4" /> Nuevo Código
                     </Button>
                 </div>
 
                 {/* Listado */}
-                <Card className="rounded-[2rem] border-2 border-gray-100 shadow-xl shadow-gray-200/40">
-                    <CardHeader className="bg-gray-50/50 border-b border-gray-100 p-6">
-                        <CardTitle className="text-lg">Cupones Registrados</CardTitle>
-                        <CardDescription>Gestiona los cupones que pueden usar los alumnos al inscribirse a esta cohorte.</CardDescription>
+                <Card className="rounded-xl border border-neutral-200/80 shadow-xs overflow-hidden dark:border-neutral-800">
+                    <CardHeader className="bg-neutral-50/60 border-b border-neutral-100 p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+                        <CardTitle className="text-base font-bold text-[#101E33] dark:text-neutral-100">
+                            Cupones Registrados
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                            Gestiona los cupones que pueden usar los alumnos al inscribirse a esta cohorte.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                         {discounts.length === 0 ? (
-                            <div className="p-12 text-center text-gray-500">
-                                <Ticket className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                <p className="font-medium">No hay descuentos registrados para esta cohorte.</p>
-                                <Button variant="link" onClick={openCreateModal} className="text-brand-blue">
+                            <div className="p-10 text-center text-neutral-500">
+                                <Ticket className="w-10 h-10 text-neutral-300 mx-auto mb-2.5" />
+                                <p className="text-sm font-medium">No hay descuentos registrados para esta cohorte.</p>
+                                <Button variant="link" onClick={openCreateModal} className="text-blue-600 text-xs">
                                     Crear el primer código
                                 </Button>
                             </div>
                         ) : (
-                            <div className="divide-y divide-gray-100">
+                            <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
                                 {discounts.map((discount) => (
-                                    <div key={discount.id} className="p-6 flex flex-col md:flex-row items-center justify-between gap-6 hover:bg-gray-50/50 transition-colors">
-                                        <div className="flex items-center gap-5 w-full md:w-auto">
-                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 border-dashed ${discount.activo === 'si' ? 'border-brand-cyan text-brand-cyan bg-brand-cyan/5' : 'border-gray-300 text-gray-400 bg-gray-50'}`}>
-                                                <Ticket className="w-5 h-5" />
+                                    <div key={discount.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center border border-dashed ${discount.activo === 'si' ? 'border-emerald-300 text-emerald-600 bg-emerald-50/70' : 'border-neutral-300 text-neutral-400 bg-neutral-50'}`}>
+                                                <Ticket className="w-4 h-4" />
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-1">
-                                                    <h3 className="text-lg font-black tracking-widest text-brand-navy uppercase">{discount.clave}</h3>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <h3 className="text-base font-bold tracking-wider text-[#101E33] dark:text-neutral-100 uppercase">
+                                                        {discount.clave}
+                                                    </h3>
                                                     {discount.activo === 'si' ? (
-                                                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none uppercase text-[9px] font-black tracking-widest">Activo</Badge>
+                                                        <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-200 text-[11px]">Activo</Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="text-gray-400 uppercase text-[9px] font-black tracking-widest border-gray-200">Inactivo</Badge>
+                                                        <Badge variant="outline" className="text-neutral-400 text-[11px]">Inactivo</Badge>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-4 text-xs font-bold text-gray-500 uppercase tracking-widest">
-                                                    <span className="flex items-center gap-1.5"><Percent className="w-3.5 h-3.5" /> {discount.descuento}%</span>
-                                                    <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Límite: {discount.limite}</span>
+                                                <div className="flex items-center gap-4 text-xs text-neutral-500">
+                                                    <span className="flex items-center gap-1"><Percent className="w-3.5 h-3.5" /> {discount.descuento}%</span>
+                                                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Límite: {discount.limite}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        
-                                        <div className="flex items-center gap-2">
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
                                                 onClick={() => openEditModal(discount)}
-                                                className="h-9 px-3 gap-1.5 rounded-xl text-orange-600 border-orange-200 hover:bg-orange-50 uppercase text-[10px] font-black tracking-widest"
+                                                className="h-8 px-3 gap-1.5 rounded-lg text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
                                             >
                                                 <Edit3 className="w-3.5 h-3.5" /> Editar
                                             </Button>
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
                                                 onClick={() => handleToggle(discount.id, discount.activo)}
-                                                className={`h-9 px-3 gap-1.5 rounded-xl uppercase text-[10px] font-black tracking-widest ${discount.activo === 'si' ? 'text-gray-600 border-gray-200 hover:bg-gray-100' : 'text-green-600 border-green-200 hover:bg-green-50'}`}
+                                                className={`h-8 px-3 gap-1.5 rounded-lg text-xs ${discount.activo === 'si' ? 'text-neutral-600 border-neutral-200 hover:bg-neutral-100' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'}`}
                                             >
                                                 <Power className="w-3.5 h-3.5" /> {discount.activo === 'si' ? 'Desactivar' : 'Activar'}
                                             </Button>
@@ -186,63 +196,63 @@ export default function DiscountsIndex({ scheduledCourse, discounts }: Props) {
 
             {/* Modal Crear/Editar */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-[425px] rounded-[2rem]">
+                <DialogContent className="sm:max-w-[425px] rounded-xl">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black uppercase tracking-tight text-brand-navy">
+                        <DialogTitle className="text-lg font-bold text-[#101E33] dark:text-neutral-100">
                             {editingId ? 'Editar Descuento' : 'Nuevo Código de Descuento'}
                         </DialogTitle>
                         <DialogDescription>
                             Ingresa los detalles del cupón promocional.
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={submit} className="space-y-6 pt-4">
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="clave" className="font-bold">Código del Cupón</Label>
-                                <Input 
-                                    id="clave" 
-                                    value={data.clave} 
+                    <form onSubmit={submit} className="space-y-4 pt-2">
+                        <div className="space-y-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="clave" className="text-xs font-semibold">Código del Cupón</Label>
+                                <Input
+                                    id="clave"
+                                    value={data.clave}
                                     onChange={e => setData('clave', e.target.value.toUpperCase())}
                                     placeholder="EJ: VERANO24"
-                                    className={`uppercase ${errors.clave ? 'border-red-500' : ''}`}
+                                    className={`uppercase h-9 rounded-lg ${errors.clave ? 'border-red-500' : ''}`}
                                 />
                                 {errors.clave && <p className="text-xs text-red-500 font-medium">{errors.clave}</p>}
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="descuento" className="font-bold">Descuento (%)</Label>
-                                <Input 
-                                    id="descuento" 
+                            <div className="space-y-1.5">
+                                <Label htmlFor="descuento" className="text-xs font-semibold">Descuento (%)</Label>
+                                <Input
+                                    id="descuento"
                                     type="number"
                                     min="1"
                                     max="100"
                                     step="1"
-                                    value={data.descuento} 
+                                    value={data.descuento}
                                     onChange={e => setData('descuento', e.target.value)}
                                     placeholder="1 - 100"
-                                    className={errors.descuento ? 'border-red-500' : ''}
+                                    className={`h-9 rounded-lg ${errors.descuento ? 'border-red-500' : ''}`}
                                 />
                                 {errors.descuento && <p className="text-xs text-red-500 font-medium">{errors.descuento}</p>}
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="limite" className="font-bold">Límite de usos</Label>
-                                <Input 
-                                    id="limite" 
+                            <div className="space-y-1.5">
+                                <Label htmlFor="limite" className="text-xs font-semibold">Límite de usos</Label>
+                                <Input
+                                    id="limite"
                                     type="number"
                                     min="1"
-                                    value={data.limite} 
+                                    value={data.limite}
                                     onChange={e => setData('limite', e.target.value)}
                                     placeholder="1"
-                                    className={errors.limite ? 'border-red-500' : ''}
+                                    className={`h-9 rounded-lg ${errors.limite ? 'border-red-500' : ''}`}
                                 />
                                 {errors.limite && <p className="text-xs text-red-500 font-medium">{errors.limite}</p>}
-                                <p className="text-[10px] text-gray-400 mt-1">Cantidad máxima de veces que puede ser utilizado por diferentes alumnos.</p>
+                                <p className="text-[11px] text-neutral-400">Cantidad máxima de veces que puede ser utilizado por diferentes alumnos.</p>
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="rounded-xl">
+                            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="h-9 rounded-lg">
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={processing} className="rounded-xl bg-brand-navy hover:bg-brand-blue text-white">
+                            <Button type="submit" disabled={processing} className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                 Guardar Cupón
                             </Button>
                         </DialogFooter>

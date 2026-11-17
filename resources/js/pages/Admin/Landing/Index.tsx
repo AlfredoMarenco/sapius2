@@ -238,22 +238,23 @@ return path;
         <>
             <Head title="Configuraciones de la Plataforma - Landing" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
                             Configuraciones de Landing
                         </h1>
-                        <p className="text-sm text-neutral-500 mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
                             Personaliza los banners principales, la sección de testimonios de Orgullo Sapius, los perfiles docentes y el Mini-Test vocacional.
                         </p>
                     </div>
                     <Button
                         type="button"
                         variant="outline"
+                        size="sm"
                         disabled={triggeringReminders}
                         onClick={handleTriggerReminders}
-                        className="flex items-center gap-2 self-start sm:self-auto"
+                        className="h-9 rounded-lg flex items-center gap-2 self-start sm:self-auto"
                     >
                         <BellRing className="w-4 h-4 text-amber-600" />
                         {triggeringReminders ? 'Ejecutando...' : 'Ejecutar Recordatorios'}
@@ -281,17 +282,21 @@ return path;
                     </TabsList>
 
                     {/* SLIDES TAB */}
-                    <TabsContent value="slides" className="space-y-6">
-                        <div className="flex justify-between items-center">
+                    <TabsContent value="slides" className="space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                             <div>
-                                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                                <h3 className="text-base sm:text-lg font-semibold text-[#101E33] dark:text-neutral-100">
                                     Banners del Slider Principal
                                 </h3>
-                                <p className="text-sm text-neutral-500">
+                                <p className="text-xs sm:text-sm text-neutral-500">
                                     Imágenes promocionales rotatorias mostradas en la cabecera del portal.
                                 </p>
                             </div>
-                            <Button onClick={() => setIsUploadSlideOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={() => setIsUploadSlideOpen(true)}
+                                className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white flex items-center gap-2 font-semibold shadow-xs self-start sm:self-auto"
+                            >
                                 <Plus className="w-4 h-4" /> Subir Imagen
                             </Button>
                         </div>
@@ -333,17 +338,21 @@ return path;
                     </TabsContent>
 
                     {/* PRIDES TAB */}
-                    <TabsContent value="prides" className="space-y-6">
-                        <div className="flex justify-between items-center">
+                    <TabsContent value="prides" className="space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                             <div>
-                                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                                <h3 className="text-base sm:text-lg font-semibold text-[#101E33] dark:text-neutral-100">
                                     Testimonios Orgullo Sapius
                                 </h3>
-                                <p className="text-sm text-neutral-500">
+                                <p className="text-xs sm:text-sm text-neutral-500">
                                     Alumnos admitidos y casos de éxito compartidos con la comunidad.
                                 </p>
                             </div>
-                            <Button onClick={openCreatePride} className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={openCreatePride}
+                                className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white flex items-center gap-2 font-semibold shadow-xs self-start sm:self-auto"
+                            >
                                 <Plus className="w-4 h-4" /> Agregar Orgullo
                             </Button>
                         </div>
@@ -396,17 +405,21 @@ return path;
                     </TabsContent>
 
                     {/* TEACHERS TAB */}
-                    <TabsContent value="teachers" className="space-y-6">
-                        <div className="flex justify-between items-center">
+                    <TabsContent value="teachers" className="space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                             <div>
-                                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                                <h3 className="text-base sm:text-lg font-semibold text-[#101E33] dark:text-neutral-100">
                                     Docentes y Profesores
                                 </h3>
-                                <p className="text-sm text-neutral-500">
+                                <p className="text-xs sm:text-sm text-neutral-500">
                                     Especialistas médicos y profesores destacados en la plataforma.
                                 </p>
                             </div>
-                            <Button onClick={openCreateTeacher} className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={openCreateTeacher}
+                                className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white flex items-center gap-2 font-semibold shadow-xs self-start sm:self-auto"
+                            >
                                 <Plus className="w-4 h-4" /> Agregar Docente
                             </Button>
                         </div>
@@ -493,7 +506,7 @@ return path;
                             <Button type="button" variant="outline" onClick={() => setIsUploadSlideOpen(false)}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={isSubmitting || !slideFile} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button type="submit" disabled={isSubmitting || !slideFile} className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                 {isSubmitting ? 'Subiendo...' : 'Subir Banner'}
                             </Button>
                         </DialogFooter>
@@ -560,7 +573,7 @@ return path;
                             <Button type="button" variant="outline" onClick={() => setIsPrideModalOpen(false)}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-amber-600 hover:bg-amber-700 text-white">
+                            <Button type="submit" disabled={isSubmitting} className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                 {isSubmitting ? 'Guardando...' : (editingPride ? 'Guardar Cambios' : 'Registrar Orgullo')}
                             </Button>
                         </DialogFooter>
@@ -616,7 +629,7 @@ return path;
                             <Button type="button" variant="outline" onClick={() => setIsTeacherModalOpen(false)}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-purple-600 hover:bg-purple-700 text-white">
+                            <Button type="submit" disabled={isSubmitting} className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                 {isSubmitting ? 'Guardando...' : (editingTeacher ? 'Guardar Cambios' : 'Registrar Docente')}
                             </Button>
                         </DialogFooter>

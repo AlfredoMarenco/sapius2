@@ -88,32 +88,33 @@ export default function SchedulesIndex({
         <>
             <Head title="Programación de Cursos" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                            <CalendarDays className="w-8 h-8 text-blue-600" /> Programación de Cursos
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100 flex items-center gap-2">
+                            <CalendarDays className="w-6 h-6 text-blue-600 shrink-0" /> Programación de Cursos
                         </h1>
-                        <p className="text-sm text-neutral-500 mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
                             Gestión de cohortes y calendarios de venta ({schedules.total} registros).
                         </p>
                     </div>
 
                     <Button
+                        size="sm"
                         onClick={() => setIsCreateOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm"
+                        className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold gap-2 shadow-xs self-start sm:self-auto"
                     >
                         <Plus className="w-4 h-4" /> Programar Cohorte
                     </Button>
                 </div>
 
                 {/* Filter by course */}
-                <div className="flex items-center gap-3 p-3.5 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-sm max-w-md">
+                <div className="flex items-center gap-2.5 p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 shadow-xs w-full max-w-md">
                     <BookOpen className="w-4 h-4 text-neutral-400 shrink-0" />
-                    <Label className="text-xs font-semibold shrink-0">Filtrar por Curso:</Label>
+                    <Label className="text-xs font-semibold shrink-0">Curso:</Label>
                     <select
-                        className="w-full text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent p-1.5"
+                        className="w-full text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-transparent px-2.5 py-1.5"
                         value={selectedCourseId || ''}
                         onChange={(e) => handleCourseFilter(e.target.value)}
                     >
@@ -126,14 +127,81 @@ export default function SchedulesIndex({
                     </select>
                 </div>
 
-                {/* Table */}
-                <Card className="border-neutral-200/80 dark:border-neutral-800 shadow-sm overflow-hidden">
+                {/* Mobile Cards */}
+                <div className="space-y-3 md:hidden">
+                    {schedules.data.length === 0 ? (
+                        <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
+                            No hay programaciones registradas para los criterios seleccionados.
+                        </div>
+                    ) : (
+                        schedules.data.map((item) => (
+                            <div
+                                key={item.id}
+                                className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs space-y-3 dark:border-neutral-800 dark:bg-neutral-900"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 space-y-1">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="font-mono text-[11px] text-neutral-400">#{item.id}</span>
+                                            <Badge variant="outline" className="font-mono text-[11px]">
+                                                {item.internal_id || 'Sin ID'}
+                                            </Badge>
+                                        </div>
+                                        <h3 className="font-semibold text-sm text-[#101E33] dark:text-neutral-100">
+                                            {item.course_title}
+                                        </h3>
+                                    </div>
+                                    <Badge
+                                        variant={item.is_active ? 'outline' : 'destructive'}
+                                        className={item.is_active ? 'border-emerald-300 text-emerald-700 text-[11px]' : 'text-[11px]'}
+                                    >
+                                        {item.is_active ? 'Activo' : 'Inactivo'}
+                                    </Badge>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
+                                    <span>Instructor: {item.instructor_name}</span>
+                                    <span>
+                                        {item.start_date && item.end_date ? `${item.start_date} - ${item.end_date}` : 'Sin fechas'}
+                                    </span>
+                                    <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-[11px]">
+                                        {item.students_count} alumnos
+                                    </Badge>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                    <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs text-amber-600 border-amber-200">
+                                        <Link href={`/admin/registro/contenido?cp_id=${item.id}`}>
+                                            <BookOpen className="w-3.5 h-3.5 mr-1" /> Contenido
+                                        </Link>
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs text-blue-600 border-blue-200">
+                                        <Link href={`/admin/curso/${item.id}`}>
+                                            <Users className="w-3.5 h-3.5 mr-1" /> Alumnos
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={`h-8 rounded-lg px-2.5 text-xs ${item.is_active ? 'text-neutral-600' : 'text-emerald-600 border-emerald-200'}`}
+                                        onClick={() => handleToggleActive(item.id)}
+                                    >
+                                        {item.is_active ? 'Desactivar' : 'Activar'}
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Desktop & Laptop Compact Table */}
+                <Card className="hidden md:block rounded-xl border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-neutral-50/50 dark:bg-neutral-900/50">
-                                <TableHead className="w-16">ID</TableHead>
+                            <TableRow className="bg-neutral-50/70 dark:bg-neutral-900/50">
+                                <TableHead className="w-14">ID</TableHead>
                                 <TableHead>Curso</TableHead>
-                                <TableHead>Generación / Identificador</TableHead>
+                                <TableHead>Generación</TableHead>
                                 <TableHead>Vigencia</TableHead>
                                 <TableHead>Instructor</TableHead>
                                 <TableHead>Alumnos</TableHead>
@@ -317,7 +385,7 @@ export default function SchedulesIndex({
                                     <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)}>
                                         Cancelar
                                     </Button>
-                                    <Button type="submit" size="sm" className="bg-blue-600 text-white">
+                                    <Button type="submit" size="sm" className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white font-semibold">
                                         <Save className="w-4 h-4 mr-1.5" /> Guardar Programación
                                     </Button>
                                 </div>

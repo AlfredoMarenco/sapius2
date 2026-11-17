@@ -73,141 +73,213 @@ export default function Index({ courses }: Props) {
     );
 
     return (
-        <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+        <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
             <Head title="Admin: Gestión de Cursos" />
 
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-brand-navy tracking-tighter uppercase">Gestión de Cursos</h1>
-                    <p className="text-muted-foreground font-medium italic">Control central de contenidos y activaciones en marketplace.</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100">
+                        Gestión de Cursos
+                    </h1>
+                    <p className="mt-0.5 text-xs sm:text-sm text-neutral-500">
+                        Control central de cursos maestros, estructura de módulos y activaciones ({courses.length} en total).
+                    </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <Link href="/admin/cursos/copy">
-                        <Button variant="outline" className="rounded-2xl border-2 font-black uppercase tracking-widest text-[10px] h-12 px-6 gap-2 shadow-sm group">
-                            <Copy className="w-4 h-4 text-brand-blue" />
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild variant="outline" size="sm" className="h-9 rounded-lg px-3.5 text-xs sm:text-sm font-medium gap-2">
+                        <Link href="/admin/cursos/copy">
+                            <Copy className="w-4 h-4 text-[#101E33] dark:text-neutral-200" />
                             Copiar Curso
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
 
-                    <Link href="/admin/cursos/create">
-                        <Button className="rounded-2xl bg-brand-navy hover:bg-brand-blue font-black uppercase tracking-widest text-[10px] h-12 px-6 gap-2 shadow-xl shadow-brand-navy/20 group">
+                    <Button asChild size="sm" className="h-9 rounded-lg bg-[#FF6B52] hover:bg-[#F0563C] text-white px-4 text-xs sm:text-sm font-semibold shadow-xs gap-2">
+                        <Link href="/admin/cursos/create">
                             <Plus className="w-4 h-4" />
                             Nuevo Curso Maestro
-                            <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
                 </div>
             </div>
 
             {/* Buscador */}
             <div className="relative max-w-md">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 <input
                     type="text"
                     placeholder="Buscar curso por título o categoría..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue shadow-sm"
+                    className="h-9 w-full rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-900 shadow-xs focus:border-[#101E33] focus:outline-none focus:ring-1 focus:ring-[#101E33] dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100"
                 />
             </div>
 
-            {/* Courses Table Card */}
-            <div className="bg-white rounded-[3rem] border-2 border-gray-100 shadow-2xl shadow-gray-200/50 overflow-hidden">
+            {/* Mobile Cards View */}
+            <div className="space-y-3 md:hidden">
+                {filteredCourses.length === 0 ? (
+                    <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
+                        No se encontraron cursos registrados.
+                    </div>
+                ) : (
+                    filteredCourses.map((course) => (
+                        <div
+                            key={course.id}
+                            className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs space-y-3 dark:border-neutral-800 dark:bg-neutral-900"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 space-y-1">
+                                    <Link
+                                        href={`/admin/courses/${course.id}`}
+                                        className="block text-sm font-semibold text-[#101E33] hover:text-[#FF6B52] transition-colors dark:text-neutral-100"
+                                    >
+                                        {course.title}
+                                    </Link>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <Badge variant="outline" className="text-[11px] font-medium">
+                                            {course.category?.name || 'General'}
+                                        </Badge>
+                                        <span className="text-[11px] text-neutral-500">
+                                            {course.modules_count || 0} módulos · {course.scheduled_courses_count || 0} cohortes
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                    <Switch
+                                        checked={course.is_active}
+                                        onCheckedChange={() => handleToggleCourse(course.id)}
+                                    />
+                                    <span className="text-[10px] font-medium text-neutral-500">
+                                        {course.is_active ? 'Visible' : 'Borrador'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                <Button asChild variant="outline" size="sm" className="h-8 rounded-lg text-xs justify-start gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50">
+                                    <Link href={`/admin/courses/${course.id}/builder`}>
+                                        <Layout className="w-3.5 h-3.5" />
+                                        Contenido
+                                    </Link>
+                                </Button>
+                                <Button asChild variant="outline" size="sm" className="h-8 rounded-lg text-xs justify-start gap-1.5 text-orange-600 border-orange-200 hover:bg-orange-50">
+                                    <Link href={`/admin/courses/${course.id}/edit`}>
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                        Editar
+                                    </Link>
+                                </Button>
+                                <Button asChild variant="outline" size="sm" className="h-8 rounded-lg text-xs justify-start gap-1.5 text-[#101E33] border-neutral-200 hover:bg-neutral-50 dark:text-neutral-200">
+                                    <Link href={`/admin/courses/${course.id}`}>
+                                        <Calendar className="w-3.5 h-3.5" />
+                                        Programar
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDelete(course.id)}
+                                    className="h-8 rounded-lg text-xs justify-start gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Eliminar
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Desktop & Laptop Compact Table View */}
+            <div className="hidden md:block rounded-xl border border-neutral-200/80 bg-white shadow-xs overflow-hidden dark:border-neutral-800 dark:bg-neutral-900">
                 <Table>
-                    <TableHeader className="bg-gray-50/50 border-b-2 border-gray-100">
-                        <TableRow className="hover:bg-transparent">
-                            <TableHead className="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-brand-navy">Curso / Categoría</TableHead>
-                            <TableHead className="text-center text-[10px] font-black uppercase tracking-[0.2em] text-brand-navy">Estructura</TableHead>
-                            <TableHead className="text-center text-[10px] font-black uppercase tracking-[0.2em] text-brand-navy">Schedules</TableHead>
-                            <TableHead className="text-center text-[10px] font-black uppercase tracking-[0.2em] text-brand-navy">Estado</TableHead>
-                            <TableHead className="text-right py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-brand-navy">Acciones</TableHead>
+                    <TableHeader>
+                        <TableRow className="bg-neutral-50/70 dark:bg-neutral-800/50">
+                            <TableHead>Curso / Categoría</TableHead>
+                            <TableHead className="text-center">Módulos</TableHead>
+                            <TableHead className="text-center">Cohortes</TableHead>
+                            <TableHead className="text-center">Estado</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {filteredCourses.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="py-32 text-center">
-                                    <div className="space-y-4">
-                                        <div className="h-20 w-20 rounded-full bg-brand-navy/5 flex items-center justify-center mx-auto text-brand-navy/20">
-                                            <Search className="w-10 h-10" />
-                                        </div>
-                                        <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No se encontraron cursos registrados</p>
-                                    </div>
+                                <TableCell colSpan={5} className="py-12 text-center text-neutral-400 text-sm">
+                                    No se encontraron cursos registrados.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filteredCourses.map((course) => (
-                                <TableRow key={course.id} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50 group">
-                                    <TableCell className="py-6 px-8">
-                                        <div className="flex items-center gap-6">
-                                            <div className="w-14 h-14 rounded-2xl bg-brand-navy/5 flex items-center justify-center group-hover:bg-brand-navy group-hover:text-white transition-all duration-500">
-                                                <Tag className="w-6 h-6" />
+                                <TableRow key={course.id} className="group">
+                                    <TableCell>
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-9 h-9 shrink-0 rounded-lg bg-[#101E33]/5 flex items-center justify-center text-[#101E33] dark:bg-neutral-800 dark:text-neutral-200">
+                                                <Tag className="w-4 h-4" />
                                             </div>
-                                            <div className="space-y-1">
-                                                <Link href={`/admin/courses/${course.id}`} className="font-black text-brand-navy uppercase tracking-tight text-lg hover:text-brand-blue transition-colors">
+                                            <div className="min-w-0">
+                                                <Link
+                                                    href={`/admin/courses/${course.id}`}
+                                                    className="block font-semibold text-sm text-[#101E33] hover:text-[#FF6B52] transition-colors truncate dark:text-neutral-100"
+                                                >
                                                     {course.title}
                                                 </Link>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant="outline" className="rounded-full bg-brand-blue/5 text-brand-blue border-brand-blue/20 text-[8px] uppercase font-black px-2">
-                                                        {course.category?.name || 'General'}
-                                                    </Badge>
-                                                </div>
+                                                <Badge variant="outline" className="mt-0.5 text-[11px] font-medium">
+                                                    {course.category?.name || 'General'}
+                                                </Badge>
                                             </div>
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <div className="inline-flex flex-col items-center">
-                                            <span className="text-lg font-black text-brand-navy">{course.modules_count || 0}</span>
-                                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Módulos</span>
-                                        </div>
+                                        <span className="inline-flex items-center justify-center rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-[#101E33] dark:bg-neutral-800 dark:text-neutral-200">
+                                            {course.modules_count || 0}
+                                        </span>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-navy/5 text-brand-navy font-black text-xs">
+                                        <span className="inline-flex items-center justify-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
                                             {course.scheduled_courses_count || 0}
-                                        </div>
+                                        </span>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Switch 
-                                                checked={course.is_active} 
-                                                onCheckedChange={() => handleToggleCourse(course.id)} 
+                                        <div className="inline-flex flex-col items-center gap-1">
+                                            <Switch
+                                                checked={course.is_active}
+                                                onCheckedChange={() => handleToggleCourse(course.id)}
                                             />
-                                            <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">
+                                            <span className="text-[10px] font-medium text-neutral-500">
                                                 {course.is_active ? 'Visible' : 'Borrador'}
                                             </span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="py-6 px-8 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button asChild variant="outline" size="sm" className="h-9 px-3 gap-2 text-brand-blue border-brand-blue/20 hover:bg-brand-blue/10">
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-1.5">
+                                            <Button asChild variant="outline" size="sm" className="h-8 px-2.5 gap-1.5 rounded-lg text-xs text-blue-600 border-blue-200 hover:bg-blue-50">
                                                 <Link href={`/admin/courses/${course.id}/builder`} title="Constructor de Contenido">
-                                                    <Layout className="w-4 h-4" />
-                                                    <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Contenido</span>
+                                                    <Layout className="w-3.5 h-3.5" />
+                                                    <span className="hidden lg:inline">Contenido</span>
                                                 </Link>
                                             </Button>
-                                            <Button asChild variant="outline" size="sm" className="h-9 px-3 gap-2 text-brand-orange border-brand-orange/20 hover:bg-brand-orange/10">
+                                            <Button asChild variant="outline" size="sm" className="h-8 px-2.5 gap-1.5 rounded-lg text-xs text-orange-600 border-orange-200 hover:bg-orange-50">
                                                 <Link href={`/admin/courses/${course.id}/edit`} title="Editar Información">
-                                                    <Edit3 className="w-4 h-4" />
-                                                    <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Editar</span>
+                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                    <span className="hidden lg:inline">Editar</span>
                                                 </Link>
                                             </Button>
-                                            <Button asChild variant="outline" size="sm" className="h-9 px-3 gap-2 text-brand-navy border-brand-navy/20 hover:bg-brand-navy/10">
+                                            <Button asChild variant="outline" size="sm" className="h-8 px-2.5 gap-1.5 rounded-lg text-xs text-[#101E33] border-neutral-200 hover:bg-neutral-50 dark:text-neutral-200">
                                                 <Link href={`/admin/courses/${course.id}`} title="Ver y Programar Cohortes">
-                                                    <Calendar className="w-4 h-4" />
-                                                    <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Programar</span>
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    <span className="hidden lg:inline">Programar</span>
                                                 </Link>
                                             </Button>
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
                                                 onClick={() => handleDelete(course.id)}
-                                                className="h-9 px-3 gap-2 text-destructive border-destructive/20 hover:bg-destructive/10"
+                                                className="h-8 px-2.5 gap-1.5 rounded-lg text-xs text-red-600 border-red-200 hover:bg-red-50"
                                                 title="Eliminar Curso"
                                             >
-                                                <Trash2 className="w-4 h-4" />
-                                                <span className="hidden xl:inline font-bold text-[10px] uppercase tracking-widest">Eliminar</span>
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <span className="hidden xl:inline">Eliminar</span>
                                             </Button>
                                         </div>
                                     </TableCell>
