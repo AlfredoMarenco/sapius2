@@ -294,6 +294,27 @@ class LandingController extends Controller
         ]);
     }
 
+    public function productsHub(): Response
+    {
+        return Inertia::render('Public/ProductsHub', [
+            'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
+        ]);
+    }
+
+    public function faq(): Response
+    {
+        return Inertia::render('Public/Faq', [
+            'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
+        ]);
+    }
+
+    public function groupsPackages(): Response
+    {
+        return Inertia::render('Public/GroupsPackages', [
+            'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
+        ]);
+    }
+
     public function coursePage($slug): Response
     {
         return Inertia::render('Public/CourseLanding', [

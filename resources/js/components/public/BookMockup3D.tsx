@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface BookMockup3DProps {
-    area: 'nutricion' | 'medicina' | 'general';
+    area: 'nutricion' | 'medicina' | 'general' | 'guias_simuladores';
     subtitle?: string;
     edition?: string;
     className?: string;
@@ -25,6 +25,11 @@ const AREA_COPY: Record<
         line1: 'EGEL Plus',
         line2: 'Sapius',
         spineLabel: 'Curso virtual EGEL Plus - sapius',
+    },
+    guias_simuladores: {
+        line1: 'Guías y',
+        line2: 'simuladores',
+        spineLabel: 'Guías y simuladores 2027 - Sapius',
     },
 };
 
@@ -73,7 +78,7 @@ export function BookMockup3D({
                 className="pointer-events-none absolute top-[50.5%] left-[42.2%] z-20 flex h-[73%] w-[44.5%] -translate-x-1/2 -translate-y-1/2 rotate-[30deg] flex-col justify-between p-[3.2cqw]"
             >
                 {/* Arriba derecha: MODALIDAD VIRTUAL */}
-                <div className="text-right text-[1.85cqw] font-medium tracking-[0.22em] text-[#FF6B52] uppercase">
+                <div className="text-right text-[1.85cqw] leading-tight font-medium tracking-[0.22em] whitespace-pre-line text-[#FF6B52] uppercase">
                     {subtitle}
                 </div>
 

@@ -17,6 +17,18 @@ class PublicRedesignRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('Public/CoursesHub'));
 
+        $this->get('/productos')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Public/ProductsHub'));
+
+        $this->get('/preguntas-frecuentes')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Public/Faq'));
+
+        $this->get('/grupos-y-paquetes')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Public/GroupsPackages'));
+
         $this->get('/nosotros')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('Public/About'));

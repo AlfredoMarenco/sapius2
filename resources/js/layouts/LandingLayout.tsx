@@ -26,7 +26,17 @@ const NAV_LINKS = [
     {
         label: 'Cursos',
         href: '/cursos',
-        matchPrefixes: ['/cursos', '/egel', '/exani', '/guias', '/simuladores'],
+        matchPrefixes: ['/cursos', '/egel', '/exani'],
+    },
+    {
+        label: 'Productos',
+        href: '/productos',
+        matchPrefixes: [
+            '/productos',
+            '/guias',
+            '/simuladores',
+            '/grupos-y-paquetes',
+        ],
     },
     { label: 'Nosotros', href: '/nosotros', matchPrefixes: ['/nosotros'] },
     {
@@ -283,6 +293,14 @@ export default function LandingLayout({
                             </li>
                             <li>
                                 <Link
+                                    href="/preguntas-frecuentes"
+                                    className="transition-colors hover:text-[#FF6B52]"
+                                >
+                                    Preguntas frecuentes
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
                                     href="/orgullo-sapius"
                                     className="transition-colors hover:text-[#FF6B52]"
                                 >
@@ -291,7 +309,7 @@ export default function LandingLayout({
                             </li>
                             <li>
                                 <Link
-                                    href="/contacto"
+                                    href="/grupos-y-paquetes"
                                     className="transition-colors hover:text-[#FF6B52]"
                                 >
                                     Universidades y equipos

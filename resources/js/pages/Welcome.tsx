@@ -1,53 +1,16 @@
 import { Head, Link } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import FaqAccordion from '@/components/public/FaqAccordion';
-import type {FaqItem} from '@/components/public/FaqAccordion';
+import { ChevronRight } from 'lucide-react';
+import React from 'react';
+import FaqSection from '@/components/public/FaqSection';
 import { openMiniTest } from '@/components/public/MiniTestModal';
 import PlusGridPattern from '@/components/public/PlusGridPattern';
-import {
-    WHATSAPP_PHONE
-    
-} from '@/components/public/PricingCard';
-import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
+import { WHATSAPP_PHONE } from '@/components/public/PricingCard';
+import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
 import { SapiusIsotype } from '@/components/public/SapiusLogo';
 import LandingLayout from '@/layouts/LandingLayout';
 
-export interface SlideRecord {
-    id: number | string;
-    img: string;
-}
-
-export interface TeacherRecord {
-    id: number | string;
-    name: string;
-    description?: string | null;
-    img?: string | null;
-}
-
-export interface PrideRecord {
-    id: number | string;
-    name: string;
-    text?: string | null;
-    text2?: string | null;
-    img?: string | null;
-}
-
-export interface ReviewRecord {
-    id: number | string;
-    user_name?: string;
-    name?: string;
-    content?: string;
-    comment?: string;
-    rating?: number | null;
-}
-
 export interface WelcomeProps {
-    slides?: SlideRecord[];
-    prides?: PrideRecord[];
-    teachers?: TeacherRecord[];
-    reviews?: ReviewRecord[];
     scheduledCourses?: ScheduledCourseCandidate[];
 }
 
@@ -117,7 +80,7 @@ const EXPERIENCE_KPIS = [
         ),
     },
     {
-        value: '+123',
+        value: '+2,000',
         lines: ['alumnos', 'inscritos'],
         icon: (
             <svg
@@ -162,168 +125,125 @@ const EXPERIENCE_KPIS = [
     },
 ];
 
-const PLACEHOLDER_EXPERTS: TeacherRecord[] = [
+const SUMA_STEPS = [
     {
-        id: 'expert-1',
-        name: 'L.N. Elsy Verónica González Sansores',
-        description: 'Premio Nacional de Excelencia EGEL',
-        img: '/img/m-4.png',
+        title: 'Comienza por lo básico',
+        description: 'Aprende los conceptos y fundamentos de cada tema.',
+        icon: (
+            <svg
+                viewBox="0 0 40 40"
+                className="h-9 w-9 stroke-[#101E33]"
+                fill="none"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+            >
+                <path d="M8 10.5c3.8 0 8.5 1.2 12 3.5 3.5-2.3 8.2-3.5 12-3.5v18.5c-3.8 0-8.5 1.2-12 3.5-3.5-2.3-8.2-3.5-12-3.5V10.5Z" />
+                <path d="M20 14v18.5" />
+                <path d="M11.5 16h5" />
+                <path d="M11.5 20.5h5" />
+                <path d="M23.5 16h5" />
+                <path d="M23.5 20.5h5" />
+            </svg>
+        ),
     },
     {
-        id: 'expert-2',
-        name: 'Dra. Erika Elizabeth González Sansores',
-        description: 'Neuróloga egresada del Centro Médico Nacional Siglo XXI',
-        img: '/img/m-5.png',
+        title: 'Construye conocimientos',
+        description:
+            'Cada nuevo tema se relaciona con los anteriores y agrega información.',
+        icon: (
+            <svg
+                viewBox="0 0 40 40"
+                className="h-9 w-9 stroke-[#101E33]"
+                fill="none"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+            >
+                <circle cx="20" cy="18" r="7.5" />
+                <path d="M16.5 29h7" />
+                <path d="M17.5 32.5h5" />
+                <path d="M20 6.5v2" />
+                <path d="m11.5 10 1.4 1.4" />
+                <path d="m28.5 10-1.4 1.4" />
+                <circle cx="20" cy="18" r="2.2" />
+                <path d="M20 13.5v2.3" />
+                <path d="M20 20.2v2.3" />
+                <path d="M15.5 18h2.3" />
+                <path d="M22.2 18h2.3" />
+            </svg>
+        ),
     },
     {
-        id: 'expert-3',
-        name: 'Lic. Trab. Soc. Martín Moisés González Sansores',
-        description: 'Docente titular del curso EGEL Plus',
-        img: '/img/m-3.png',
+        title: 'Avanza progresivamente',
+        description:
+            'Se incorporan contenidos de mayor complejidad conforme se consolidan las bases.',
+        icon: (
+            <svg
+                viewBox="0 0 40 40"
+                className="h-9 w-9 stroke-[#101E33]"
+                fill="none"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+            >
+                <path d="M9 31h22" />
+                <path d="M10.5 26h5v5h-5z" />
+                <path d="M17.5 20.5h5V31h-5z" />
+                <path d="M24.5 15h5v16h-5z" />
+                <path d="m11 16 7-5.5 4.5 3 6-5.5" />
+                <path d="M25 8h3.5v3.5" />
+            </svg>
+        ),
     },
     {
-        id: 'expert-4',
-        name: 'Dr. César Abraham Estrada Aguirre',
-        description: 'Cirujano Plástico Estético y Reconstructivo',
-        img: '/img/m-2.png',
+        title: 'Integra lo aprendido',
+        description: 'Conecta todos los conocimientos y aprende a aplicarlos.',
+        icon: (
+            <svg
+                viewBox="0 0 40 40"
+                className="h-9 w-9 stroke-[#101E33]"
+                fill="none"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+            >
+                <circle cx="13" cy="13" r="3.5" />
+                <circle cx="27" cy="13" r="3.5" />
+                <circle cx="20" cy="27" r="3.8" />
+                <path d="M16.5 13h7" />
+                <path d="m14.8 16 3.5 7.6" />
+                <path d="m25.2 16-3.5 7.6" />
+            </svg>
+        ),
     },
     {
-        id: 'expert-5',
-        name: 'L.N. Fernando Iván Pat Poot',
-        description: 'Docente Especialista Sapius',
-        img: '/img/m-6.png',
+        title: 'Evalúa y refuerza',
+        description:
+            'Mediante actividades y simuladores identifica errores y fortalece tus áreas de oportunidad.',
+        icon: (
+            <svg
+                viewBox="0 0 40 40"
+                className="h-9 w-9 stroke-[#101E33]"
+                fill="none"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+            >
+                <circle cx="18" cy="18" r="8.5" />
+                <path d="m24.5 24.5 6.5 6.5" />
+                <path d="m14.5 18.2 2.4 2.4 4.8-4.9" />
+            </svg>
+        ),
     },
 ];
 
-const PLACEHOLDER_PRIDES: PrideRecord[] = [
-    {
-        id: 'pride-1',
-        name: 'Premio CENEVAL al Desempeño de Excelencia',
-        text: 'EGEL Plus Nutrición · Sobresaliente',
-        text2: 'El acompañamiento semanal y los simuladores del Método SUMA me permitieron llegar con total seguridad el día de mi examen EGEL Nutrición.',
-        img: null,
-    },
-    {
-        id: 'pride-2',
-        name: 'Testimonio de Desempeño Sobresaliente',
-        text: 'EGEL Plus Medicina · Sobresaliente',
-        text2: 'Estudiar con videoclases concretas y exámenes diarios transformó por completo mi organización durante las 10 semanas de preparación.',
-        img: null,
-    },
-    {
-        id: 'pride-3',
-        name: 'Aprobación en Primera Aplicación',
-        text: 'EGEL Plus Nutrición · Aprobado',
-        text2: 'La guía digital e impresa resume exactamente lo que necesitas dominar sin perder tiempo buscando bibliografía dispersa.',
-        img: null,
-    },
-];
-
-const PLACEHOLDER_REVIEWS: ReviewRecord[] = [
-    {
-        id: 'rev-1',
-        user_name: 'Egresada de Nutrición',
-        content: 'Excelente plataforma y profesores súper preparados. Las asesorías dominicales en vivo aclaran cada reactivo paso a paso.',
-        rating: 5,
-    },
-    {
-        id: 'rev-2',
-        user_name: 'Egresado de Medicina',
-        content: 'Los simuladores cronometrados son idénticos en exigencia al examen real; me ayudaron muchísimo a controlar mis tiempos.',
-        rating: 5,
-    },
-    {
-        id: 'rev-3',
-        user_name: 'Alumna Modalidad Asincrónica',
-        content: 'Pude combinar mis prácticas profesionales con el curso asincrónico de 10 semanas y obtuve resultado sobresaliente.',
-        rating: 5,
-    },
-];
-
-const HOME_FAQS: FaqItem[] = [
-    {
-        id: 'tiempo',
-        question: '¿Todavía estoy a tiempo?',
-        answer: 'Sí. Contamos tanto con programas completos de 10 semanas como con modalidad 100% asincrónica, Guías Digitales y Simuladores independientes para adaptarnos exactamente al tiempo que falta para tu examen.',
-    },
-    {
-        id: 'diferencia',
-        question: '¿Qué diferencia hay entre los productos?',
-        answer: 'La Guía + Simulador te brinda lectura de repaso y práctica autónoma; el Curso Asincrónico suma 10 semanas con videoclases, tareas y exámenes diarios a tu ritmo; y el Curso Premium incluye además guía impresa, kit físico, asesorías dominicales en vivo y garantía condicionada.',
-    },
-    {
-        id: 'acceso',
-        question: '¿Cuándo recibo mi acceso?',
-        answer: 'Al confirmar tu inscripción en nuestra plataforma recibes tus credenciales para acceder a tu panel de alumno, y en paquetes con inicio programado o preventa te notificamos puntualmente cada apertura de bloque.',
-    },
-    {
-        id: 'semanas',
-        question: '¿Cuantas semanas son el curso completo?',
-        answer: 'El curso completo tiene una duración de 10 semanas,',
-    },
-];
-
-export default function Welcome({
-    slides = [],
-    prides = [],
-    teachers = [],
-    reviews = [],
-    scheduledCourses,
-}: WelcomeProps) {
-    const activeSlides = Array.isArray(slides)
-        ? slides.filter((slide) => Boolean(slide?.img))
-        : [];
-    const [activeSlideIndex, setActiveSlideIndex] = useState(0);
-
-    useEffect(() => {
-        if (activeSlides.length <= 1) {
-return;
-}
-
-        const interval = window.setInterval(() => {
-            setActiveSlideIndex((prev) => (prev + 1) % activeSlides.length);
-        }, 6000);
-
-        return () => window.clearInterval(interval);
-    }, [activeSlides.length]);
-
-    const currentSlideIdx =
-        activeSlides.length > 0 ? activeSlideIndex % activeSlides.length : 0;
-
-    const displayedExperts =
-        Array.isArray(teachers) && teachers.length > 0
-            ? teachers.slice(0, 6)
-            : PLACEHOLDER_EXPERTS;
-
-    const displayedPrides =
-        Array.isArray(prides) && prides.length > 0
-            ? prides.slice(0, 3)
-            : PLACEHOLDER_PRIDES;
-
-    const displayedReviews =
-        Array.isArray(reviews) && reviews.length > 0
-            ? reviews.slice(0, 6)
-            : PLACEHOLDER_REVIEWS;
-
-    const resolveTeacherImg = (img?: string | null) => {
-        if (!img) {
-return '/img/brand2026/expert-placeholder.png';
-}
-
-        if (img.startsWith('http') || img.startsWith('/')) {
-return img;
-}
-
-        return `/media/stream/${img}`;
-    };
-
-    const resolveSlideImg = (img: string) => {
-        if (img.startsWith('http') || img.startsWith('/')) {
-return img;
-}
-
-        return `/media/stream/${img}`;
-    };
+export default function Welcome({ scheduledCourses }: WelcomeProps) {
 
     return (
         <LandingLayout scheduledCourses={scheduledCourses}>
@@ -390,7 +310,7 @@ return img;
                                 </button>
 
                                 <Link
-                                    href="/cursos"
+                                    href="/productos"
                                     className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-8 py-3.5 text-[16px] font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] sm:w-[285px]"
                                 >
                                     Ver productos
@@ -531,91 +451,6 @@ return img;
             </section>
 
             {/* =========================================================
-                SECCIÓN 2.5: SLIDES ADMINISTRABLES DE BD (cuando existan)
-               ========================================================= */}
-            {activeSlides.length > 0 && (
-                <section
-                    aria-label="Avisos y convocatorias Sapius"
-                    className="bg-white pt-14 pb-2 sm:pt-18"
-                >
-                    <div className="mx-auto max-w-6xl px-5 sm:px-8">
-                        <div className="relative overflow-hidden rounded-[26px] border border-[#FF6B52]/45 bg-white p-2 shadow-[0_18px_40px_-14px_rgba(16,30,51,0.16)] sm:p-3">
-                            <div className="relative aspect-[16/6] min-h-[190px] w-full overflow-hidden rounded-[20px] bg-[#CFE4FF]/30">
-                                <img
-                                    src={resolveSlideImg(
-                                        activeSlides[currentSlideIdx].img,
-                                    )}
-                                    alt={`Convocatoria Sapius ${currentSlideIdx + 1}`}
-                                    onError={(e) => {
-                                        (
-                                            e.currentTarget as HTMLImageElement
-                                        ).src =
-                                            '/img/brand2026/card-simuladores.png';
-                                    }}
-                                    className="h-full w-full object-cover transition-opacity duration-300"
-                                />
-
-                                {activeSlides.length > 1 && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            aria-label="Slide anterior"
-                                            onClick={() =>
-                                                setActiveSlideIndex(
-                                                    (prev) =>
-                                                        (prev -
-                                                            1 +
-                                                            activeSlides.length) %
-                                                        activeSlides.length,
-                                                )
-                                            }
-                                            className="absolute top-1/2 left-3 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#101E33]/80 text-white shadow-md transition-colors hover:bg-[#FF6B52]"
-                                        >
-                                            <ChevronLeft className="h-5 w-5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            aria-label="Siguiente slide"
-                                            onClick={() =>
-                                                setActiveSlideIndex(
-                                                    (prev) =>
-                                                        (prev + 1) %
-                                                        activeSlides.length,
-                                                )
-                                            }
-                                            className="absolute top-1/2 right-3 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#101E33]/80 text-white shadow-md transition-colors hover:bg-[#FF6B52]"
-                                        >
-                                            <ChevronRight className="h-5 w-5" />
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-
-                            {activeSlides.length > 1 && (
-                                <div className="mt-3 mb-1 flex items-center justify-center gap-2">
-                                    {activeSlides.map((slide, idx) => (
-                                        <button
-                                            key={slide.id}
-                                            type="button"
-                                            aria-label={`Ir al slide ${idx + 1}`}
-                                            onClick={() =>
-                                                setActiveSlideIndex(idx)
-                                            }
-                                            className={`h-2.5 rounded-full transition-all ${
-                                                idx === currentSlideIdx
-                                                    ? 'w-7 bg-[#FF6B52]'
-                                                    : 'w-2.5 bg-[#101E33]/25 hover:bg-[#101E33]/50'
-                                            }`}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            {/* =========================================================
                 SECCIÓN 3: NUESTRA EXPERIENCIA (page1_s2_y1050.png)
                ========================================================= */}
             <section className="bg-white py-18 sm:py-22 lg:py-26">
@@ -676,76 +511,112 @@ return img;
             </section>
 
             {/* =========================================================
-                SECCIÓN 4: CONOCE NUESTRO MÉTODO SUMA (page1_s2_y1050.png)
+                SECCIÓN 4: CONOCE NUESTRO MÉTODO SUMA (Canva Page 1 v297)
                ========================================================= */}
-            <section className="relative overflow-hidden bg-[#101E33] py-20 text-white lg:py-26">
-                {/* Grilla coral 6x4 arriba derecha */}
-                <div className="pointer-events-none absolute top-8 right-5 hidden opacity-85 md:block lg:right-8">
-                    <PlusGridPattern
-                        rows={6}
-                        cols={4}
-                        color="coral"
-                        gap={32}
-                        size={8}
-                    />
-                </div>
-                {/* Grilla blanca tenue 4x5 abajo izquierda */}
-                <div className="pointer-events-none absolute bottom-8 left-5 hidden opacity-35 md:block lg:left-8">
-                    <PlusGridPattern
-                        rows={4}
-                        cols={5}
-                        color="white"
-                        gap={32}
-                        size={8}
-                    />
-                </div>
-
-                <div className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-10">
-                    <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
-                        {/* Izquierda: Isotipo s. + Título + Párrafo */}
+            <section className="relative overflow-hidden bg-[#101E33] py-20 text-white lg:py-24">
+                <div className="relative z-10 mx-auto max-w-[1220px] px-5 sm:px-8 lg:px-10">
+                    {/* Fila superior: Isotipo s. + Título + grilla coral | 2 párrafos descriptivos */}
+                    <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-12 lg:gap-14">
                         <motion.div
                             initial={{ opacity: 0, y: 18 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: '-60px' }}
                             transition={{ duration: 0.4 }}
-                            className="lg:col-span-6"
+                            className="lg:col-span-5"
                         >
                             <SapiusIsotype variant="light" className="h-9" />
 
-                            <h2 className="mt-7 font-display text-3xl leading-[1.06] font-extrabold tracking-tight text-white sm:text-4xl lg:text-[3rem]">
+                            <h2 className="mt-6 font-display text-3xl leading-[1.06] font-extrabold tracking-tight text-white sm:text-4xl lg:text-[2.85rem]">
                                 Conoce nuestro
                                 <br />
                                 Método SUMA
                             </h2>
 
-                            <p className="mt-7 max-w-[490px] text-base leading-[1.55] font-light text-white/88 sm:text-[17px]">
-                                Cuatro eslabones: de lo sencillo a lo complejo.
-                                Es nuestro sistema de aprendizaje estructurado
-                                en 4 bloques estratégicos diseñado para guiarte
-                                paso a paso desde el primer día hasta tu examen.
-                                En lugar de saturarte con teoría, SUMA combina
-                                videoclases diarias, práctica progresiva con
-                                simuladores y acompañamiento en vivo para
-                                consolidar tus conocimientos de forma clara,
-                                constante y efectiva.
-                            </p>
+                            <div className="mt-8 hidden opacity-85 md:block">
+                                <PlusGridPattern
+                                    rows={4}
+                                    cols={5}
+                                    color="coral"
+                                    gap={28}
+                                    size={8}
+                                />
+                            </div>
                         </motion.div>
 
-                        {/* Derecha: Engranes 3D plateados */}
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.96 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, y: 18 }}
+                            whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: '-60px' }}
-                            transition={{ duration: 0.45 }}
-                            className="flex justify-center lg:col-span-6"
+                            transition={{ duration: 0.4, delay: 0.08 }}
+                            className="space-y-6 pt-2 text-base leading-[1.6] font-light text-white/90 sm:text-[17.5px] lg:col-span-7"
                         >
-                            <img
-                                src="/img/brand2026/gears-suma.png"
-                                alt="Engranes del Método SUMA Sapius"
-                                draggable={false}
-                                className="h-auto w-full max-w-[360px] object-contain select-none drop-shadow-[0_24px_38px_rgba(0,0,0,0.45)] sm:max-w-[450px] lg:max-w-[520px]"
-                            />
+                            <p>
+                                El Método SUMA es una metodología de{' '}
+                                <strong className="font-bold text-[#FF6B52]">
+                                    aprendizaje progresivo
+                                </strong>{' '}
+                                que consiste en construir el conocimiento de lo{' '}
+                                <strong className="font-bold text-[#FF6B52]">
+                                    más sencillo a lo más complejo
+                                </strong>
+                                , integrando cada tema nuevo con los
+                                conocimientos previamente adquiridos.
+                            </p>
+                            <p>
+                                Su objetivo es que el alumno no memorice
+                                información de manera aislada, sino que{' '}
+                                <strong className="font-bold text-[#FF6B52]">
+                                    comprenda, relacione y consolide
+                                </strong>{' '}
+                                los conocimientos paso a paso hasta{' '}
+                                <strong className="font-bold text-[#FF6B52]">
+                                    desarrollar las habilidades
+                                </strong>{' '}
+                                necesarias para presentar el EGEL Plus.
+                            </p>
                         </motion.div>
+                    </div>
+
+                    {/* Fila inferior: ¿Cómo funciona? + 5 pasos horizontales */}
+                    <div className="mt-14 lg:mt-16">
+                        <h3 className="text-center font-display text-3xl font-extrabold tracking-tight text-white sm:text-[2.45rem]">
+                            ¿Cómo{' '}
+                            <span className="text-[#FF6B52]">funciona?</span>
+                        </h3>
+
+                        <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
+                            {SUMA_STEPS.map((step, idx) => (
+                                <motion.div
+                                    key={step.title}
+                                    initial={{ opacity: 0, y: 16 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true, margin: '-40px' }}
+                                    transition={{
+                                        duration: 0.35,
+                                        delay: idx * 0.05,
+                                    }}
+                                    className="relative flex flex-col items-center text-center"
+                                >
+                                    <div className="relative flex h-20 w-20 items-center justify-center rounded-[22px] bg-white text-[#101E33] shadow-[0_12px_28px_-8px_rgba(0,0,0,0.4)]">
+                                        {step.icon}
+                                    </div>
+
+                                    {idx < SUMA_STEPS.length - 1 && (
+                                        <ChevronRight
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute top-10 -right-3 hidden h-5 w-5 translate-x-1/2 -translate-y-1/2 text-white/75 lg:block"
+                                        />
+                                    )}
+
+                                    <h4 className="mt-5 font-display text-[15.5px] leading-snug font-extrabold text-[#FF6B52]">
+                                        {step.title}
+                                    </h4>
+                                    <p className="mt-2 max-w-[210px] text-xs leading-relaxed text-white/85 sm:text-[13px]">
+                                        {step.description}
+                                    </p>
+                                </motion.div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </section>
@@ -793,7 +664,8 @@ return img;
                         transition={{ duration: 0.35 }}
                         className="text-center font-display text-2xl font-extrabold tracking-tight text-[#101E33] sm:text-4xl lg:text-[2.65rem]"
                     >
-                        ¿Cuál producto necesito y qué incluye?
+                        ¿Cuál producto necesito{' '}
+                        <span className="text-[#FF6B52]">y qué incluye?</span>
                     </motion.h2>
 
                     {/* 3 Columnas escalonadas exactas a page1_s3_y2100.png */}
@@ -868,7 +740,7 @@ return img;
 
                                 <div className="mt-9 flex justify-center">
                                     <Link
-                                        href="/cursos#guias-simuladores"
+                                        href="/productos"
                                         className="inline-flex w-full max-w-[195px] items-center justify-center rounded-full bg-[#FF6B52] px-6 py-2.5 text-base font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
                                     >
                                         Ver más
@@ -1100,265 +972,14 @@ return img;
             </section>
 
             {/* =========================================================
-                SECCIÓN 7: CONOCE A NUESTROS EXPERTOS (page1_s4_y3150.png)
+                SECCIÓN 7: PREGUNTAS FRECUENTES (Canva Page 1 v297)
                ========================================================= */}
-            <section className="relative overflow-hidden bg-white py-20 lg:py-26">
-                {/* Grilla derecha en coral y grilla inferior izquierda en navy */}
-                <div className="pointer-events-none absolute top-6 right-5 hidden opacity-85 md:block lg:right-8">
-                    <PlusGridPattern
-                        rows={7}
-                        cols={4}
-                        color="coral"
-                        gap={32}
-                        size={8}
-                    />
-                </div>
-                <div className="pointer-events-none absolute bottom-4 left-5 hidden opacity-75 md:block lg:left-8">
-                    <PlusGridPattern
-                        rows={3}
-                        cols={6}
-                        color="navy"
-                        gap={32}
-                        size={8}
-                    />
-                </div>
-
-                <div className="relative z-10 mx-auto max-w-[1140px] px-5 sm:px-8">
-                    <motion.h2
-                        initial={{ opacity: 0, y: 14 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, margin: '-60px' }}
-                        transition={{ duration: 0.35 }}
-                        className="text-center font-display text-3xl font-extrabold tracking-tight text-[#FF6B52] sm:text-4xl lg:text-[2.7rem]"
-                    >
-                        Conoce a nuestros expertos
-                    </motion.h2>
-
-                    <div className="mt-14 grid grid-cols-1 gap-12 sm:grid-cols-2 md:grid-cols-3">
-                        {displayedExperts.map((expert, idx) => (
-                            <motion.div
-                                key={expert.id}
-                                initial={{ opacity: 0, y: 16 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true, margin: '-50px' }}
-                                transition={{
-                                    duration: 0.35,
-                                    delay: idx * 0.06,
-                                }}
-                                className="flex flex-col items-center text-center"
-                            >
-                                {/* Retrato recortado limpio sobre fondo blanco con arco inferior redondeado */}
-                                <div className="flex h-60 w-60 items-end justify-center overflow-hidden rounded-b-full bg-transparent">
-                                    <img
-                                        src={resolveTeacherImg(expert.img)}
-                                        alt={expert.name}
-                                        onError={(e) => {
-                                            (
-                                                e.currentTarget as HTMLImageElement
-                                            ).src =
-                                                '/img/brand2026/expert-placeholder.png';
-                                        }}
-                                        className="h-58 w-auto object-contain object-bottom"
-                                    />
-                                </div>
-
-                                <h3 className="mt-4 font-display text-lg font-extrabold text-[#101E33] sm:text-xl">
-                                    {expert.name}
-                                </h3>
-                                <p className="mt-0.5 text-sm font-normal text-[#FF6B52]">
-                                    {expert.description ||
-                                        'Docente Especialista Sapius'}
-                                </p>
-                            </motion.div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* =========================================================
-                SECCIÓN 7.5: ORGULLO SAPIUS Y OPINIONES DE ALUMNOS
-               ========================================================= */}
-            <section className="relative overflow-hidden bg-[#101E33] py-20 text-white lg:py-24">
-                <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-                    <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-                        <div>
-                            <span className="text-xs font-extrabold tracking-widest text-[#FF6B52] uppercase">
-                                Resultados comprobados
-                            </span>
-                            <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                                Orgullo <span className="text-[#FF6B52]">Sapius</span> y Opiniones
-                            </h2>
-                        </div>
-                        <Link
-                            href="/orgullo-sapius"
-                            className="inline-flex items-center justify-center rounded-full bg-[#FF6B52] px-6 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
-                        >
-                            Ver todos los testimonios
-                        </Link>
-                    </div>
-
-                    {/* Casos de Orgullo Sapius */}
-                    <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
-                        {displayedPrides.map((item) => (
-                            <div
-                                key={item.id}
-                                className="flex flex-col justify-between rounded-3xl border border-white/10 bg-[#192B47] p-6 shadow-lg"
-                            >
-                                <div>
-                                    <div className="flex items-center gap-3.5">
-                                        <img
-                                            src={resolveTeacherImg(item.img)}
-                                            alt={item.name}
-                                            onError={(e) => {
-                                                (e.currentTarget as HTMLImageElement).src = '/img/brand2026/expert-placeholder.png';
-                                            }}
-                                            className="h-14 w-14 shrink-0 rounded-full border-2 border-[#FF6B52] bg-white object-cover object-top"
-                                        />
-                                        <div>
-                                            <h3 className="font-display text-base font-extrabold text-white leading-snug">
-                                                {item.name}
-                                            </h3>
-                                            {item.text && (
-                                                <p className="text-xs font-bold text-[#FF6B52] mt-0.5">
-                                                    {item.text}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {item.text2 && (
-                                        <p className="mt-4 text-sm leading-relaxed text-white/85">
-                                            “{item.text2}”
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Reseñas de alumnos aprobadas */}
-                    {displayedReviews.length > 0 && (
-                        <div className="mt-12 border-t border-white/10 pt-10">
-                            <h3 className="text-center font-display text-2xl font-extrabold text-white mb-8">
-                                Lo que opinan nuestros alumnos
-                            </h3>
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                                {displayedReviews.map((rev) => {
-                                    const author = rev.user_name || rev.name || 'Alumno Sapius';
-                                    const body = rev.content || rev.comment || '';
-                                    const stars = Math.min(5, Math.max(1, Number(rev.rating ?? 5)));
-
-                                    return (
-                                        <div
-                                            key={rev.id}
-                                            className="flex flex-col justify-between rounded-2xl bg-white p-6 text-[#101E33] shadow-md"
-                                        >
-                                            <div>
-                                                <div className="flex items-center gap-1 text-[#FF6B52] mb-3">
-                                                    {Array.from({ length: stars }).map((_, i) => (
-                                                        <span key={i}>★</span>
-                                                    ))}
-                                                </div>
-                                                <p className="text-sm leading-relaxed text-[#101E33]/85">
-                                                    “{body}”
-                                                </p>
-                                            </div>
-                                            <div className="mt-4 pt-3 border-t border-[#101E33]/10 text-xs font-extrabold text-[#101E33]">
-                                                {author}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </section>
-
-            {/* =========================================================
-                SECCIÓN 8: PREGUNTAS FRECUENTES (page1_s5_y4200.png)
-               ========================================================= */}
-            <section className="relative overflow-hidden bg-white py-16 lg:py-24">
-                {/* Sutil resplandor cálido izquierdo */}
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                        background:
-                            'radial-gradient(circle at 18% 55%, rgba(246, 240, 234, 0.95) 0%, rgba(246, 240, 234, 0.45) 35%, transparent 58%)',
-                    }}
-                />
-
-                <div className="relative z-10 mx-auto max-w-[1180px] px-5 sm:px-8">
-                    <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
-                        {/* Izquierda: Cabecera con squircle 3D + doble burbuja ? + Acordeón */}
-                        <div className="lg:col-span-7">
-                            <div className="flex items-center gap-4">
-                                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center sm:h-18 sm:w-18">
-                                    <img
-                                        src="/img/brand2026/badge-squircle-peach.png"
-                                        alt=""
-                                        aria-hidden="true"
-                                        draggable={false}
-                                        className="pointer-events-none absolute inset-0 h-full w-full object-contain select-none"
-                                    />
-                                    <svg
-                                        viewBox="0 0 36 36"
-                                        className="relative z-10 h-8 w-8 stroke-[#101E33]"
-                                        fill="none"
-                                        strokeWidth="1.7"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M9 19H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5" />
-                                        <rect
-                                            x="11"
-                                            y="12"
-                                            width="18"
-                                            height="13"
-                                            rx="2.5"
-                                        />
-                                        <path d="M16 25v4l4.5-4" />
-                                        <path d="M18.4 16.5a1.9 1.9 0 1 1 2.7 1.7c-.7.4-1.1.8-1.1 1.5" />
-                                        <circle
-                                            cx="20"
-                                            cy="22.2"
-                                            r="0.7"
-                                            className="fill-[#101E33]"
-                                        />
-                                    </svg>
-                                </div>
-
-                                <h2 className="font-display text-3xl font-extrabold tracking-tight text-[#101E33] sm:text-[2.5rem]">
-                                    Preguntas frecuentes
-                                </h2>
-                            </div>
-
-                            <div className="mt-8">
-                                <FaqAccordion
-                                    items={HOME_FAQS}
-                                    defaultOpenId="semanas"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Derecha: Isotipo gigante s. + Botón coral Ver más */}
-                        <div className="flex flex-col items-center justify-center lg:col-span-5">
-                            <SapiusIsotype
-                                variant="dark"
-                                className="h-40 sm:h-48 lg:h-[210px]"
-                            />
-
-                            <Link
-                                href="/contacto"
-                                className="mt-7 inline-flex w-full max-w-[275px] items-center justify-center rounded-full bg-[#FF6B52] px-8 py-3.5 text-base font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
-                            >
-                                Ver más
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <FaqSection
+                headingAs="h2"
+                subtitle="Encuentra información sobre nuestros cursos, metodología y proceso de preparación para el EGEL Plus."
+                ctaHref="/preguntas-frecuentes"
+                ctaLabel="Ir a Preguntas frecuentes"
+            />
 
             {/* =========================================================
                 SECCIÓN 9: EMPIEZA HOY TU RUTA DE ESTUDIO (page1_s5_y4200.png)

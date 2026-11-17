@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Route;
 // Public Landing Pages (Identical to ../Sapius + 2026 Redesign Hub Routes)
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/cursos', [LandingController::class, 'coursesHub'])->name('public.courses');
+Route::get('/productos', [LandingController::class, 'productsHub'])->name('public.products');
+Route::get('/preguntas-frecuentes', [LandingController::class, 'faq'])->name('public.faq');
+Route::get('/grupos-y-paquetes', [LandingController::class, 'groupsPackages'])->name('public.groups');
 Route::get('/nosotros', [LandingController::class, 'about'])->name('public.about');
 Route::get('/orgullo-sapius', [LandingController::class, 'pride'])->name('public.pride');
 Route::get('/contacto', [LandingController::class, 'contact'])->name('public.contact');
