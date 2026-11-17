@@ -194,98 +194,103 @@ export default function SchedulesIndex({
                     )}
                 </div>
 
-                {/* Desktop & Laptop Compact Table */}
+                {/* Desktop & Laptop Compact Table (5 columns - Zero Horizontal Overflow) */}
                 <Card className="hidden md:block rounded-xl border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden">
-                    <Table>
+                    <Table className="table-fixed">
                         <TableHeader>
                             <TableRow className="bg-neutral-50/70 dark:bg-neutral-900/50">
-                                <TableHead className="w-14">ID</TableHead>
-                                <TableHead>Curso</TableHead>
-                                <TableHead>Generación</TableHead>
-                                <TableHead>Vigencia</TableHead>
-                                <TableHead>Instructor</TableHead>
-                                <TableHead>Alumnos</TableHead>
-                                <TableHead>Estatus</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="w-[36%]">Curso y Generación</TableHead>
+                                <TableHead className="w-[15%]">Vigencia</TableHead>
+                                <TableHead className="w-[10%] text-center">Alumnos</TableHead>
+                                <TableHead className="w-[11%] text-center">Estatus</TableHead>
+                                <TableHead className="w-[28%] text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {schedules.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center py-12 text-neutral-400 text-sm">
+                                    <TableCell colSpan={5} className="text-center py-12 text-neutral-400 text-sm">
                                         No hay programaciones registradas para los criterios seleccionados.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 schedules.data.map((item) => (
                                     <TableRow key={item.id}>
-                                        <TableCell className="font-mono text-xs text-neutral-500">
-                                            #{item.id}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
-                                                {item.course_title}
+                                        <TableCell className="max-w-0">
+                                            <div className="min-w-0 space-y-1">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <span className="font-mono text-[11px] text-neutral-400 shrink-0">#{item.id}</span>
+                                                    <span className="font-semibold text-sm text-[#101E33] dark:text-neutral-100 truncate" title={item.course_title}>
+                                                        {item.course_title}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+                                                    <Badge variant="outline" className="font-mono text-[11px] font-medium max-w-[200px] truncate" title={item.internal_id || 'Sin ID'}>
+                                                        {item.internal_id || 'Sin ID'}
+                                                    </Badge>
+                                                    <span className="truncate max-w-[160px]" title={item.instructor_name}>
+                                                        · {item.instructor_name}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline" className="font-mono text-xs font-semibold">
-                                                {item.internal_id || 'Sin ID'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-xs text-neutral-600 dark:text-neutral-400">
+                                        <TableCell className="text-xs text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
                                             {item.start_date && item.end_date ? (
-                                                <span>{item.start_date} - {item.end_date}</span>
+                                                <div className="leading-tight space-y-0.5">
+                                                    <div>{item.start_date}</div>
+                                                    <div className="text-neutral-400">{item.end_date}</div>
+                                                </div>
                                             ) : (
                                                 <span className="italic text-neutral-400">Sin fechas</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-xs text-neutral-600 dark:text-neutral-400">
-                                            {item.instructor_name}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-xs">
-                                                {item.students_count} alumnos
+                                        <TableCell className="text-center whitespace-nowrap">
+                                            <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold">
+                                                {item.students_count}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-center whitespace-nowrap">
                                             <Badge
                                                 variant={item.is_active ? 'outline' : 'destructive'}
-                                                className={item.is_active ? 'border-emerald-300 text-emerald-700' : ''}
+                                                className={item.is_active ? 'border-emerald-300 text-emerald-700 text-[11px]' : 'text-[11px]'}
                                             >
                                                 {item.is_active ? 'Activo' : 'Inactivo'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
+                                        <TableCell className="text-right whitespace-nowrap">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <Button
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 px-2.5 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                                    className="h-8 px-2 text-xs rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 border-amber-200"
                                                     title="Programar fechas de contenido del curso"
                                                 >
                                                     <Link href={`/admin/registro/contenido?cp_id=${item.id}`}>
-                                                        <BookOpen className="w-3.5 h-3.5 mr-1" /> Contenido
+                                                        <BookOpen className="w-3.5 h-3.5 xl:mr-1" />
+                                                        <span className="hidden xl:inline">Contenido</span>
                                                     </Link>
                                                 </Button>
                                                 <Button
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                    className="h-8 px-2 text-xs rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                                                    title="Ver alumnos inscritos"
                                                 >
                                                     <Link href={`/admin/curso/${item.id}`}>
-                                                        <Users className="w-3.5 h-3.5 mr-1" /> Alumnos
+                                                        <Users className="w-3.5 h-3.5 xl:mr-1" />
+                                                        <span className="hidden xl:inline">Alumnos</span>
                                                     </Link>
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
-                                                    className={item.is_active ? 'text-neutral-400 hover:text-red-600 h-8 px-2' : 'text-emerald-600 h-8 px-2'}
+                                                    className={`h-8 w-8 p-0 rounded-lg ${item.is_active ? 'text-neutral-400 hover:text-red-600' : 'text-emerald-600 hover:bg-emerald-50'}`}
                                                     onClick={() => handleToggleActive(item.id)}
                                                     title={item.is_active ? 'Desactivar cohorte' : 'Activar cohorte'}
                                                 >
-                                                    {item.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                                    {item.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                                                 </Button>
                                             </div>
                                         </TableCell>

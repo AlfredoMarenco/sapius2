@@ -85,57 +85,64 @@ export default function Inscriptions({ inscriptions }: InscriptionsProps) {
                 </div>
 
                 <Card className="hidden md:block rounded-xl border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden">
-                    <Table>
+                    <Table className="table-fixed">
                         <TableHeader>
                             <TableRow className="bg-neutral-50/70 dark:bg-neutral-900/50">
-                                <TableHead>ID</TableHead>
-                                <TableHead>Alumno</TableHead>
-                                <TableHead>Curso</TableHead>
-                                <TableHead>Referencia</TableHead>
-                                <TableHead>Tipo Pago</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="w-[26%]">Alumno</TableHead>
+                                <TableHead className="w-[28%]">Curso / Fecha</TableHead>
+                                <TableHead className="w-[22%]">Referencia / Pago</TableHead>
+                                <TableHead className="w-[11%] text-center">Estado</TableHead>
+                                <TableHead className="w-[13%] text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {inscriptions.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center py-8 text-neutral-400">
+                                    <TableCell colSpan={5} className="text-center py-8 text-neutral-400">
                                         No se encontraron registros de inscripciones.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 inscriptions.data.map((item) => (
                                     <TableRow key={item.id}>
-                                        <TableCell className="font-mono text-xs">{item.id}</TableCell>
-                                        <TableCell>
-                                            <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
-                                                {item.user_name}
+                                        <TableCell className="max-w-0">
+                                            <div className="min-w-0">
+                                                <div className="font-semibold text-sm text-[#101E33] dark:text-neutral-100 truncate">
+                                                    <span className="font-mono text-[11px] text-neutral-400 mr-1">#{item.id}</span>
+                                                    {item.user_name}
+                                                </div>
+                                                <div className="text-xs text-neutral-500 truncate">
+                                                    {item.user_email}
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-neutral-400">
-                                                {item.user_email}
+                                        </TableCell>
+                                        <TableCell className="max-w-0">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-blue-600 truncate" title={item.course_title}>
+                                                    {item.course_title}
+                                                </div>
+                                                <div className="text-xs text-neutral-400">
+                                                    {item.created_at}
+                                                </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-sm font-medium text-blue-600">
-                                            {item.course_title}
+                                        <TableCell className="max-w-0">
+                                            <div className="min-w-0">
+                                                <div className="font-mono text-xs text-neutral-700 dark:text-neutral-300 truncate" title={item.reference}>
+                                                    {item.reference}
+                                                </div>
+                                                <div className="text-xs capitalize text-neutral-400">
+                                                    {item.payment_type || 'N/A'}
+                                                </div>
+                                            </div>
                                         </TableCell>
-                                        <TableCell className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
-                                            {item.reference}
-                                        </TableCell>
-                                        <TableCell className="text-xs capitalize">
-                                            {item.payment_type || 'N/A'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant={item.status === 'si' ? 'default' : 'secondary'} className={item.status === 'si' ? 'bg-emerald-600' : 'bg-amber-500 text-white'}>
+                                        <TableCell className="text-center whitespace-nowrap">
+                                            <Badge variant={item.status === 'si' ? 'default' : 'secondary'} className={`text-[11px] ${item.status === 'si' ? 'bg-emerald-600' : 'bg-amber-500 text-white'}`}>
                                                 {item.status === 'si' ? 'Aprobado' : 'Pendiente'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-xs text-neutral-500">
-                                            {item.created_at}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button asChild size="sm" variant="outline" className="h-8 rounded-lg text-xs">
+                                        <TableCell className="text-right whitespace-nowrap">
+                                            <Button asChild size="sm" variant="outline" className="h-8 rounded-lg text-xs px-2.5">
                                                 <Link href={`/admin/reports/inscriptions/${item.id}`}>
                                                     Ver Detalles
                                                 </Link>

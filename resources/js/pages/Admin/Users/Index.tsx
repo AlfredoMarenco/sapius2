@@ -376,26 +376,23 @@ export default function UsersIndex({
                     )}
                 </div>
 
-                {/* Desktop & Laptop Table Card */}
+                {/* Desktop & Laptop Table Card (5 columns) */}
                 <Card className="hidden md:block overflow-hidden rounded-xl border-neutral-200/80 shadow-xs dark:border-neutral-800">
-                    <Table>
+                    <Table className="table-fixed">
                         <TableHeader>
                             <TableRow className="bg-neutral-50/70 dark:bg-neutral-900/50">
-                                <TableHead className="w-12">ID</TableHead>
-                                <TableHead>Nombre / Usuario</TableHead>
-                                <TableHead>Correo</TableHead>
-                                <TableHead>Rol</TableHead>
-                                <TableHead>Validación</TableHead>
-                                <TableHead>MAC</TableHead>
-                                <TableHead>Estatus</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="w-[34%]">Usuario / Correo</TableHead>
+                                <TableHead className="w-[17%]">Rol / Estatus</TableHead>
+                                <TableHead className="w-[12%]">Validación</TableHead>
+                                <TableHead className="w-[15%]">MAC</TableHead>
+                                <TableHead className="w-[22%] text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {users.data.length === 0 ? (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={8}
+                                        colSpan={5}
                                         className="py-12 text-center text-neutral-400"
                                     >
                                         No se encontraron usuarios con los criterios
@@ -412,40 +409,53 @@ export default function UsersIndex({
                                                 : ''
                                         }
                                     >
-                                        <TableCell className="font-mono text-xs text-neutral-500">
-                                            {user.id}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                                                {user.name}
-                                                {user.is_blocked && (
-                                                    <Badge
-                                                        variant="destructive"
-                                                        className="h-4 px-1 py-0 text-[10px]"
-                                                    >
-                                                        Bloqueado ({user.strikes} pts)
-                                                    </Badge>
-                                                )}
+                                        <TableCell className="max-w-0">
+                                            <div className="min-w-0 space-y-0.5">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <span className="font-mono text-[11px] text-neutral-400 shrink-0">#{user.id}</span>
+                                                    <span className="text-sm font-semibold text-[#101E33] dark:text-neutral-100 truncate">
+                                                        {user.name}
+                                                    </span>
+                                                    {user.is_blocked && (
+                                                        <Badge
+                                                            variant="destructive"
+                                                            className="h-4 px-1 py-0 text-[10px] shrink-0"
+                                                        >
+                                                            Bloqueado ({user.strikes})
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-neutral-500 truncate" title={`${user.email} (@${user.username})`}>
+                                                    {user.email} · <span className="text-neutral-400">@{user.username}</span>
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-neutral-400">
-                                                @{user.username}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[11px] font-semibold capitalize"
+                                                >
+                                                    {user.role}
+                                                </Badge>
+                                                <Badge
+                                                    variant={
+                                                        user.is_active ? 'outline' : 'destructive'
+                                                    }
+                                                    className={
+                                                        user.is_active
+                                                            ? 'border-emerald-300 text-emerald-700 text-[11px] dark:text-emerald-400'
+                                                            : 'text-[11px]'
+                                                    }
+                                                >
+                                                    {user.is_active ? 'Activo' : 'Inactivo'}
+                                                </Badge>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-sm text-neutral-600 dark:text-neutral-300">
-                                            {user.email}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant="outline"
-                                                className="text-xs font-semibold capitalize"
-                                            >
-                                                {user.role}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
+                                        <TableCell className="whitespace-nowrap">
                                             {user.is_validated ? (
                                                 <Badge
-                                                    className="cursor-pointer bg-emerald-600 text-xs text-white hover:bg-emerald-700"
+                                                    className="cursor-pointer bg-emerald-600 text-[11px] text-white hover:bg-emerald-700"
                                                     onClick={() => handleUnapprove(user.id)}
                                                     title="Clic para revocar validación"
                                                 >
@@ -454,7 +464,7 @@ export default function UsersIndex({
                                             ) : (
                                                 <Badge
                                                     variant="secondary"
-                                                    className="cursor-pointer bg-amber-100 text-xs text-amber-800 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
+                                                    className="cursor-pointer bg-amber-100 text-[11px] text-amber-800 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
                                                     onClick={() => handleApprove(user.id)}
                                                     title="Clic para aprobar"
                                                 >
@@ -465,16 +475,16 @@ export default function UsersIndex({
                                         <TableCell>
                                             {user.pending_mac_address ? (
                                                 <Link href={`/admin/users/${user.id}/verify`}>
-                                                    <Badge className="cursor-pointer gap-1 bg-amber-500 text-xs text-white hover:bg-amber-600">
+                                                    <Badge className="cursor-pointer gap-1 bg-amber-500 text-[11px] text-white hover:bg-amber-600">
                                                         <AlertTriangle className="h-3 w-3" />{' '}
-                                                        Cambio Pendiente
+                                                        Cambio
                                                     </Badge>
                                                 </Link>
                                             ) : user.mac_address ? (
-                                                <div className="flex items-center gap-1.5 font-mono text-xs text-neutral-600 dark:text-neutral-400">
-                                                    <Laptop className="h-3.5 w-3.5 text-neutral-400" />
+                                                <div className="flex items-center gap-1 font-mono text-xs text-neutral-600 dark:text-neutral-400">
+                                                    <Laptop className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                                                     <span
-                                                        className="max-w-[110px] truncate"
+                                                        className="truncate"
                                                         title={user.mac_address}
                                                     >
                                                         {user.mac_address}
@@ -486,34 +496,17 @@ export default function UsersIndex({
                                                 </span>
                                             )}
                                         </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={
-                                                    user.is_active ? 'outline' : 'destructive'
-                                                }
-                                                className={
-                                                    user.is_active
-                                                        ? 'border-emerald-300 text-emerald-700 dark:text-emerald-400'
-                                                        : ''
-                                                }
-                                            >
-                                                {user.is_active ? 'Activo' : 'Inactivo'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
+                                        <TableCell className="text-right whitespace-nowrap">
+                                            <div className="flex items-center justify-end gap-1">
                                                 {user.is_blocked && (
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-8 gap-1.5 border-amber-200 px-2.5 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                                        className="h-8 w-8 p-0 rounded-lg border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
                                                         onClick={() => handleUnlock(user.id)}
                                                         title="Desbloquear alumno y resetear strikes"
                                                     >
                                                         <Unlock className="h-3.5 w-3.5" />
-                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                            Desbloquear
-                                                        </span>
                                                     </Button>
                                                 )}
 
@@ -521,14 +514,11 @@ export default function UsersIndex({
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-8 gap-1.5 border-neutral-200 px-2.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                                                        className="h-8 w-8 p-0 rounded-lg border-neutral-200 text-neutral-500 hover:bg-red-50 hover:text-red-600"
                                                         onClick={() => handleClearMac(user.id)}
                                                         title="Desvincular MAC address"
                                                     >
                                                         <Laptop className="h-3.5 w-3.5" />
-                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                            Reset MAC
-                                                        </span>
                                                     </Button>
                                                 )}
 
@@ -536,16 +526,13 @@ export default function UsersIndex({
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 gap-1.5 border-orange-200 px-2.5 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                                                    className="h-8 w-8 p-0 rounded-lg border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
                                                 >
                                                     <Link
                                                         href={`/admin/users/${user.id}/edit`}
                                                         title="Editar Usuario"
                                                     >
                                                         <Edit3 className="h-3.5 w-3.5" />
-                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                            Editar
-                                                        </span>
                                                     </Link>
                                                 </Button>
 
@@ -553,21 +540,18 @@ export default function UsersIndex({
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 gap-1.5 border-blue-200 px-2.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                                                    className="h-8 w-8 p-0 rounded-lg border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                                                     title="Verificar Expediente y Documentación"
                                                 >
                                                     <Link href={`/admin/users/${user.id}/verify`}>
                                                         <FileCheck className="h-3.5 w-3.5" />
-                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                            Validar
-                                                        </span>
                                                     </Link>
                                                 </Button>
 
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className={`h-8 gap-1.5 px-2.5 ${
+                                                    className={`h-8 w-8 p-0 rounded-lg ${
                                                         user.is_active
                                                             ? 'border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700'
                                                             : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'
@@ -580,19 +564,9 @@ export default function UsersIndex({
                                                     }
                                                 >
                                                     {user.is_active ? (
-                                                        <>
-                                                            <XCircle className="h-3.5 w-3.5" />{' '}
-                                                            <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                                Desactivar
-                                                            </span>
-                                                        </>
+                                                        <XCircle className="h-3.5 w-3.5" />
                                                     ) : (
-                                                        <>
-                                                            <CheckCircle className="h-3.5 w-3.5" />{' '}
-                                                            <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                                Activar
-                                                            </span>
-                                                        </>
+                                                        <CheckCircle className="h-3.5 w-3.5" />
                                                     )}
                                                 </Button>
 
@@ -600,13 +574,11 @@ export default function UsersIndex({
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 gap-1.5 border-slate-200 px-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+                                                    className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+                                                    title="Ver Detalles"
                                                 >
                                                     <Link href={`/admin/users/${user.id}/view`}>
                                                         <Eye className="h-3.5 w-3.5" />
-                                                        <span className="hidden text-[10px] font-bold tracking-widest uppercase xl:inline">
-                                                            Detalles
-                                                        </span>
                                                     </Link>
                                                 </Button>
                                             </div>

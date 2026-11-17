@@ -215,26 +215,26 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
         <>
             <Head title={`Inscritos - ${cohort.internal_id}`} />
 
-            <div className="flex flex-col gap-6 p-6">
+            <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
                 {/* Botón de retorno y encabezado */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
                         <Link
                             href="/admin"
-                            className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                         >
-                            <ChevronLeft className="size-5" />
+                            <ChevronLeft className="size-4" />
                         </Link>
-                        <div>
+                        <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <span className="rounded-md bg-brand-blue/10 px-2.5 py-0.5 text-xs font-semibold text-brand-blue">
+                                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
                                     Cohorte #{cohort.id}
                                 </span>
-                                <span className="rounded-md bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground truncate max-w-[180px]">
                                     {cohort.internal_id}
                                 </span>
                             </div>
-                            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                            <h1 className="mt-0.5 text-xl sm:text-2xl font-bold tracking-tight text-[#101E33] dark:text-neutral-100 truncate">
                                 {cohort.course?.title || 'Curso Programado'}
                             </h1>
                         </div>
@@ -243,14 +243,14 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
                     <div className="flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => setCopyModalOpen(true)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-brand-blue bg-white px-4 py-2 text-sm font-medium text-brand-blue shadow-sm hover:bg-brand-blue/5 transition-all"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs sm:text-sm font-medium text-[#101E33] shadow-xs hover:bg-neutral-50 transition-colors"
                         >
                             <Users className="size-4" />
                             Copiar Cohorte
                         </button>
                         <button
                             onClick={() => setManualModalOpen(true)}
-                            className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-blue/90 transition-all"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#FF6B52] px-3.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-[#F0563C] transition-colors"
                         >
                             <UserPlus className="size-4" />
                             Venta Presencial
@@ -258,18 +258,18 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
                         <a
                             href={`/admin/exportAllResults/${cohort.id}?format=excel`}
                             title="Descargar sábana de calificaciones en formato Excel"
-                            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400 transition-all"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs sm:text-sm font-medium text-foreground shadow-xs hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400 transition-colors"
                         >
                             <FileSpreadsheet className="size-4 text-emerald-600" />
-                            Exportar Excel (.xlsx)
+                            Excel (.xlsx)
                         </a>
                         <a
                             href={`/admin/exportAllResults/${cohort.id}?format=zip`}
                             title="Descargar paquete ZIP con los reportes individuales en PDF"
-                            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-all"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs sm:text-sm font-medium text-foreground shadow-xs hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-colors"
                         >
                             <FileArchive className="size-4 text-rose-600" />
-                            Exportar PDFs (.zip)
+                            PDFs (.zip)
                         </a>
                     </div>
                 </div>
@@ -383,50 +383,50 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
                 </div>
 
                 {/* Tabla de Alumnos */}
-                <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
+                <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+                    <div className="overflow-x-auto [scrollbar-width:thin]">
                         <table className="w-full text-left text-sm">
-                            <thead className="border-b border-border bg-muted/30 text-xs font-semibold uppercase text-muted-foreground">
+                            <thead className="border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground">
                                 <tr>
-                                    <th className="px-6 py-4">Alumno</th>
-                                    <th className="px-6 py-4">Fecha Registro</th>
-                                    <th className="px-6 py-4">Aceptado</th>
-                                    <th className="px-6 py-4">Seguridad</th>
-                                    <th className="px-6 py-4 text-right">Seguimiento y Acciones</th>
+                                    <th className="px-3 py-2.5 sm:px-4 sm:py-3">Alumno</th>
+                                    <th className="px-3 py-2.5 sm:px-4 sm:py-3">Registro</th>
+                                    <th className="px-3 py-2.5 sm:px-4 sm:py-3">Aceptado</th>
+                                    <th className="px-3 py-2.5 sm:px-4 sm:py-3">Seguridad</th>
+                                    <th className="px-3 py-2.5 sm:px-4 sm:py-3 text-right">Seguimiento y Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {filteredEnrollments.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                                        <td colSpan={5} className="py-10 text-center text-muted-foreground">
                                             No se encontraron alumnos con los criterios seleccionados.
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredEnrollments.map((enrollment) => (
                                         <tr key={enrollment.id} className="hover:bg-muted/20 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex size-9 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue font-semibold text-xs">
+                                            <td className="px-3 py-2.5 sm:px-4 sm:py-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 font-semibold text-xs">
                                                         {enrollment.student_name.charAt(0).toUpperCase()}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-medium text-foreground">{enrollment.student_name}</p>
-                                                        <p className="text-xs text-muted-foreground">{enrollment.student_email}</p>
+                                                    <div className="min-w-0">
+                                                        <p className="font-medium text-sm text-foreground truncate max-w-[200px]">{enrollment.student_name}</p>
+                                                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">{enrollment.student_email}</p>
                                                         {enrollment.student_phone && (
                                                             <p className="text-[11px] text-muted-foreground/80">Tel: {enrollment.student_phone}</p>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground">
+                                            <td className="px-3 py-2.5 sm:px-4 sm:py-3 whitespace-nowrap text-xs text-muted-foreground">
                                                 {enrollment.enrolled_at || 'N/A'}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-3 py-2.5 sm:px-4 sm:py-3 whitespace-nowrap">
                                                 <button
                                                     onClick={() => handleToggleAcceptance(enrollment.id, enrollment.accepted)}
                                                     title={enrollment.accepted === 'si' ? 'Clic para desactivar' : 'Clic para aceptar'}
-                                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                                                         enrollment.accepted === 'si'
                                                             ? 'bg-green-500/10 text-green-700 hover:bg-green-500/20'
                                                             : 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/20'
@@ -443,10 +443,10 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
                                                     )}
                                                 </button>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-3 py-2.5 sm:px-4 sm:py-3 whitespace-nowrap">
                                                 {enrollment.is_blocked ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-600">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600">
                                                             <ShieldAlert className="size-3" /> Bloqueado
                                                         </span>
                                                         <button
@@ -458,43 +458,43 @@ export default function Enrollments({ cohort, enrollments, otherCohorts }: Props
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700">
                                                         Activo
                                                     </span>
                                                 )}
                                                 {enrollment.mac_address && (
-                                                    <p className="mt-1 text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">
-                                                        MAC: {enrollment.mac_address}
+                                                    <p className="mt-0.5 text-[10px] text-muted-foreground font-mono truncate max-w-[110px]">
+                                                        {enrollment.mac_address}
                                                     </p>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                <div className="flex items-center justify-end gap-1.5">
+                                            <td className="px-3 py-2.5 sm:px-4 sm:py-3 whitespace-nowrap text-right">
+                                                <div className="flex items-center justify-end gap-1">
                                                     <Link
                                                         href={`/admin/evaluacion/resultados/${enrollment.id}`}
-                                                        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted hover:text-brand-blue transition-colors shadow-sm"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                                                         title="Ver Resultados de Exámenes"
                                                     >
-                                                        <Award className="size-3.5 text-brand-blue" />
-                                                        <span>Exámenes</span>
+                                                        <Award className="size-3.5 text-blue-600" />
+                                                        <span className="hidden lg:inline">Exámenes</span>
                                                     </Link>
 
                                                     <Link
                                                         href={`/admin/curso/progress/${cohort.id}/${enrollment.user_id}`}
-                                                        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted hover:text-green-600 transition-colors shadow-sm"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                                                         title="Ver Progreso del Alumno"
                                                     >
-                                                        <TrendingUp className="size-3.5 text-green-600" />
-                                                        <span>Progreso</span>
+                                                        <TrendingUp className="size-3.5 text-emerald-600" />
+                                                        <span className="hidden lg:inline">Progreso</span>
                                                     </Link>
 
                                                     <Link
                                                         href={`/admin/curso/homework-tracking/${cohort.id}/${enrollment.user_id}`}
-                                                        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted hover:text-blue-600 transition-colors shadow-sm"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                                                         title="Seguimiento de Tareas"
                                                     >
-                                                        <FileText className="size-3.5 text-blue-600" />
-                                                        <span>Tareas</span>
+                                                        <FileText className="size-3.5 text-orange-600" />
+                                                        <span className="hidden lg:inline">Tareas</span>
                                                     </Link>
                                                 </div>
                                             </td>
