@@ -1,7 +1,9 @@
 import { Head, router } from '@inertiajs/react';
-import { Image as ImageIcon, Award, GraduationCap, Plus, Trash2, Edit, BellRing } from 'lucide-react';
+import { Image as ImageIcon, Award, GraduationCap, Plus, Trash2, Edit, BellRing, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import type { MiniTestConfig } from '@/components/public/MiniTestModal';
+import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { MiniTestConfigManager } from './MiniTest';
 
 interface Slide {
     id: number;
@@ -46,9 +49,17 @@ interface Props {
     slides: Slide[];
     prides: Pride[];
     teachers: Teacher[];
+    miniTestConfig?: MiniTestConfig;
+    scheduledCourses?: ScheduledCourseCandidate[];
 }
 
-export default function LandingConfigIndex({ slides = [], prides = [], teachers = [] }: Props) {
+export default function LandingConfigIndex({
+    slides = [],
+    prides = [],
+    teachers = [],
+    miniTestConfig,
+    scheduledCourses = [],
+}: Props) {
     // Slides state
     const [isUploadSlideOpen, setIsUploadSlideOpen] = useState(false);
     const [slideFile, setSlideFile] = useState<File | null>(null);
@@ -234,7 +245,7 @@ return path;
                             Configuraciones de Landing
                         </h1>
                         <p className="text-sm text-neutral-500 mt-1">
-                            Personaliza los banners principales, la sección de testimonios de Orgullo Sapius y los perfiles docentes.
+                            Personaliza los banners principales, la sección de testimonios de Orgullo Sapius, los perfiles docentes y el Mini-Test vocacional.
                         </p>
                     </div>
                     <Button
@@ -250,7 +261,7 @@ return path;
                 </div>
 
                 <Tabs defaultValue="slides" className="space-y-6">
-                    <TabsList className="bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+                    <TabsList className="bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl flex-wrap h-auto">
                         <TabsTrigger value="slides" className="flex items-center gap-2">
                             <ImageIcon className="w-4 h-4" />
                             Slides Principales ({slides.length})
@@ -262,6 +273,10 @@ return path;
                         <TabsTrigger value="teachers" className="flex items-center gap-2">
                             <GraduationCap className="w-4 h-4" />
                             Docentes ({teachers.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="mini-test" className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-[#FF6B52]" />
+                            Mini-Test Vocacional
                         </TabsTrigger>
                     </TabsList>
 
@@ -441,6 +456,14 @@ return path;
                                 ))}
                             </div>
                         )}
+                    </TabsContent>
+
+                    {/* MINI-TEST TAB */}
+                    <TabsContent value="mini-test" className="space-y-6">
+                        <MiniTestConfigManager
+                            config={miniTestConfig}
+                            scheduledCourses={scheduledCourses}
+                        />
                     </TabsContent>
                 </Tabs>
             </div>

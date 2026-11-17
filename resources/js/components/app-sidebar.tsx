@@ -6,7 +6,6 @@ import {
     CheckCircle,
     Copy,
     Flag,
-    HelpCircle,
     Home,
     Info,
     LayoutTemplate,
@@ -103,11 +102,6 @@ export function AppSidebar() {
                     title: 'Landing',
                     href: '/admin/configuraciones',
                     icon: Tv,
-                },
-                {
-                    title: 'Mini-Test Landing',
-                    href: '/admin/mini-test',
-                    icon: HelpCircle,
                 },
                 {
                     title: 'Administrables',

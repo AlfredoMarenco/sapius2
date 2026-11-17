@@ -43,8 +43,8 @@ import AppLayout from '@/layouts/app-layout';
 import { LandingAdminNav } from './LandingAdminNav';
 
 interface Props {
-    config: MiniTestConfig;
-    scheduledCourses: ScheduledCourseCandidate[];
+    config?: MiniTestConfig;
+    scheduledCourses?: ScheduledCourseCandidate[];
 }
 
 const AREA_LABELS: Record<MiniTestArea, string> = {
@@ -120,7 +120,7 @@ function makeUniqueId(prefix: string, existingIds: string[]): string {
     return `${prefix}_${index}`;
 }
 
-export default function MiniTestAdminPage({
+export function MiniTestConfigManager({
     config: initialConfig,
     scheduledCourses = [],
 }: Props) {
@@ -479,78 +479,73 @@ export default function MiniTestAdminPage({
     }, [draft.recommendations, areaFilterTab]);
 
     return (
-        <>
-            <Head title="Mini-Test Vocacional - Configuración Landing" />
-
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
-                {/* Encabezado y Acciones Principales */}
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div>
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-                                Mini-Test Vocacional de Landing
-                            </h1>
-                            {hasUnsavedChanges && (
-                                <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                                    Cambios sin guardar
-                                </Badge>
-                            )}
-                        </div>
-                        <p className="text-sm text-neutral-500 mt-1">
-                            Administra cuántas preguntas se muestran ({activeQuestionsCount} activas), sus opciones, puntos de afinidad y las {activeRecommendationsCount} tarjetas de recomendación sugeridas.
-                        </p>
-                    </div>
-
+        <div className="space-y-6">
+            {/* Encabezado del editor y Acciones Principales */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
                     <div className="flex flex-wrap items-center gap-2.5">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setPreviewOpen(true)}
-                            className="flex items-center gap-2"
-                        >
-                            <Eye className="w-4 h-4 text-blue-600" />
-                            Vista Previa en Vivo
-                        </Button>
-
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleReset}
-                            disabled={resetting || saving}
-                            className="flex items-center gap-2 text-neutral-700"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                            {resetting ? 'Restaurando...' : 'Restaurar Original'}
-                        </Button>
-
-                        <Button
-                            type="button"
-                            onClick={handleSave}
-                            disabled={saving || resetting}
-                            className="flex items-center gap-2 bg-[#FF6B52] hover:bg-[#F0563C] text-white"
-                        >
-                            <Save className="w-4 h-4" />
-                            {saving ? 'Guardando...' : 'Guardar Cambios'}
-                        </Button>
+                        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                            Editor del Mini-Test Vocacional
+                        </h3>
+                        {hasUnsavedChanges && (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                                Cambios sin guardar
+                            </Badge>
+                        )}
                     </div>
+                    <p className="text-sm text-neutral-500 mt-0.5">
+                        Administra cuántas preguntas se muestran ({activeQuestionsCount} activas), sus opciones, puntos de afinidad y las {activeRecommendationsCount} tarjetas de recomendación sugeridas.
+                    </p>
                 </div>
 
-                <LandingAdminNav active="mini-test" />
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPreviewOpen(true)}
+                        className="flex items-center gap-2"
+                    >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                        Vista Previa en Vivo
+                    </Button>
 
-                {/* Banner explicativo del motor */}
-                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-950 flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                        <p className="font-semibold">
-                            ¿Cómo decide el test qué sugerir al alumno?
-                        </p>
-                        <p className="text-xs leading-relaxed text-blue-900/90">
-                            Cada opción elegida puede <strong>filtrar el área</strong> (Nutrición, Medicina u Otro) y <strong>sumar puntos de afinidad</strong> hacia una o más tarjetas de recomendación. Al terminar todas las preguntas activas (sean 3, 6 o 10), el sistema sugiere la tarjeta de esa área que acumuló más puntos. Puedes usar <strong>Vista Previa en Vivo</strong> para probar tu flujo antes de guardar.
-                        </p>
-                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleReset}
+                        disabled={resetting || saving}
+                        className="flex items-center gap-2 text-neutral-700"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        {resetting ? 'Restaurando...' : 'Restaurar Original'}
+                    </Button>
+
+                    <Button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving || resetting}
+                        className="flex items-center gap-2 bg-[#FF6B52] hover:bg-[#F0563C] text-white"
+                    >
+                        <Save className="w-4 h-4" />
+                        {saving ? 'Guardando...' : 'Guardar Cambios'}
+                    </Button>
                 </div>
+            </div>
 
-                <Tabs defaultValue="questions" className="space-y-6">
+            {/* Banner explicativo del motor */}
+            <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-950 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                    <p className="font-semibold">
+                        ¿Cómo decide el test qué sugerir al alumno?
+                    </p>
+                    <p className="text-xs leading-relaxed text-blue-900/90">
+                        Cada opción elegida puede <strong>filtrar el área</strong> (Nutrición, Medicina u Otro) y <strong>sumar puntos de afinidad</strong> hacia una o más tarjetas de recomendación. Al terminar todas las preguntas activas (sean 3, 6 o 10), el sistema sugiere la tarjeta de esa área que acumuló más puntos. Puedes usar <strong>Vista Previa en Vivo</strong> para probar tu flujo antes de guardar.
+                    </p>
+                </div>
+            </div>
+
+            <Tabs defaultValue="questions" className="space-y-6">
                     <TabsList className="bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl flex-wrap h-auto">
                         <TabsTrigger value="questions" className="flex items-center gap-2">
                             <SlidersHorizontal className="w-4 h-4" />
@@ -1293,7 +1288,6 @@ export default function MiniTestAdminPage({
                         </Card>
                     </TabsContent>
                 </Tabs>
-            </div>
 
             {/* Modal de Vista Previa en Vivo con el borrador actual */}
             <MiniTestModal
@@ -1303,6 +1297,35 @@ export default function MiniTestAdminPage({
                 scheduledCourses={scheduledCourses}
                 listenToGlobalEvent={false}
             />
+        </div>
+    );
+}
+
+export default function MiniTestAdminPage({
+    config,
+    scheduledCourses = [],
+}: Props) {
+    return (
+        <>
+            <Head title="Mini-Test Vocacional - Configuración Landing" />
+
+            <div className="p-6 max-w-7xl mx-auto space-y-6">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                        Configuraciones de Landing
+                    </h1>
+                    <p className="text-sm text-neutral-500 mt-1">
+                        Personaliza las preguntas, opciones y tarjetas de recomendación del Mini-Test Vocacional.
+                    </p>
+                </div>
+
+                <LandingAdminNav active="slides" />
+
+                <MiniTestConfigManager
+                    config={config}
+                    scheduledCourses={scheduledCourses}
+                />
+            </div>
         </>
     );
 }

@@ -4,28 +4,56 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pride;
+use App\Models\ScheduledCourse;
 use App\Models\Slide;
 use App\Models\Teacher;
+use App\Services\MiniTestConfigService;
 use App\Traits\OptimizesImages;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class LandingConfigController extends Controller
 {
     use OptimizesImages;
 
-    public function index()
+    public function index(MiniTestConfigService $miniTestService)
     {
         $slides = Slide::where('section', 'LIKE', 'slider-index')->orWhereNull('section')->orderBy('position', 'asc')->get();
         $prides = Pride::orderBy('position', 'asc')->get();
         $teachers = Teacher::orderBy('position', 'asc')->get();
 
+        $scheduledCourses = [];
+        try {
+            if (Schema::hasTable('cursos_programados') && Schema::hasTable('cursos')) {
+                $scheduledCourses = ScheduledCourse::with('course')
+                    ->where('activo', 'si')
+                    ->whereHas('course', fn ($q) => $q->where('activo', 'si'))
+                    ->orderByDesc('id')
+                    ->get()
+                    ->map(fn (ScheduledCourse $scheduled): array => [
+                        'id' => $scheduled->id,
+                        'identificador' => $scheduled->identificador,
+                        'precio' => (float) ($scheduled->precio ?? 0),
+                        'course_title' => $scheduled->course?->title ?? 'Programa Sapius',
+                        'course_slug' => $scheduled->course?->slug,
+                    ])
+                    ->values()
+                    ->all();
+            }
+        } catch (QueryException) {
+            $scheduledCourses = [];
+        }
+
         return Inertia::render('Admin/Landing/Index', [
             'slides' => $slides,
             'prides' => $prides,
             'teachers' => $teachers,
+            'miniTestConfig' => $miniTestService->getConfig(),
+            'scheduledCourses' => $scheduledCourses,
         ]);
     }
 
