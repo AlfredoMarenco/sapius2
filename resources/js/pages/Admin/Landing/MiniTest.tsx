@@ -2,6 +2,8 @@ import { Head, router } from '@inertiajs/react';
 import {
     ArrowDown,
     ArrowUp,
+    ChevronDown,
+    ChevronRight,
     Copy,
     Eye,
     Plus,
@@ -139,6 +141,36 @@ export function MiniTestConfigManager({
     const [selectedWeightPoints, setSelectedWeightPoints] = useState<
         Record<string, number>
     >({});
+    const [expandedQuestions, setExpandedQuestions] = useState<
+        Record<string, boolean>
+    >({});
+    const [expandedRecommendations, setExpandedRecommendations] = useState<
+        Record<string, boolean>
+    >({});
+
+    const toggleQuestionExpanded = (id: string) => {
+        setExpandedQuestions((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const setAllQuestionsExpanded = (expand: boolean) => {
+        const next: Record<string, boolean> = {};
+        for (const q of draft.questions) {
+            next[q.id] = expand;
+        }
+        setExpandedQuestions(next);
+    };
+
+    const toggleRecommendationExpanded = (id: string) => {
+        setExpandedRecommendations((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const setAllRecommendationsExpanded = (expand: boolean) => {
+        const next: Record<string, boolean> = {};
+        for (const r of draft.recommendations) {
+            next[r.id] = expand;
+        }
+        setExpandedRecommendations(next);
+    };
 
     useEffect(() => {
         setDraft(normalizeConfig(initialConfig));
@@ -261,6 +293,7 @@ export function MiniTestConfigManager({
             ...prev,
             questions: [...prev.questions, newQuestion],
         }));
+        setExpandedQuestions((prev) => ({ ...prev, [newId]: true }));
     };
 
     const updateQuestion = (
@@ -407,6 +440,7 @@ export function MiniTestConfigManager({
             ...prev,
             recommendations: [...prev.recommendations, newRec],
         }));
+        setExpandedRecommendations((prev) => ({ ...prev, [newId]: true }));
     };
 
     const duplicateRecommendation = (rec: MiniTestRecommendation) => {
@@ -427,6 +461,7 @@ export function MiniTestConfigManager({
             ...prev,
             recommendations: [...prev.recommendations, copy],
         }));
+        setExpandedRecommendations((prev) => ({ ...prev, [newId]: true }));
     };
 
     const updateRecommendation = (
@@ -562,101 +597,145 @@ export function MiniTestConfigManager({
 
                     {/* TAB 1: PREGUNTAS Y OPCIONES */}
                     <TabsContent value="questions" className="space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <p className="text-sm text-neutral-600">
-                                Ordena, activa o desactiva preguntas y asigna qué resultado impulsa cada respuesta.
+                                Ordena, activa o desactiva preguntas y haz clic en una pregunta para desplegar y editar sus opciones.
                             </p>
-                            <Button type="button" onClick={addQuestion} className="flex items-center gap-2">
-                                <Plus className="w-4 h-4" />
-                                Agregar Pregunta
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setAllQuestionsExpanded(true)}
+                                    className="text-xs"
+                                >
+                                    Expandir todas
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setAllQuestionsExpanded(false)}
+                                    className="text-xs"
+                                >
+                                    Colapsar todas
+                                </Button>
+                                <Button type="button" onClick={addQuestion} className="flex items-center gap-2">
+                                    <Plus className="w-4 h-4" />
+                                    Agregar Pregunta
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className="space-y-5">
-                            {draft.questions.map((question, qIndex) => (
-                                <Card
-                                    key={question.id}
-                                    className={
-                                        question.active
-                                            ? 'border-neutral-200 shadow-sm'
-                                            : 'border-dashed border-neutral-300 bg-neutral-50/70 opacity-80'
-                                    }
-                                >
-                                    <CardHeader className="pb-4 border-b border-neutral-100">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <Badge variant="outline" className="font-mono text-xs">
-                                                    #{qIndex + 1}
-                                                </Badge>
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        checked={question.active}
-                                                        onCheckedChange={(checked) =>
-                                                            updateQuestion(qIndex, { active: checked })
-                                                        }
-                                                    />
-                                                    <span className="text-xs font-medium text-neutral-700">
-                                                        {question.active ? 'Visible en el test' : 'Oculta'}
+                        <div className="space-y-3">
+                            {draft.questions.map((question, qIndex) => {
+                                const isExpanded = Boolean(expandedQuestions[question.id]);
+
+                                return (
+                                    <Card
+                                        key={question.id}
+                                        className={
+                                            question.active
+                                                ? 'border-neutral-200 shadow-sm'
+                                                : 'border-dashed border-neutral-300 bg-neutral-50/70 opacity-80'
+                                        }
+                                    >
+                                        <CardHeader className={isExpanded ? 'pb-4 border-b border-neutral-100' : 'py-3.5'}>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleQuestionExpanded(question.id)}
+                                                    className="flex flex-1 items-center gap-3 text-left min-w-0 group"
+                                                >
+                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-600 group-hover:border-[#FF6B52]/50 group-hover:text-[#FF6B52] transition-colors">
+                                                        {isExpanded ? (
+                                                            <ChevronDown className="w-4 h-4" />
+                                                        ) : (
+                                                            <ChevronRight className="w-4 h-4" />
+                                                        )}
                                                     </span>
+                                                    <Badge variant="outline" className="font-mono text-xs shrink-0">
+                                                        #{qIndex + 1}
+                                                    </Badge>
+                                                    <span className="font-semibold text-sm sm:text-base text-neutral-900 dark:text-neutral-100 truncate">
+                                                        {question.title || 'Pregunta sin título'}
+                                                    </span>
+                                                    <Badge variant="secondary" className="text-[11px] shrink-0">
+                                                        {question.options.length} {question.options.length === 1 ? 'opción' : 'opciones'}
+                                                    </Badge>
+                                                </button>
+
+                                                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                                                    <div className="flex items-center gap-2 mr-1">
+                                                        <Switch
+                                                            checked={question.active}
+                                                            onCheckedChange={(checked) =>
+                                                                updateQuestion(qIndex, { active: checked })
+                                                            }
+                                                        />
+                                                        <span className="text-xs font-medium text-neutral-700 w-16">
+                                                            {question.active ? 'Visible' : 'Oculta'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1">
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={qIndex === 0}
+                                                            onClick={() => moveQuestion(qIndex, -1)}
+                                                            title="Subir pregunta"
+                                                        >
+                                                            <ArrowUp className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={qIndex === draft.questions.length - 1}
+                                                            onClick={() => moveQuestion(qIndex, 1)}
+                                                            title="Bajar pregunta"
+                                                        >
+                                                            <ArrowDown className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => deleteQuestion(qIndex)}
+                                                            title="Eliminar pregunta"
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
+                                        </CardHeader>
 
-                                            <div className="flex items-center gap-1.5">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    disabled={qIndex === 0}
-                                                    onClick={() => moveQuestion(qIndex, -1)}
-                                                    title="Subir pregunta"
-                                                >
-                                                    <ArrowUp className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    disabled={qIndex === draft.questions.length - 1}
-                                                    onClick={() => moveQuestion(qIndex, 1)}
-                                                    title="Bajar pregunta"
-                                                >
-                                                    <ArrowDown className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => deleteQuestion(qIndex)}
-                                                    title="Eliminar pregunta"
-                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
+                                        {isExpanded && (
+                                            <CardContent className="pt-5 space-y-4">
+                                                <div>
+                                                    <Label htmlFor={`q-title-${question.id}`} className="text-xs text-neutral-500">
+                                                        Texto de la pregunta
+                                                    </Label>
+                                                    <Input
+                                                        id={`q-title-${question.id}`}
+                                                        value={question.title}
+                                                        onChange={(e) =>
+                                                            updateQuestion(qIndex, { title: e.target.value })
+                                                        }
+                                                        className="mt-1 font-semibold"
+                                                        placeholder="Ej. ¿Qué examen vas a presentar?"
+                                                    />
+                                                </div>
 
-                                        <div className="pt-3">
-                                            <Label htmlFor={`q-title-${question.id}`} className="text-xs text-neutral-500">
-                                                Texto de la pregunta
-                                            </Label>
-                                            <Input
-                                                id={`q-title-${question.id}`}
-                                                value={question.title}
-                                                onChange={(e) =>
-                                                    updateQuestion(qIndex, { title: e.target.value })
-                                                }
-                                                className="mt-1 font-semibold"
-                                                placeholder="Ej. ¿Qué examen vas a presentar?"
-                                            />
-                                        </div>
-                                    </CardHeader>
-
-                                    <CardContent className="pt-5 space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                                                Opciones de respuesta ({question.options.length})
-                                            </h4>
-                                            <Button
+                                                <div className="flex items-center justify-between pt-2">
+                                                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                                                        Opciones de respuesta ({question.options.length})
+                                                    </h4>
+                                                    <Button
                                                 type="button"
                                                 size="sm"
                                                 variant="outline"
@@ -849,15 +928,17 @@ export function MiniTestConfigManager({
                                                 );
                                             })}
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                            </CardContent>
+                                        )}
+                                    </Card>
+                                );
+                            })}
                         </div>
                     </TabsContent>
 
                     {/* TAB 2: TARJETAS DE RECOMENDACIÓN */}
                     <TabsContent value="recommendations" className="space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 {(['all', 'nutricion', 'medicina', 'otro', 'general'] as const).map(
                                     (area) => (
@@ -877,76 +958,120 @@ export function MiniTestConfigManager({
                                 )}
                             </div>
 
-                            <Button
-                                type="button"
-                                onClick={addRecommendation}
-                                className="flex items-center gap-2 self-start"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Nueva Tarjeta de Recomendación
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setAllRecommendationsExpanded(true)}
+                                    className="text-xs"
+                                >
+                                    Expandir todas
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setAllRecommendationsExpanded(false)}
+                                    className="text-xs"
+                                >
+                                    Colapsar todas
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={addRecommendation}
+                                    className="flex items-center gap-2 self-start"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Nueva Tarjeta de Recomendación
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className="space-y-5">
-                            {filteredRecommendations.map((rec) => (
-                                <Card
-                                    key={rec.id}
-                                    className={
-                                        rec.active
-                                            ? 'border-neutral-200 shadow-sm'
-                                            : 'border-dashed border-neutral-300 bg-neutral-50/70 opacity-80'
-                                    }
-                                >
-                                    <CardHeader className="pb-4 border-b border-neutral-100">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div className="flex flex-wrap items-center gap-2.5">
-                                                <Badge className="bg-[#101E33] text-white">
-                                                    {AREA_LABELS[rec.area]}
-                                                </Badge>
-                                                <Badge variant="outline" className="font-mono text-xs">
-                                                    Prioridad #{rec.priority}
-                                                </Badge>
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        checked={rec.active}
-                                                        onCheckedChange={(checked) =>
-                                                            updateRecommendation(rec.id, {
-                                                                active: checked,
-                                                            })
-                                                        }
-                                                    />
-                                                    <span className="text-xs font-medium text-neutral-700">
-                                                        {rec.active ? 'Activa' : 'Inactiva'}
+                        <div className="space-y-3">
+                            {filteredRecommendations.map((rec) => {
+                                const isExpanded = Boolean(expandedRecommendations[rec.id]);
+
+                                return (
+                                    <Card
+                                        key={rec.id}
+                                        className={
+                                            rec.active
+                                                ? 'border-neutral-200 shadow-sm'
+                                                : 'border-dashed border-neutral-300 bg-neutral-50/70 opacity-80'
+                                        }
+                                    >
+                                        <CardHeader className={isExpanded ? 'pb-4 border-b border-neutral-100' : 'py-3.5'}>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleRecommendationExpanded(rec.id)}
+                                                    className="flex flex-1 flex-wrap items-center gap-2.5 text-left min-w-0 group"
+                                                >
+                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-600 group-hover:border-[#FF6B52]/50 group-hover:text-[#FF6B52] transition-colors">
+                                                        {isExpanded ? (
+                                                            <ChevronDown className="w-4 h-4" />
+                                                        ) : (
+                                                            <ChevronRight className="w-4 h-4" />
+                                                        )}
                                                     </span>
+                                                    <Badge className="bg-[#101E33] text-white shrink-0">
+                                                        {AREA_LABELS[rec.area]}
+                                                    </Badge>
+                                                    <Badge variant="outline" className="font-mono text-xs shrink-0">
+                                                        Prioridad #{rec.priority}
+                                                    </Badge>
+                                                    <span className="font-semibold text-sm sm:text-base text-neutral-900 dark:text-neutral-100 truncate">
+                                                        {rec.title}
+                                                    </span>
+                                                    <Badge variant="secondary" className="text-xs font-semibold shrink-0">
+                                                        {rec.price}
+                                                    </Badge>
+                                                </button>
+
+                                                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                                                    <div className="flex items-center gap-2 mr-1">
+                                                        <Switch
+                                                            checked={rec.active}
+                                                            onCheckedChange={(checked) =>
+                                                                updateRecommendation(rec.id, {
+                                                                    active: checked,
+                                                                })
+                                                            }
+                                                        />
+                                                        <span className="text-xs font-medium text-neutral-700 w-14">
+                                                            {rec.active ? 'Activa' : 'Inactiva'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => duplicateRecommendation(rec)}
+                                                            className="h-8 text-xs flex items-center gap-1.5"
+                                                        >
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                            Duplicar
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => deleteRecommendation(rec.id)}
+                                                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            title="Eliminar tarjeta"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
+                                        </CardHeader>
 
-                                            <div className="flex items-center gap-1.5">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => duplicateRecommendation(rec)}
-                                                    className="h-8 text-xs flex items-center gap-1.5"
-                                                >
-                                                    <Copy className="w-3.5 h-3.5" />
-                                                    Duplicar
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => deleteRecommendation(rec.id)}
-                                                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                    title="Eliminar tarjeta"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </CardHeader>
-
-                                    <CardContent className="pt-5 space-y-5">
+                                        {isExpanded && (
+                                            <CardContent className="pt-5 space-y-5">
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                                             <div className="md:col-span-5">
                                                 <Label className="text-xs">Título de la Tarjeta</Label>
@@ -1223,9 +1348,11 @@ export function MiniTestConfigManager({
                                                 />
                                             </div>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                            </CardContent>
+                                        )}
+                                    </Card>
+                                );
+                            })}
                         </div>
                     </TabsContent>
 
