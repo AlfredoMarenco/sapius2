@@ -56,6 +56,24 @@ return false;
     );
 }
 
+function getSafeTextAlign(el: Element): React.CSSProperties | undefined {
+    const rawStyle = el.getAttribute('style');
+
+    if (!rawStyle) {
+return undefined;
+}
+
+    const match = rawStyle.match(/text-align\s*:\s*(left|center|right|justify)\b/i);
+
+    if (!match) {
+return undefined;
+}
+
+    return {
+        textAlign: match[1].toLowerCase() as React.CSSProperties['textAlign'],
+    };
+}
+
 function domNodeToReact(node: ChildNode, key: string): React.ReactNode {
     if (node.nodeType === Node.TEXT_NODE) {
         return node.textContent;
@@ -76,16 +94,91 @@ function domNodeToReact(node: ChildNode, key: string): React.ReactNode {
         return <br key={key} />;
     }
 
+    if (tag === 'hr') {
+        return <hr key={key} className="my-2 border-[#101E33]/15" />;
+    }
+
     const children = Array.from(el.childNodes).map((child, idx) =>
         domNodeToReact(child, `${key}-${idx}`),
     );
+    const alignStyle = getSafeTextAlign(el);
 
     switch (tag) {
         case 'p':
             return (
-                <p key={key} className="mb-1.5 last:mb-0">
+                <p key={key} style={alignStyle} className="mb-1.5 last:mb-0">
                     {children}
                 </p>
+            );
+        case 'div':
+            return (
+                <div key={key} style={alignStyle} className="mb-1.5 last:mb-0">
+                    {children}
+                </div>
+            );
+        case 'span':
+            return <span key={key}>{children}</span>;
+        case 'h1':
+            return (
+                <h1 key={key} style={alignStyle} className="mt-2 mb-1 text-base font-extrabold text-[#101E33]">
+                    {children}
+                </h1>
+            );
+        case 'h2':
+            return (
+                <h2 key={key} style={alignStyle} className="mt-2 mb-1 text-sm font-bold text-[#101E33]">
+                    {children}
+                </h2>
+            );
+        case 'h3':
+            return (
+                <h3 key={key} style={alignStyle} className="mt-1.5 mb-1 text-xs font-bold text-[#101E33]">
+                    {children}
+                </h3>
+            );
+        case 'h4':
+            return (
+                <h4 key={key} style={alignStyle} className="mt-1.5 mb-0.5 text-xs font-semibold text-[#101E33]">
+                    {children}
+                </h4>
+            );
+        case 'blockquote':
+            return (
+                <blockquote key={key} className="my-1.5 border-l-2 border-[#FF6B52]/70 pl-3 text-[#101E33]/80 italic">
+                    {children}
+                </blockquote>
+            );
+        case 'table':
+            return (
+                <div key={key} className="my-2 overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-[11px]">{children}</table>
+                </div>
+            );
+        case 'thead':
+            return (
+                <thead key={key} className="bg-[#101E33]/5 font-semibold text-[#101E33]">
+                    {children}
+                </thead>
+            );
+        case 'tbody':
+            return <tbody key={key}>{children}</tbody>;
+        case 'tr':
+            return (
+                <tr key={key} className="border-b border-[#101E33]/10">
+                    {children}
+                </tr>
+            );
+        case 'th':
+            return (
+                <th key={key} className="border border-[#101E33]/15 px-2 py-1 font-bold">
+                    {children}
+                </th>
+            );
+        case 'td':
+            return (
+                <td key={key} className="border border-[#101E33]/15 px-2 py-1 align-top">
+                    {children}
+                </td>
             );
         case 'ul':
             return (

@@ -1,4 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { 
     ArrowLeft, 
@@ -9,10 +8,17 @@ import {
     Tag,
     Plus
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import RichTextEditor from '@/components/editor/RichTextEditor';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { 
     Select, 
     SelectContent, 
@@ -20,15 +26,10 @@ import {
     SelectTrigger, 
     SelectValue 
 } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import {
-    Dialog,
-    DialogContent,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import AppLayout from '@/layouts/app-layout';
+import { normalizeOptionalRichHtml } from '@/lib/utils';
 import { store as storeCategoryRoute } from '@/routes/admin/categories';
-import { useState, useEffect } from 'react';
 
 interface Category {
     id: number;
@@ -56,7 +57,7 @@ export default function Create({ categories }: Props) {
     const handleCreateCategory = () => {
         categoryForm.post(storeCategoryRoute.url(), {
             preserveScroll: true,
-            onSuccess: (page) => {
+            onSuccess: () => {
                 setIsCategoryModalOpen(false);
                 categoryForm.reset();
                 // Select the newest category (it will be the one just created)
@@ -174,15 +175,14 @@ export default function Create({ categories }: Props) {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="description" className="text-xs sm:text-sm font-semibold text-[#101E33] dark:text-neutral-200 flex items-center gap-2">
+                                    <Label className="text-xs sm:text-sm font-semibold text-[#101E33] dark:text-neutral-200 flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-orange-500" /> Descripción
                                     </Label>
-                                    <Textarea
-                                        id="description"
-                                        value={data.description}
-                                        onChange={e => setData('description', e.target.value)}
-                                        placeholder="Escribe una breve descripción del curso..."
-                                        className="min-h-[130px] rounded-lg"
+                                    <RichTextEditor
+                                        variant="standard"
+                                        content={data.description}
+                                        onChange={(val) => setData('description', normalizeOptionalRichHtml(val))}
+                                        placeholder="Describe el contenido, objetivos e instrucciones del curso..."
                                     />
                                     {errors.description && <p className="text-xs text-red-600 font-medium">{errors.description}</p>}
                                 </div>

@@ -12,13 +12,15 @@ import {
     X 
 } from 'lucide-react';
 import { useState } from 'react';
+import RichTextEditor from '@/components/editor/RichTextEditor';
+import MathHtml from '@/components/MathHtml';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { normalizeOptionalRichHtml } from '@/lib/utils';
 
 interface ManageableItem {
     id: number;
@@ -433,9 +435,9 @@ return;
                                             #{item.id}
                                         </Badge>
                                     </div>
-                                    <CardDescription
-                                        className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-4 prose prose-xs max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: item.descripcion || 'Sin descripción detallada.' }}
+                                    <MathHtml
+                                        html={item.descripcion || 'Sin descripción detallada.'}
+                                        className="prose prose-xs mt-1 line-clamp-4 max-w-none text-xs text-neutral-600 dark:text-neutral-400"
                                     />
                                 </CardHeader>
                                 <CardContent className="pt-0 border-t border-neutral-100 dark:border-neutral-800/60 mt-3 pt-3 flex items-center justify-between">
@@ -480,7 +482,7 @@ return;
                 {/* Create Modal */}
                 {isCreateOpen && (
                     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                        <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-neutral-200 dark:border-neutral-800">
+                        <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl border border-neutral-200 dark:border-neutral-800">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-bold">Nueva Tarjeta Administrable</h3>
                                 <button onClick={() => setIsCreateOpen(false)} className="text-neutral-400 hover:text-neutral-600">
@@ -526,11 +528,17 @@ return;
 
                                 <div className="space-y-1">
                                     <Label className="text-xs">Descripción</Label>
-                                    <Textarea
-                                        rows={3}
+                                    <RichTextEditor
+                                        variant="standard"
+                                        minHeightClassName="min-h-[160px]"
                                         placeholder="Breve descripción del contenido o enlace..."
-                                        value={createForm.descripcion}
-                                        onChange={(e) => setCreateForm({ ...createForm, descripcion: e.target.value })}
+                                        content={createForm.descripcion}
+                                        onChange={(val) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                descripcion: normalizeOptionalRichHtml(val),
+                                            })
+                                        }
                                     />
                                 </div>
 
@@ -550,7 +558,7 @@ return;
                 {/* Edit Modal */}
                 {isEditOpen && editingItem && (
                     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                        <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-neutral-200 dark:border-neutral-800">
+                        <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl border border-neutral-200 dark:border-neutral-800">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-bold">Editar Tarjeta #{editingItem.id}</h3>
                                 <button onClick={() => setIsEditOpen(false)} className="text-neutral-400 hover:text-neutral-600">
@@ -570,10 +578,17 @@ return;
 
                                 <div className="space-y-1">
                                     <Label className="text-xs">Descripción</Label>
-                                    <Textarea
-                                        rows={3}
-                                        value={editingItem.descripcion}
-                                        onChange={(e) => setEditingItem({ ...editingItem, descripcion: e.target.value })}
+                                    <RichTextEditor
+                                        variant="standard"
+                                        minHeightClassName="min-h-[160px]"
+                                        placeholder="Breve descripción del contenido o enlace..."
+                                        content={editingItem.descripcion}
+                                        onChange={(val) =>
+                                            setEditingItem({
+                                                ...editingItem,
+                                                descripcion: normalizeOptionalRichHtml(val),
+                                            })
+                                        }
                                     />
                                 </div>
 

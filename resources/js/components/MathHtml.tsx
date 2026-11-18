@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
 import katex from 'katex';
+import React, { useMemo } from 'react';
 import 'katex/dist/katex.min.css';
 
 interface MathHtmlProps {
@@ -38,13 +38,28 @@ function decodeBasicEntities(input: string): string {
         .trim();
 }
 
-function isSafeUrl(url: string): boolean {
+const SAFE_DATA_IMAGE_REGEX = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i;
+
+function isSafeUrl(url: string, isImageSrc = false): boolean {
     const trimmed = url.trim();
-    if (!trimmed) return false;
-    if (trimmed.startsWith('/') || trimmed.startsWith('#')) return true;
+
+    if (!trimmed) {
+return false;
+}
+
+    if (isImageSrc && SAFE_DATA_IMAGE_REGEX.test(trimmed)) {
+return true;
+}
+
+    if (trimmed.startsWith('/') || trimmed.startsWith('#')) {
+return true;
+}
+
     try {
         const parsed = new URL(trimmed, 'https://sapius.local');
-        return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+        const allowedProtocols = isImageSrc ? ['http:', 'https:'] : ['http:', 'https:', 'mailto:'];
+
+        return allowedProtocols.includes(parsed.protocol);
     } catch {
         return false;
     }
@@ -58,21 +73,29 @@ function sanitizeHtml(rawHtml: string): string {
 
             const sanitizeNode = (node: Element) => {
                 const children = Array.from(node.children);
+
                 for (const child of children) {
                     const tagName = child.tagName.toLowerCase();
+
                     if (UNSAFE_TAGS.has(tagName)) {
                         child.remove();
                         continue;
                     }
 
                     const attrs = Array.from(child.attributes);
+
                     for (const attr of attrs) {
                         const attrName = attr.name.toLowerCase();
+
                         if (attrName.startsWith('on') || attrName === 'srcdoc') {
                             child.removeAttribute(attr.name);
                             continue;
                         }
-                        if ((attrName === 'href' || attrName === 'src') && !isSafeUrl(attr.value)) {
+
+                        if (
+                            (attrName === 'href' || attrName === 'src') &&
+                            !isSafeUrl(attr.value, tagName === 'img' && attrName === 'src')
+                        ) {
                             child.removeAttribute(attr.name);
                         }
                     }
@@ -86,6 +109,7 @@ function sanitizeHtml(rawHtml: string): string {
             };
 
             sanitizeNode(doc.body);
+
             return doc.body.innerHTML;
         } catch {
             // Fallback to regex sanitization
@@ -98,11 +122,17 @@ function sanitizeHtml(rawHtml: string): string {
         .replace(/<(object|embed|style|form)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
         .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
         .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
-        .replace(/(href|src)\s*=\s*(['"])\s*(javascript|vbscript|data):[^'"]*\2/gi, '$1="#"');
+        .replace(/href\s*=\s*(['"])\s*(javascript|vbscript|data):[^'"]*\1/gi, 'href="#"')
+        .replace(
+            /src\s*=\s*(['"])\s*(?:javascript|vbscript|data(?!:image\/(?:png|jpeg|jpg|gif|webp);base64,)):[^'"]*\1/gi,
+            'src="#"',
+        );
 }
 
 function renderMathInHtml(rawHtml: string): string {
-    if (!rawHtml) return '';
+    if (!rawHtml) {
+return '';
+}
 
     const tokens: { placeholder: string; expr: string; displayMode: boolean }[] = [];
     let counter = 0;
@@ -114,11 +144,12 @@ function renderMathInHtml(rawHtml: string): string {
             expr: decodeBasicEntities(expr),
             displayMode,
         });
+
         return placeholder;
     };
 
     // Extraer expresiones antes de sanitizar para preservar MathML generado por KaTeX
-    let tokenized = rawHtml
+    const tokenized = rawHtml
         .replace(/\[math\]([\s\S]*?)\[\/math\]/gi, (_, expr) => pushToken(expr, false))
         .replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => pushToken(expr, true))
         .replace(/\\\[([\s\S]*?)\\\]/g, (_, expr) => pushToken(expr, true))
@@ -128,6 +159,7 @@ function renderMathInHtml(rawHtml: string): string {
 
     for (const token of tokens) {
         let rendered = '';
+
         try {
             rendered = katex.renderToString(token.expr, {
                 displayMode: token.displayMode,
@@ -137,6 +169,7 @@ function renderMathInHtml(rawHtml: string): string {
         } catch {
             rendered = `<code>${token.expr}</code>`;
         }
+
         safeHtml = safeHtml.replace(token.placeholder, rendered);
     }
 
@@ -146,7 +179,9 @@ function renderMathInHtml(rawHtml: string): string {
 export default function MathHtml({ html, className = '' }: MathHtmlProps) {
     const renderedHtml = useMemo(() => renderMathInHtml(html || ''), [html]);
 
-    if (!html) return null;
+    if (!html) {
+return null;
+}
 
     return <div className={className} dangerouslySetInnerHTML={{ __html: renderedHtml }} />;
 }

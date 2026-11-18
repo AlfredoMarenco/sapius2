@@ -1,5 +1,3 @@
-import React from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { 
     BookOpen, 
@@ -7,15 +5,13 @@ import {
     GraduationCap, 
     Calendar, 
     UserCheck, 
-    Layers, 
-    BarChart3, 
-    ArrowRight, 
     Download, 
     Clock, 
-    Tag,
-    ChevronRight,
-    Award
+    ChevronRight
 } from 'lucide-react';
+import React from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { stripHtml } from '@/lib/utils';
 
 interface CohortCard {
     id: number;
@@ -194,10 +190,9 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                             {cohort.course?.title || 'Curso Programado'}
                                         </h3>
                                         {cohort.course?.description && (
-                                            <div
-                                                className="mt-1.5 text-xs text-neutral-500 line-clamp-2"
-                                                dangerouslySetInnerHTML={{ __html: cohort.course.description }}
-                                            />
+                                            <p className="mt-1.5 text-xs text-neutral-500 line-clamp-2">
+                                                {stripHtml(cohort.course.description)}
+                                            </p>
                                         )}
 
                                         {/* Fechas de inicio y fin */}

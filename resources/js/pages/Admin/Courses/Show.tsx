@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import MathHtml from '@/components/MathHtml';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -60,6 +61,7 @@ interface ScheduledCourse {
 interface Course {
     id: number;
     title: string;
+    description?: string | null;
     image: string | null;
     category: {
         name: string;
@@ -373,6 +375,12 @@ export default function Show({ course, instructors }: Props) {
                                         )}
                                     </div>
                                 </div>
+                                {course.description && (
+                                    <MathHtml
+                                        html={course.description}
+                                        className="prose prose-xs max-w-none border-t border-neutral-100 pt-3 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400"
+                                    />
+                                )}
                             </div>
 
                             <Button asChild className="w-full h-9 rounded-lg bg-[#101E33] hover:bg-[#192B47] text-white text-xs sm:text-sm font-semibold">

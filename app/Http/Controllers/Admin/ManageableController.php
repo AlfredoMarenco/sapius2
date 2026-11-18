@@ -8,11 +8,14 @@ use App\Models\ManageableGuiaNutrition;
 use App\Models\ManageableSimulatorMedicine;
 use App\Models\ManageableSimulatorNutrition;
 use App\Services\ExamCriteriaService;
+use App\Traits\SanitizesRichHtml;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ManageableController extends Controller
 {
+    use SanitizesRichHtml;
+
     /**
      * Display manageable cards for Simulators and Study Guides
      * Legacy URL: GET /admin/manageable
@@ -69,7 +72,7 @@ class ManageableController extends Controller
 
         $data = [
             'titulo' => $request->titulo,
-            'descripcion' => $request->descripcion,
+            'descripcion' => $this->sanitizeRichHtml($request->descripcion, true) ?? '',
             'type' => $request->type,
             'category' => $request->category,
             'position' => $request->position ?? 0,
@@ -108,7 +111,7 @@ class ManageableController extends Controller
 
         $data = [
             'titulo' => $request->titulo,
-            'descripcion' => $request->descripcion,
+            'descripcion' => $this->sanitizeRichHtml($request->descripcion, true) ?? '',
         ];
 
         if ($request->type === 'simuladores') {

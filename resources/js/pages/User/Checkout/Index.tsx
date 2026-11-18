@@ -13,6 +13,7 @@ import {
     CheckCircle2,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import MathHtml from '@/components/MathHtml';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -496,9 +497,9 @@ return;
                             </CardHeader>
 
                             <CardContent className="p-5 pt-0 space-y-4">
-                                <div
-                                    className="text-xs text-neutral-500 line-clamp-3 prose prose-sm max-w-none dark:prose-invert"
-                                    dangerouslySetInnerHTML={{ __html: course.description }}
+                                <MathHtml
+                                    html={course.description}
+                                    className="prose prose-sm max-w-none max-h-56 overflow-y-auto pr-1 text-xs text-neutral-600 dark:prose-invert dark:text-neutral-300"
                                 />
 
                                 <Separator />

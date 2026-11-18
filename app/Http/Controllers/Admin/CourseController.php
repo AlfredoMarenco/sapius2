@@ -15,6 +15,7 @@ use App\Models\Quiz;
 use App\Models\User;
 use App\Services\CourseCategoryService;
 use App\Traits\OptimizesImages;
+use App\Traits\SanitizesRichHtml;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +25,7 @@ use Inertia\Inertia;
 class CourseController extends Controller
 {
     use OptimizesImages;
+    use SanitizesRichHtml;
 
     public function index()
     {
@@ -78,7 +80,7 @@ class CourseController extends Controller
         $course->user_id = auth()->id();
         $course->title = $validated['title'];
         $course->slug = Str::slug($validated['title']).'-'.time();
-        $course->description = $validated['description'];
+        $course->description = $this->sanitizeRichHtml($validated['description'] ?? null, true);
         $course->activo = 'si';
 
         if ($request->hasFile('image')) {
@@ -143,7 +145,7 @@ class CourseController extends Controller
         ]);
 
         $course->title = $validated['title'];
-        $course->description = $validated['description'] ?? null;
+        $course->description = $this->sanitizeRichHtml($validated['description'] ?? null, true);
 
         if ($request->has('activo')) {
             $course->activo = $request->activo ? 'si' : 'no';

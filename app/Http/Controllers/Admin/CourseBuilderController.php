@@ -10,6 +10,8 @@ use App\Models\Media;
 use App\Models\Module;
 use App\Models\Question;
 use App\Models\Quiz;
+use App\Traits\OptimizesImages;
+use App\Traits\SanitizesRichHtml;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,9 @@ use Inertia\Inertia;
 
 class CourseBuilderController extends Controller
 {
+    use OptimizesImages;
+    use SanitizesRichHtml;
+
     /**
      * Display the course builder interface.
      */
@@ -60,20 +65,28 @@ class CourseBuilderController extends Controller
     }
 
     /**
-     * Sanitize HTML input to strip script tags, inline event handlers, and javascript: URIs.
+     * Sanitize HTML input to strip script tags, inline event handlers, and dangerous URIs.
      */
-    protected function sanitizeHtml(?string $html): ?string
+    protected function sanitizeHtml(?string $html, bool $nullIfEmpty = false): ?string
     {
-        if ($html === null) {
-            return null;
-        }
+        return $this->sanitizeRichHtml($html, $nullIfEmpty);
+    }
 
-        $clean = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $html);
-        $clean = preg_replace('/<\s*\/?\s*script\b[^>]*>/is', '', (string) $clean);
-        $clean = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/is', '', (string) $clean);
-        $clean = preg_replace('/(?:javascript|vbscript)\s*:/i', '', (string) $clean);
+    /**
+     * Upload and optimize an image pasted/inserted in the rich text editor.
+     */
+    public function uploadEditorImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp,gif|max:4096',
+            'course_id' => 'nullable|integer',
+        ]);
 
-        return (string) $clean;
+        $path = $this->optimizeAndStoreImage($request->file('image'), 'editor');
+
+        return response()->json([
+            'url' => '/media/stream/'.$path,
+        ]);
     }
 
     /**
@@ -372,7 +385,7 @@ class CourseBuilderController extends Controller
             $timeString = '01:00:00';
         }
 
-        $descripcion = $this->sanitizeHtml($validated['descripcion'] ?? $validated['description'] ?? null);
+        $descripcion = $this->sanitizeHtml($validated['descripcion'] ?? $validated['description'] ?? null, true);
 
         $quizData = [
             'course_id' => $lesson->curso_id,
@@ -382,7 +395,7 @@ class CourseBuilderController extends Controller
             'attempts_allowed' => (int) $validated['attempts_allowed'],
         ];
 
-        if ($descripcion !== null) {
+        if ($request->exists('description') || $request->exists('descripcion')) {
             $quizData['description'] = $descripcion;
         }
 

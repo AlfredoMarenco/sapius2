@@ -42,6 +42,7 @@ Route::middleware(['auth', 'verified', 'role:instructor', 'restrict.mobile'])->p
     Route::post('/quizzes/{quiz}/import-questions', [QuizImportController::class, 'import'])->name('quizzes.questions.import');
     Route::get('/quizzes/{quiz}/export-questions', [QuizImportController::class, 'export'])->name('quizzes.questions.export');
     Route::post('/lessons/{lesson}/homework', [CourseBuilderController::class, 'storeHomework'])->name('lessons.homework.store');
+    Route::post('/editor/upload-image', [CourseBuilderController::class, 'uploadEditorImage'])->name('editor.upload-image');
 
     // Material PDFs e imágenes de preguntas para Instructor
     Route::get('/lessons/{leccion_id}/material-pdfs', [InteractivePdfController::class, 'index'])->name('material-pdfs.index');

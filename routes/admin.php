@@ -156,6 +156,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
         ->where('filename', '.*')
         ->name('preguntas.imagen');
     Route::post('/lessons/{lesson}/homework', [CourseBuilderController::class, 'storeHomework'])->name('lessons.homework.store');
+    Route::post('/editor/upload-image', [CourseBuilderController::class, 'uploadEditorImage'])->name('editor.upload-image');
 
     // Programación de Cursos (Legacy URL: /admin/registro/programacion)
     Route::match(['get', 'post'], '/registro/programacion', [ScheduledCourseController::class, 'index'])->name('schedule');

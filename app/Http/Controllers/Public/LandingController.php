@@ -115,9 +115,16 @@ class LandingController extends Controller
             return null;
         }
 
-        $clean = strip_tags($html, '<p><br><ul><ol><li><strong><b><em><i><u><span><a>');
+        $clean = strip_tags($html, '<p><br><ul><ol><li><strong><b><em><i><u><span><a><h1><h2><h3><h4><blockquote><hr><div><table><thead><tbody><tr><th><td>');
         $clean = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
-        $clean = preg_replace('/\s+style\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
+        $clean = preg_replace_callback('/\s+style\s*=\s*(["\'])(.*?)\1/is', function (array $matches): string {
+            if (preg_match('/text-align\s*:\s*(left|center|right|justify)\b/i', $matches[2], $alignMatch)) {
+                return ' style="text-align: '.strtolower($alignMatch[1]).'"';
+            }
+
+            return '';
+        }, $clean) ?? $clean;
+        $clean = preg_replace('/\s+style\s*=\s*[^\s>"\']+/i', '', $clean) ?? $clean;
         $clean = preg_replace('/href\s*=\s*(["\'])\s*(?:javascript|data|vbscript):[^"\']*\1/i', 'href="#"', $clean) ?? $clean;
 
         return trim($clean);

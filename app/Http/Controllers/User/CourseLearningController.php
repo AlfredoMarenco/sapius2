@@ -929,6 +929,7 @@ class CourseLearningController extends Controller
         $allowedRoots = [
             storage_path('app/public'),
             storage_path('app/public/courses'),
+            storage_path('app/public/editor'),
             storage_path('app/public/slider-index'),
             storage_path('app/public/prides'),
             storage_path('app/public/teachers'),
@@ -955,6 +956,7 @@ class CourseLearningController extends Controller
             $prodRoots = [
                 $prodBase.'/storage/app/public',
                 $prodBase.'/storage/app/public/courses',
+                $prodBase.'/storage/app/public/editor',
                 $prodBase.'/storage/app/public/slider-index',
                 $prodBase.'/storage/app/public/prides',
                 $prodBase.'/storage/app/public/teachers',

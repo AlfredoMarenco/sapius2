@@ -228,4 +228,12 @@ class CourseBuilderController extends BaseCourseBuilderController
 
         return parent::storeHomework($request, $lesson);
     }
+
+    public function uploadEditorImage(Request $request)
+    {
+        $courseId = (int) ($request->input('course_id') ?? $request->input('curso_id') ?? 0);
+        $this->authorizeCourse($courseId);
+
+        return parent::uploadEditorImage($request);
+    }
 }

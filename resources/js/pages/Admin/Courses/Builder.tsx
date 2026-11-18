@@ -31,6 +31,7 @@ import {
 import type { ReactElement } from 'react';
 import { useState, useMemo, useEffect } from 'react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
+import MathHtml from '@/components/MathHtml';
 import {
     Accordion,
     AccordionContent,
@@ -60,15 +61,21 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { cn, getEmbedVideoUrl } from '@/lib/utils';
+import {
+    cn,
+    getEmbedVideoUrl,
+    isEmptyRichHtml,
+    normalizeOptionalRichHtml,
+} from '@/lib/utils';
 import ContentSchedulingModal from './Partials/ContentSchedulingModal';
 
 interface Answer {
     id?: number;
     text: string;
     is_correct: boolean;
+    image?: string | null;
+    imagen?: string | null;
 }
 
 interface Question {
@@ -85,6 +92,8 @@ interface Question {
 interface Quiz {
     id: number;
     title: string;
+    description?: string | null;
+    descripcion?: string | null;
     type: string;
     time_limit: string | number | null;
     attempts_allowed: number;
@@ -196,64 +205,6 @@ function minutesToTimeString(minutes: number): string {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 }
 
-/**
- * Sanitiza HTML de contenido teórico, preguntas y respuestas antes de renderizar.
- */
-function sanitizeHtml(rawHtml: string | null | undefined): string {
-    if (!rawHtml) {
-return '';
-}
-
-    if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
-        return rawHtml
-            .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-            .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
-            .replace(/javascript:/gi, '');
-    }
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(rawHtml, 'text/html');
-    const blockedTags = [
-        'script',
-        'style',
-        'iframe',
-        'object',
-        'embed',
-        'form',
-        'input',
-        'button',
-        'meta',
-        'link',
-        'base',
-    ];
-
-    blockedTags.forEach((tag) => {
-        doc.querySelectorAll(tag).forEach((el) => el.remove());
-    });
-
-    doc.querySelectorAll('*').forEach((el) => {
-        Array.from(el.attributes).forEach((attr) => {
-            const name = attr.name.toLowerCase();
-            const value = attr.value.trim().toLowerCase();
-
-            if (name.startsWith('on')) {
-                el.removeAttribute(attr.name);
-            }
-
-            if (
-                (name === 'href' || name === 'src' || name === 'xlink:href') &&
-                (value.startsWith('javascript:') ||
-                    value.startsWith('vbscript:') ||
-                    value.startsWith('data:text/html'))
-            ) {
-                el.removeAttribute(attr.name);
-            }
-        });
-    });
-
-    return doc.body.innerHTML;
-}
-
 const Toast = ({
     message,
     type,
@@ -345,6 +296,8 @@ export default function Builder({ course, routePrefix }: Props) {
     const [questionSaving, setQuestionSaving] = useState(false);
     const [questionImageFile, setQuestionImageFile] = useState<File | null>(null);
     const [questionImagePreview, setQuestionImagePreview] = useState<string | null>(null);
+    const [answerImageFiles, setAnswerImageFiles] = useState<Record<number, File | null>>({});
+    const [answerImagePreviews, setAnswerImagePreviews] = useState<Record<number, string | null>>({});
     const [questionFormState, setQuestionFormState] = useState<{
         slug: string;
         text: string;
@@ -430,7 +383,9 @@ export default function Builder({ course, routePrefix }: Props) {
     });
 
     const quizForm = useForm({
+        quiz_id: null as number | null,
         title: 'Evaluación de Lección',
+        description: '',
         type: 'PRÁCTICA',
         time_limit: 30,
         attempts_allowed: 1,
@@ -464,7 +419,9 @@ export default function Builder({ course, routePrefix }: Props) {
 
         const qz = lesson.quizzes?.[0];
         quizForm.setData({
+            quiz_id: qz?.id ?? null,
             title: qz?.title ?? 'Evaluación de Lección',
+            description: qz?.description ?? qz?.descripcion ?? '',
             type: qz?.type ?? 'PRÁCTICA',
             time_limit: timeLimitToMinutes(qz?.time_limit),
             attempts_allowed: Number(qz?.attempts_allowed ?? 1),
@@ -676,9 +633,13 @@ return;
         e.preventDefault();
 
         if (!activeLesson) {
-return;
-}
+            return;
+        }
 
+        quizForm.transform((data) => ({
+            ...data,
+            quiz_id: activeQuiz?.id ?? data.quiz_id,
+        }));
         quizForm.post(`${prefix}/lessons/${activeLesson.id}/quiz`, {
             preserveScroll: true,
         });
@@ -688,6 +649,8 @@ return;
         setEditingQuestion(null);
         setQuestionImageFile(null);
         setQuestionImagePreview(null);
+        setAnswerImageFiles({});
+        setAnswerImagePreviews({});
         setQuestionFormState({
             slug: '',
             text: '',
@@ -706,6 +669,7 @@ return;
     const openEditQuestionModal = (question: Question) => {
         setEditingQuestion(question);
         setQuestionImageFile(null);
+        setAnswerImageFiles({});
         const existingImg = question.image || question.imagen || null;
         setQuestionImagePreview(
             existingImg
@@ -715,12 +679,14 @@ return;
                 : null,
         );
 
-        const normalizedAnswers =
+        const normalizedAnswers: Answer[] =
             question.answers && question.answers.length >= 2
                 ? question.answers.map((a) => ({
                       id: a.id,
                       text: a.text,
                       is_correct: Boolean(a.is_correct),
+                      image: a.image ?? null,
+                      imagen: a.imagen ?? null,
                   }))
                 : [
                       { text: '', is_correct: true },
@@ -728,6 +694,18 @@ return;
                       { text: '', is_correct: false },
                       { text: '', is_correct: false },
                   ];
+
+        const initialAnswerPreviews: Record<number, string | null> = {};
+        normalizedAnswers.forEach((a, idx) => {
+            const existingAnsImg = a.image || a.imagen || null;
+
+            if (existingAnsImg) {
+                initialAnswerPreviews[idx] = existingAnsImg.startsWith('http')
+                    ? existingAnsImg
+                    : `${prefix}/preguntas/imagen/${existingAnsImg}`;
+            }
+        });
+        setAnswerImagePreviews(initialAnswerPreviews);
 
         setQuestionFormState({
             slug: question.slug || '',
@@ -743,11 +721,39 @@ return;
         e.preventDefault();
 
         if (!activeLesson || activeLesson.quizzes.length === 0) {
-return;
-}
+            return;
+        }
+
+        if (isEmptyRichHtml(questionFormState.text)) {
+            setToast({
+                message: 'El texto de la pregunta es obligatorio.',
+                type: 'error',
+            });
+
+            return;
+        }
+
+        for (let idx = 0; idx < questionFormState.answers.length; idx++) {
+            const ans = questionFormState.answers[idx];
+            const hasAnsImg = Boolean(
+                answerImageFiles[idx] || ans.image || ans.imagen,
+            );
+
+            if (isEmptyRichHtml(ans.text) && !hasAnsImg) {
+                setToast({
+                    message: `La opción ${String.fromCharCode(65 + idx)} debe tener texto o imagen.`,
+                    type: 'error',
+                });
+
+                return;
+            }
+        }
 
         const parsedPoints = parseFloat(questionFormState.points);
         const safePoints = Number.isNaN(parsedPoints) ? 0 : parsedPoints;
+        const normalizedExplanation = normalizeOptionalRichHtml(
+            questionFormState.explanation,
+        );
 
         setQuestionSaving(true);
 
@@ -755,7 +761,11 @@ return;
             ? `${prefix}/questions/${editingQuestion.id}`
             : `${prefix}/quizzes/${activeLesson.quizzes[0].id}/questions`;
 
-        if (questionImageFile) {
+        const hasAnyImageFile =
+            Boolean(questionImageFile) ||
+            Object.values(answerImageFiles).some(Boolean);
+
+        if (hasAnyImageFile) {
             const formData = new FormData();
 
             if (editingQuestion) {
@@ -764,17 +774,32 @@ return;
 
             formData.append('slug', questionFormState.slug);
             formData.append('text', questionFormState.text);
-            formData.append('explanation', questionFormState.explanation);
+            formData.append('explanation', normalizedExplanation);
             formData.append('points', String(safePoints));
-            formData.append('image', questionImageFile);
+
+            if (questionImageFile) {
+                formData.append('image', questionImageFile);
+            }
 
             questionFormState.answers.forEach((ans, idx) => {
                 if (ans.id) {
                     formData.append(`answers[${idx}][id]`, String(ans.id));
                 }
 
-                formData.append(`answers[${idx}][text]`, ans.text);
-                formData.append(`answers[${idx}][is_correct]`, ans.is_correct ? '1' : '0');
+                const resolvedText = isEmptyRichHtml(ans.text)
+                    ? '<p></p>'
+                    : ans.text;
+                formData.append(`answers[${idx}][text]`, resolvedText);
+                formData.append(
+                    `answers[${idx}][is_correct]`,
+                    ans.is_correct ? '1' : '0',
+                );
+
+                const ansFile = answerImageFiles[idx];
+
+                if (ansFile) {
+                    formData.append(`answers[${idx}][image]`, ansFile);
+                }
             });
 
             router.post(targetUrl, formData, {
@@ -785,6 +810,8 @@ return;
                     setEditingQuestion(null);
                     setQuestionImageFile(null);
                     setQuestionImagePreview(null);
+                    setAnswerImageFiles({});
+                    setAnswerImagePreviews({});
                 },
                 onError: () => {
                     setToast({
@@ -801,11 +828,11 @@ return;
         const payload = {
             slug: questionFormState.slug || null,
             text: questionFormState.text,
-            explanation: questionFormState.explanation || null,
+            explanation: normalizedExplanation || null,
             points: safePoints,
             answers: questionFormState.answers.map((ans) => ({
                 ...(ans.id ? { id: ans.id } : {}),
-                text: ans.text,
+                text: isEmptyRichHtml(ans.text) ? '<p></p>' : ans.text,
                 is_correct: Boolean(ans.is_correct),
             })),
         };
@@ -815,6 +842,8 @@ return;
             onSuccess: () => {
                 setIsQuestionModalOpen(false);
                 setEditingQuestion(null);
+                setAnswerImageFiles({});
+                setAnswerImagePreviews({});
             },
             onError: () => {
                 setToast({
@@ -886,6 +915,7 @@ return;
                 `${prefix}/lessons/${activeLesson.id}/quiz`,
                 {
                     ...quizForm.data,
+                    quiz_id: activeQuiz?.id ?? quizForm.data.quiz_id,
                     ...formValues,
                 },
                 {
@@ -1507,11 +1537,15 @@ return;
                                                     </Button>
                                                 </div>
                                                 <RichTextEditor
+                                                    variant="full"
+                                                    minHeightClassName="min-h-[420px]"
                                                     content={contentForm.data.content}
                                                     onChange={(val) =>
                                                         contentForm.setData('content', val)
                                                     }
-                                                    className="min-h-[500px]"
+                                                    imageUploadUrl={`${prefix}/editor/upload-image`}
+                                                    imageUploadExtraData={{ course_id: course.id }}
+                                                    placeholder="Redacta el contenido teórico de la lección..."
                                                 />
                                             </CardContent>
                                         </Card>
@@ -1521,8 +1555,8 @@ return;
                                         value="quiz"
                                         className="animate-in fade-in slide-in-from-bottom-4 space-y-8 duration-500"
                                     >
-                                        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                                            <Card className="h-fit overflow-hidden rounded-[2.5rem] border-2 border-orange-100/50 shadow-xl shadow-orange-100/20 md:col-span-1">
+                                        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                                            <Card className="h-fit overflow-hidden rounded-[2.5rem] border-2 border-orange-100/50 shadow-xl shadow-orange-100/20 lg:col-span-5">
                                                 <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-orange-100 bg-orange-50/50 p-6">
                                                     <CardTitle className="flex items-center gap-2 text-[10px] font-black tracking-widest text-orange-700 uppercase">
                                                         <Settings className="h-4 w-4" />{' '}
@@ -1726,6 +1760,24 @@ return;
                                                         </div>
                                                     </div>
 
+                                                    <div className="grid gap-1.5">
+                                                        <Label className="text-[10px] font-black tracking-widest text-orange-800/60 uppercase">
+                                                            Descripción / Instrucciones
+                                                        </Label>
+                                                        <RichTextEditor
+                                                            variant="standard"
+                                                            minHeightClassName="min-h-[120px]"
+                                                            content={quizForm.data.description}
+                                                            onChange={(val) =>
+                                                                quizForm.setData(
+                                                                    'description',
+                                                                    normalizeOptionalRichHtml(val),
+                                                                )
+                                                            }
+                                                            placeholder="Indicaciones previas para el sustentante..."
+                                                        />
+                                                    </div>
+
                                                     <Button
                                                         onClick={handleSaveQuiz}
                                                         disabled={quizForm.processing}
@@ -1737,7 +1789,7 @@ return;
                                                 </CardContent>
                                             </Card>
 
-                                            <div className="space-y-6 md:col-span-2">
+                                            <div className="space-y-6 lg:col-span-7">
                                                 <div className="flex flex-wrap items-center justify-between gap-3 px-4">
                                                     <div>
                                                         <h3 className="text-xl font-black tracking-tight text-brand-navy uppercase">
@@ -1830,13 +1882,9 @@ return;
                                                                                     </Badge>
                                                                                 )}
                                                                             </div>
-                                                                            <div
+                                                                            <MathHtml
+                                                                                html={q.text}
                                                                                 className="prose prose-sm max-w-none text-base leading-snug font-bold text-brand-navy"
-                                                                                dangerouslySetInnerHTML={{
-                                                                                    __html: sanitizeHtml(
-                                                                                        q.text,
-                                                                                    ),
-                                                                                }}
                                                                             />
                                                                             {qImage && (
                                                                                 <img
@@ -1852,14 +1900,15 @@ return;
                                                                                 />
                                                                             )}
                                                                             {q.explanation && (
-                                                                                <div
-                                                                                    className="prose prose-xs mt-2 max-w-none rounded-xl border border-amber-200/60 bg-amber-50/70 px-3 py-2 text-xs text-muted-foreground"
-                                                                                    dangerouslySetInnerHTML={{
-                                                                                        __html: `<strong class="text-amber-800">Retroalimentación:</strong> ${sanitizeHtml(
-                                                                                            q.explanation,
-                                                                                        )}`,
-                                                                                    }}
-                                                                                />
+                                                                                <div className="mt-2 rounded-xl border border-amber-200/60 bg-amber-50/70 px-3 py-2 text-xs text-muted-foreground">
+                                                                                    <strong className="mb-1 block text-amber-800">
+                                                                                        Retroalimentación:
+                                                                                    </strong>
+                                                                                    <MathHtml
+                                                                                        html={q.explanation}
+                                                                                        className="prose prose-xs max-w-none"
+                                                                                    />
+                                                                                </div>
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -1893,31 +1942,46 @@ return;
                                                                     </div>
                                                                 </div>
                                                                 <div className="grid grid-cols-1 gap-3 pl-14 md:grid-cols-2">
-                                                                    {q.answers.map((a, aidx) => (
-                                                                        <div
-                                                                            key={a.id ?? aidx}
-                                                                            className={cn(
-                                                                                'flex items-center gap-3 rounded-2xl border-2 p-4 text-[11px] font-bold transition-all',
-                                                                                a.is_correct
-                                                                                    ? 'border-green-200 bg-green-50 text-green-700 shadow-sm'
-                                                                                    : 'border-gray-100 bg-gray-50/50 text-gray-500',
-                                                                            )}
-                                                                        >
-                                                                            {a.is_correct ? (
-                                                                                <CheckCircle2 className="h-4 w-4 shrink-0 fill-green-600 text-white" />
-                                                                            ) : (
-                                                                                <div className="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300" />
-                                                                            )}
+                                                                    {q.answers.map((a, aidx) => {
+                                                                        const aImage = a.image || a.imagen;
+
+                                                                        return (
                                                                             <div
-                                                                                className="prose prose-xs max-w-none"
-                                                                                dangerouslySetInnerHTML={{
-                                                                                    __html: sanitizeHtml(
-                                                                                        a.text,
-                                                                                    ),
-                                                                                }}
-                                                                            />
-                                                                        </div>
-                                                                    ))}
+                                                                                key={a.id ?? aidx}
+                                                                                className={cn(
+                                                                                    'flex items-start gap-3 rounded-2xl border-2 p-4 text-[11px] font-bold transition-all',
+                                                                                    a.is_correct
+                                                                                        ? 'border-green-200 bg-green-50 text-green-700 shadow-sm'
+                                                                                        : 'border-gray-100 bg-gray-50/50 text-gray-500',
+                                                                                )}
+                                                                            >
+                                                                                {a.is_correct ? (
+                                                                                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 fill-green-600 text-white" />
+                                                                                ) : (
+                                                                                    <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-gray-300" />
+                                                                                )}
+                                                                                <div className="min-w-0 flex-1 space-y-1.5">
+                                                                                    <MathHtml
+                                                                                        html={a.text}
+                                                                                        className="prose prose-xs max-w-none"
+                                                                                    />
+                                                                                    {aImage && (
+                                                                                        <img
+                                                                                            src={
+                                                                                                aImage.startsWith(
+                                                                                                    'http',
+                                                                                                )
+                                                                                                    ? aImage
+                                                                                                    : `${prefix}/preguntas/imagen/${aImage}`
+                                                                                            }
+                                                                                            alt={`Imagen opción ${String.fromCharCode(65 + aidx)}`}
+                                                                                            className="max-h-24 rounded-lg border object-contain"
+                                                                                        />
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </CardContent>
                                                         </Card>
@@ -1991,15 +2055,16 @@ return;
                                                     <Label className="text-[10px] font-black tracking-widest text-brand-navy uppercase">
                                                         Instrucciones Detalladas
                                                     </Label>
-                                                    <Textarea
-                                                        value={homeworkForm.data.description}
-                                                        onChange={(e) =>
+                                                    <RichTextEditor
+                                                        variant="standard"
+                                                        minHeightClassName="min-h-[220px]"
+                                                        content={homeworkForm.data.description}
+                                                        onChange={(val) =>
                                                             homeworkForm.setData(
                                                                 'description',
-                                                                e.target.value,
+                                                                normalizeOptionalRichHtml(val),
                                                             )
                                                         }
-                                                        className="min-h-[250px] rounded-[1.5rem] border-2 p-6 font-medium"
                                                         placeholder="Escribe aquí los pasos que el estudiante debe seguir..."
                                                     />
                                                 </div>
@@ -2481,7 +2546,7 @@ handleChunkVideoUpload(f);
 
             {/* Create / Edit Question Modal */}
             <Dialog open={isQuestionModalOpen} onOpenChange={setIsQuestionModalOpen}>
-                <DialogContent className="max-w-2xl overflow-hidden rounded-[2.5rem] border-2 p-0 shadow-2xl">
+                <DialogContent className="sm:max-w-3xl overflow-hidden rounded-[2.5rem] border-2 p-0 shadow-2xl">
                     <div className="flex items-center justify-between bg-brand-navy p-8 text-white">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-3 font-black tracking-tight uppercase">
@@ -2541,16 +2606,18 @@ handleChunkVideoUpload(f);
                             <Label className="text-[10px] font-black tracking-widest text-brand-navy/60 uppercase">
                                 Texto de la Pregunta *
                             </Label>
-                            <Textarea
-                                required
-                                value={questionFormState.text}
-                                onChange={(e) =>
+                            <RichTextEditor
+                                variant="full"
+                                minHeightClassName="min-h-[130px]"
+                                content={questionFormState.text}
+                                onChange={(val) =>
                                     setQuestionFormState({
                                         ...questionFormState,
-                                        text: e.target.value,
+                                        text: val,
                                     })
                                 }
-                                className="min-h-[100px] rounded-2xl border-2 p-4 text-base font-bold focus-visible:ring-brand-blue"
+                                imageUploadUrl={`${prefix}/editor/upload-image`}
+                                imageUploadExtraData={{ course_id: course.id }}
                                 placeholder="Escribe el planteamiento de la pregunta..."
                             />
                         </div>
@@ -2559,16 +2626,19 @@ handleChunkVideoUpload(f);
                             <Label className="text-[10px] font-black tracking-widest text-brand-navy/60 uppercase">
                                 Retroalimentación / Explicación Pedagógica
                             </Label>
-                            <Textarea
-                                value={questionFormState.explanation}
-                                onChange={(e) =>
+                            <RichTextEditor
+                                variant="full"
+                                minHeightClassName="min-h-[110px]"
+                                content={questionFormState.explanation}
+                                onChange={(val) =>
                                     setQuestionFormState({
                                         ...questionFormState,
-                                        explanation: e.target.value,
+                                        explanation: normalizeOptionalRichHtml(val),
                                     })
                                 }
+                                imageUploadUrl={`${prefix}/editor/upload-image`}
+                                imageUploadExtraData={{ course_id: course.id }}
                                 placeholder="Ej: La respuesta es correcta debido al principio de..."
-                                className="rounded-2xl border-2 border-dashed bg-gray-50/50 p-4 text-sm italic focus-visible:ring-brand-blue"
                             />
                         </div>
 
@@ -2603,69 +2673,115 @@ handleChunkVideoUpload(f);
                                 Opciones de Respuesta
                             </Label>
                             {questionFormState.answers.map((a, idx) => (
-                                <div key={idx} className="flex items-center gap-4">
-                                    <div className="flex-1 space-y-1">
-                                        <div className="relative">
-                                            <div
-                                                className={cn(
-                                                    'absolute top-1/2 left-4 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-lg text-xs font-black',
-                                                    a.is_correct
-                                                        ? 'bg-green-600 text-white'
-                                                        : 'bg-gray-100 text-gray-400',
-                                                )}
-                                            >
-                                                {String.fromCharCode(65 + idx)}
-                                            </div>
-                                            <Input
-                                                required
-                                                value={a.text}
-                                                onChange={(e) => {
+                                <div
+                                    key={idx}
+                                    className={cn(
+                                        'space-y-2 rounded-2xl border-2 p-3 transition-colors',
+                                        a.is_correct
+                                            ? 'border-green-300 bg-green-50/20'
+                                            : 'border-neutral-200/80 bg-white',
+                                    )}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div
+                                            className={cn(
+                                                'mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black',
+                                                a.is_correct
+                                                    ? 'bg-green-600 text-white'
+                                                    : 'bg-gray-100 text-gray-500',
+                                            )}
+                                        >
+                                            {String.fromCharCode(65 + idx)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <RichTextEditor
+                                                variant="compact"
+                                                content={a.text}
+                                                onChange={(val) => {
                                                     const newAnswers = [
                                                         ...questionFormState.answers,
                                                     ];
                                                     newAnswers[idx] = {
                                                         ...newAnswers[idx],
-                                                        text: e.target.value,
+                                                        text: val,
                                                     };
                                                     setQuestionFormState({
                                                         ...questionFormState,
                                                         answers: newAnswers,
                                                     });
                                                 }}
-                                                className={cn(
-                                                    'h-12 rounded-2xl border-2 pl-12 font-bold',
-                                                    a.is_correct
-                                                        ? 'border-green-400 bg-green-50/30'
-                                                        : 'hover:border-gray-300',
-                                                )}
                                                 placeholder={`Texto de la opción ${String.fromCharCode(65 + idx)}`}
                                             />
                                         </div>
+                                        <Button
+                                            type="button"
+                                            variant={a.is_correct ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                const newAnswers =
+                                                    questionFormState.answers.map(
+                                                        (ans, i) => ({
+                                                            ...ans,
+                                                            is_correct: i === idx,
+                                                        }),
+                                                    );
+                                                setQuestionFormState({
+                                                    ...questionFormState,
+                                                    answers: newAnswers,
+                                                });
+                                            }}
+                                            className={cn(
+                                                'mt-1 h-10 w-24 shrink-0 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all',
+                                                a.is_correct
+                                                    ? 'bg-green-600 shadow-lg shadow-green-600/20 hover:bg-green-700'
+                                                    : 'border-2 text-gray-400 hover:bg-gray-50',
+                                            )}
+                                        >
+                                            {a.is_correct ? 'Correcta' : 'Marcar'}
+                                        </Button>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant={a.is_correct ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            const newAnswers = questionFormState.answers.map(
-                                                (ans, i) => ({
-                                                    ...ans,
-                                                    is_correct: i === idx,
-                                                }),
-                                            );
-                                            setQuestionFormState({
-                                                ...questionFormState,
-                                                answers: newAnswers,
-                                            });
-                                        }}
-                                        className={cn(
-                                            'h-12 w-24 rounded-2xl text-[9px] font-black tracking-widest uppercase transition-all',
-                                            a.is_correct
-                                                ? 'bg-green-600 shadow-lg shadow-green-600/20 hover:bg-green-700'
-                                                : 'border-2 text-gray-400 hover:bg-gray-50',
+
+                                    <div className="flex flex-wrap items-center gap-3 pl-10">
+                                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 px-2.5 py-1 text-[11px] font-medium text-neutral-600 hover:bg-neutral-50">
+                                            <ImageIcon className="h-3.5 w-3.5 text-brand-blue" />
+                                            <span>
+                                                {answerImagePreviews[idx]
+                                                    ? 'Cambiar imagen de opción'
+                                                    : 'Adjuntar imagen (opcional)'}
+                                            </span>
+                                            <input
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/webp"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file =
+                                                        e.target.files?.[0] ||
+                                                        null;
+                                                    setAnswerImageFiles((prev) => ({
+                                                        ...prev,
+                                                        [idx]: file,
+                                                    }));
+
+                                                    if (file) {
+                                                        setAnswerImagePreviews(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                [idx]: URL.createObjectURL(
+                                                                    file,
+                                                                ),
+                                                            }),
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                        {answerImagePreviews[idx] && (
+                                            <img
+                                                src={answerImagePreviews[idx]!}
+                                                alt={`Vista previa opción ${String.fromCharCode(65 + idx)}`}
+                                                className="max-h-16 rounded-lg border object-contain"
+                                            />
                                         )}
-                                    >
-                                        {a.is_correct ? 'Correcta' : 'Marcar'}
-                                    </Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -2817,11 +2933,7 @@ handleChunkVideoUpload(f);
                             </h4>
                             <div className="prose prose-sm min-h-[120px] max-w-none rounded-2xl border border-gray-100 bg-gray-50 p-6">
                                 {activeLesson?.content ? (
-                                    <div
-                                        dangerouslySetInnerHTML={{
-                                            __html: sanitizeHtml(activeLesson.content),
-                                        }}
-                                    />
+                                    <MathHtml html={activeLesson.content} />
                                 ) : (
                                     <p className="text-xs text-muted-foreground italic">
                                         Sin contenido teórico registrado.
