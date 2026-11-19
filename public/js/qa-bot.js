@@ -30,8 +30,13 @@
         return;
     }
 
+    const initialContext = window.__SAPIUS_QA_CONTEXT__ || null;
+
     const state = {
         isAdmin: false,
+        reviewer: initialContext?.reviewer || null,
+        activeAccount: initialContext?.activeAccount ?? initialContext?.active_account ?? null,
+        viaPass: Boolean(initialContext?.viaPass ?? initialContext?.via_pass),
         isOpen: false,
         activeTab: 'new',
         currentUrl: window.location.href,
@@ -85,17 +90,37 @@
         return null;
     }
 
+    function applyQaContext(ctx) {
+        if (!ctx) {
+            return;
+        }
+        if (ctx.enabled === true || ctx.reviewer) {
+            state.isAdmin = true;
+        }
+        if (ctx.reviewer) {
+            state.reviewer = ctx.reviewer;
+        }
+        state.activeAccount =
+            ctx.activeAccount !== undefined ? ctx.activeAccount : (ctx.active_account ?? null);
+        state.viaPass = Boolean(ctx.viaPass !== undefined ? ctx.viaPass : ctx.via_pass);
+    }
+
     function detectInitialState() {
         const page = parseInitialInertiaPage();
         if (page) {
             state.currentComponent = page.component || null;
-            if (page.props && page.props.auth && page.props.auth.user) {
-                state.isAdmin = page.props.auth.user.role === 'admin';
+            if (page.props?.qaBot?.enabled) {
+                applyQaContext(page.props.qaBot);
+            } else if (page.props?.auth?.user?.role === 'admin') {
+                state.isAdmin = true;
             }
         }
 
         if (window.__SAPIUS_QA_ADMIN__ === true) {
             state.isAdmin = true;
+        }
+        if (window.__SAPIUS_QA_CONTEXT__) {
+            applyQaContext(window.__SAPIUS_QA_CONTEXT__);
         }
     }
 
@@ -557,6 +582,26 @@
         }
     }
 
+    async function revokePass() {
+        try {
+            await fetch('/admin/qa-bot/revoke-pass', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: getCsrfHeaders(),
+            });
+        } catch {
+            // Ignore
+        } finally {
+            state.isAdmin = false;
+            state.isOpen = false;
+            state.viaPass = false;
+            state.activeAccount = null;
+            window.__SAPIUS_QA_ADMIN__ = false;
+            window.__SAPIUS_QA_CONTEXT__ = null;
+            ensureMounted();
+        }
+    }
+
     function attachShadowEvents() {
         if (!shadowRoot) {
             return;
@@ -647,6 +692,9 @@
                     break;
                 case 'confirm-delete':
                     deleteReport(id);
+                    break;
+                case 'revoke-pass':
+                    revokePass();
                     break;
                 default:
                     break;
@@ -754,6 +802,10 @@
         const componentBadge = state.currentComponent
             ? `<span class="chip chip-comp">${escapeHtml(state.currentComponent)}</span>`
             : '';
+        const testedAsBadge =
+            state.activeAccount && state.activeAccount.role !== 'admin'
+                ? `<span class="chip chip-tested">🎓 Probando como: ${escapeHtml(state.activeAccount.name || state.activeAccount.email)} (${escapeHtml(state.activeAccount.role || 'alumno')})</span>`
+                : '';
 
         const feedbackHtml = state.submitFeedback
             ? `<div class="alert ${state.submitFeedback.type === 'error' ? 'alert-error' : 'alert-success'}">${escapeHtml(state.submitFeedback.text)}</div>`
@@ -781,6 +833,7 @@
                 <div class="context-bar">
                     <span class="chip chip-url" title="${escapeHtml(state.currentUrl)}">${escapeHtml(shortUrl)}</span>
                     ${componentBadge}
+                    ${testedAsBadge}
                 </div>
                 ${renderErrorPreview()}
                 ${feedbackHtml}
@@ -870,6 +923,18 @@
                     ? `<button type="button" class="btn-xs btn-ghost" data-qa-action="open-reopen" data-qa-id="${escapeHtml(report.id)}">Responder / Reenviar</button>`
                     : '';
 
+        const authorName = report.author?.name || 'Administrador';
+        const authorEmail = report.author?.email ? ` <span class="author-email">(${escapeHtml(report.author.email)})</span>` : '';
+        const authorHtml = `<div class="report-author">👤 <strong>Solicitó:</strong> ${escapeHtml(authorName)}${authorEmail}</div>`;
+
+        const showTestedAs =
+            report.tested_as &&
+            (report.tested_as.role !== 'admin' ||
+                (report.tested_as.id && report.tested_as.id !== report.author?.id));
+        const testedAsHtml = showTestedAs
+            ? `<div class="report-tested-as">🎓 <strong>Probando cuenta:</strong> ${escapeHtml(report.tested_as.name || report.tested_as.email || 'Alumno')} (${escapeHtml(report.tested_as.role || 'alumno')})</div>`
+            : '';
+
         return `
             <div class="report-card">
                 <div class="report-head">
@@ -877,6 +942,8 @@
                     <span class="status-pill ${meta.cls}">${meta.icon} ${meta.label}</span>
                     <span class="report-time">${escapeHtml(formatTime(report.created_at))}</span>
                 </div>
+                ${authorHtml}
+                ${testedAsHtml}
                 ${defectBadgeHtml ? `<div>${defectBadgeHtml}</div>` : ''}
                 <div class="report-msg">${escapeHtml(report.message)}</div>
                 <div class="report-meta">
@@ -944,15 +1011,26 @@
             badgeHtml = `<span class="fab-badge fab-badge-pending">${activeCount}</span>`;
         }
 
+        const reviewerName = state.reviewer?.name || 'Administrador';
+        const headerSub = state.viaPass
+            ? `👤 Revisor: ${escapeHtml(reviewerName)} · Modo pase activo`
+            : `👤 Revisor: ${escapeHtml(reviewerName)}`;
+        const revokeBtnHtml = state.viaPass
+            ? `<button type="button" class="revoke-btn" data-qa-action="revoke-pass" title="Desactivar pase QA en este navegador">🔒 Salir de modo QA</button>`
+            : '';
+
         const panelHtml = state.isOpen
             ? `
                 <div class="panel" role="dialog" aria-label="Bot de Revisión QA">
                     <div class="panel-header">
                         <div class="panel-title-wrap">
                             <div class="panel-title">🛠️ Bot QA Sapius</div>
-                            <div class="panel-sub">Solo administradores · Escucha en vivo</div>
+                            <div class="panel-sub">${headerSub}</div>
                         </div>
-                        <button type="button" class="close-btn" data-qa-action="close" aria-label="Cerrar">✕</button>
+                        <div class="header-actions">
+                            ${revokeBtnHtml}
+                            <button type="button" class="close-btn" data-qa-action="close" aria-label="Cerrar">✕</button>
+                        </div>
                     </div>
                     <div class="tabs">
                         <button type="button" class="tab-btn ${state.activeTab === 'new' ? 'active' : ''}" data-qa-action="tab-new">
@@ -1007,6 +1085,12 @@
                 }
                 .panel-title { font-size: 14px; font-weight: 700; }
                 .panel-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+                .header-actions { display: flex; align-items: center; gap: 6px; }
+                .revoke-btn {
+                    background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(248, 113, 113, 0.45);
+                    color: #fecaca; border-radius: 8px; padding: 4px 8px; font-size: 10px; font-weight: 700; cursor: pointer;
+                }
+                .revoke-btn:hover { background: rgba(239, 68, 68, 0.35); color: #ffffff; }
                 .close-btn {
                     background: rgba(255,255,255,0.1); border: none; color: #e2e8f0;
                     width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 14px;
@@ -1036,6 +1120,7 @@
                 }
                 .chip-url { background: #f1f5f9; color: #334155; font-family: ui-monospace, monospace; }
                 .chip-comp { background: #eef2ff; color: #4338ca; font-weight: 600; }
+                .chip-tested { background: #ecfeff; color: #0e7490; font-weight: 600; border: 1px solid #a5f3fc; }
                 .error-box {
                     background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 10px;
                     font-size: 11px; color: #991b1b; display: flex; flex-direction: column; gap: 4px;
@@ -1103,6 +1188,12 @@
                 .defect-chip {
                     display: inline-block; font-size: 10px; font-weight: 600; color: #475569;
                     background: #e2e8f0; border-radius: 6px; padding: 2px 7px;
+                }
+                .report-author { font-size: 11px; color: #1e293b; }
+                .report-author .author-email { color: #64748b; font-size: 10px; }
+                .report-tested-as {
+                    font-size: 11px; color: #0e7490; background: #ecfeff;
+                    border: 1px solid #cffafe; border-radius: 6px; padding: 3px 7px;
                 }
                 .report-time { margin-left: auto; font-size: 10px; color: #64748b; }
                 .report-msg { font-size: 12px; color: #0f172a; white-space: pre-wrap; word-break: break-word; }
@@ -1193,7 +1284,16 @@
             if (page.component) {
                 state.currentComponent = page.component;
             }
-            if (page.props && Object.prototype.hasOwnProperty.call(page.props, 'auth')) {
+            if (page.props && Object.prototype.hasOwnProperty.call(page.props, 'qaBot')) {
+                if (page.props.qaBot && page.props.qaBot.enabled) {
+                    applyQaContext(page.props.qaBot);
+                } else {
+                    state.isAdmin = page.props.auth?.user?.role === 'admin';
+                    state.activeAccount = null;
+                    state.viaPass = false;
+                }
+                window.__SAPIUS_QA_ADMIN__ = state.isAdmin;
+            } else if (page.props && Object.prototype.hasOwnProperty.call(page.props, 'auth')) {
                 state.isAdmin = page.props.auth?.user?.role === 'admin';
                 window.__SAPIUS_QA_ADMIN__ = state.isAdmin;
             }

@@ -48,15 +48,93 @@ test('students cannot access qa bot endpoints and do not receive admin cookie or
     $this->actingAs($student)->delete('/admin/qa-bot/reports/QA-001')->assertRedirect(route('dashboard'));
 });
 
-test('admins receive qa_admin_active cookie and admin flag in inertia root view', function () {
+test('admins receive signed qa_admin_active cookie and admin flag in inertia root view', function () {
     $admin = $this->assignLegacyRole(User::factory()->create(), 'admin');
 
     $response = $this->actingAs($admin)->get(route('appearance.edit'));
 
     $response->assertOk();
-    $response->assertPlainCookie('qa_admin_active', '1');
     $response->assertSee('window.__SAPIUS_QA_ADMIN__ = true', false);
     $response->assertSee('/js/qa-bot.js', false);
+
+    $passCookie = collect($response->headers->getCookies())
+        ->first(fn ($cookie) => $cookie->getName() === QaFeedbackBotController::PASS_COOKIE_NAME);
+
+    expect($passCookie)->not->toBeNull();
+    $verified = QaFeedbackBotController::verifyReviewerPassToken($passCookie->getValue());
+    expect($verified)->toBeArray()
+        ->and($verified['admin_id'])->toBe($admin->id)
+        ->and($verified['email'])->toBe($admin->email);
+});
+
+test('forged or tampered qa_admin_active cookie is rejected and expired for students', function () {
+    $student = $this->assignLegacyRole(User::factory()->create(), 'alumno');
+
+    $pageResponse = $this->actingAs($student)
+        ->withUnencryptedCookie(QaFeedbackBotController::PASS_COOKIE_NAME, '1')
+        ->get(route('appearance.edit'));
+
+    $pageResponse->assertOk();
+    $pageResponse->assertCookieExpired(QaFeedbackBotController::PASS_COOKIE_NAME);
+    $pageResponse->assertDontSee('window.__SAPIUS_QA_ADMIN__ = true', false);
+
+    $this->actingAs($student)
+        ->withCredentials()
+        ->withUnencryptedCookie(QaFeedbackBotController::PASS_COOKIE_NAME, 'forged.signature')
+        ->getJson('/admin/qa-bot/reports')
+        ->assertForbidden();
+});
+
+test('reviewer pass allows admin to keep qa bot when testing as a student and records both identities', function () {
+    $admin = $this->assignLegacyRole(User::factory()->create(['nombre' => 'Alfredo', 'apellido' => 'Revisor']), 'admin');
+    $student = $this->assignLegacyRole(User::factory()->create(['nombre' => 'Alumno', 'apellido' => 'Prueba']), 'alumno');
+
+    $adminResponse = $this->actingAs($admin)->get(route('appearance.edit'));
+    $passCookie = collect($adminResponse->headers->getCookies())
+        ->first(fn ($cookie) => $cookie->getName() === QaFeedbackBotController::PASS_COOKIE_NAME);
+
+    expect($passCookie)->not->toBeNull();
+    $token = $passCookie->getValue();
+
+    $studentPage = $this->actingAs($student)
+        ->withUnencryptedCookie(QaFeedbackBotController::PASS_COOKIE_NAME, $token)
+        ->get(route('appearance.edit'));
+
+    $studentPage->assertOk();
+    $studentPage->assertSee('window.__SAPIUS_QA_ADMIN__ = true', false);
+    $studentPage->assertSee('window.__SAPIUS_QA_CONTEXT__', false);
+
+    $reportResponse = $this->actingAs($student)
+        ->withCredentials()
+        ->withUnencryptedCookie(QaFeedbackBotController::PASS_COOKIE_NAME, $token)
+        ->postJson('/admin/qa-bot/reports', [
+            'message' => 'El video no carga en modo alumno',
+            'defect_type' => 'broken_action',
+            'url' => 'https://test.sapius.com.mx/alumno/curso/1',
+        ]);
+
+    $reportResponse->assertStatus(201)
+        ->assertJsonPath('report.author.id', $admin->id)
+        ->assertJsonPath('report.author.email', $admin->email)
+        ->assertJsonPath('report.tested_as.id', $student->id)
+        ->assertJsonPath('report.tested_as.role', 'alumno');
+
+    $revokeResponse = $this->actingAs($student)
+        ->withCredentials()
+        ->withUnencryptedCookie(QaFeedbackBotController::PASS_COOKIE_NAME, $token)
+        ->postJson('/admin/qa-bot/revoke-pass');
+
+    $revokeResponse->assertOk()
+        ->assertJsonPath('revoked', true)
+        ->assertCookieExpired(QaFeedbackBotController::PASS_COOKIE_NAME);
+
+    // If admin account is deactivated, existing pass token is immediately rejected
+    $admin->forceFill(['activo' => 'no'])->save();
+    $this->actingAs($student)
+        ->withCredentials()
+        ->withUnencryptedCookie(QaFeedbackBotController::PASS_COOKIE_NAME, $token)
+        ->getJson('/admin/qa-bot/reports')
+        ->assertForbidden();
 });
 
 test('laravel error pages inject qa bot and exception payload only for admins', function () {

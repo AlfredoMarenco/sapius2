@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Controllers\Admin\QaFeedbackBotController;
 use App\Services\MiniTestConfigService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -97,10 +98,17 @@ class HandleInertiaRequests extends Middleware
             ];
         }
 
-        if ($sharedUser && ($sharedUser['role'] ?? null) === 'admin') {
-            Cookie::queue('qa_admin_active', '1', 60 * 24 * 7);
-        } elseif ($request->hasCookie('qa_admin_active')) {
-            Cookie::queue(Cookie::forget('qa_admin_active'));
+        $qaContext = null;
+
+        if ($user && ($sharedUser['role'] ?? null) === 'admin') {
+            $passToken = QaFeedbackBotController::createReviewerPassToken($user);
+            Cookie::queue(QaFeedbackBotController::PASS_COOKIE_NAME, $passToken, 60 * 24 * 7);
+            $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
+        } else {
+            $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
+            if ($qaContext === null && $request->hasCookie(QaFeedbackBotController::PASS_COOKIE_NAME)) {
+                Cookie::queue(Cookie::forget(QaFeedbackBotController::PASS_COOKIE_NAME));
+            }
         }
 
         return [
@@ -116,6 +124,12 @@ class HandleInertiaRequests extends Middleware
             'recaptcha_site_key' => config('elearning.captcha_data_sitekey'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'miniTestConfig' => fn (): array => app(MiniTestConfigService::class)->getConfig(),
+            'qaBot' => $qaContext ? [
+                'enabled' => true,
+                'reviewer' => $qaContext['reviewer'],
+                'activeAccount' => $qaContext['active_account'],
+                'viaPass' => $qaContext['via_pass'],
+            ] : null,
         ];
     }
 }

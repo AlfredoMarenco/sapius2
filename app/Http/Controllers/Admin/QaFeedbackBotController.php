@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -15,6 +18,146 @@ class QaFeedbackBotController extends Controller
     public const VALID_AGENT_STATUSES = ['pending', 'in_progress', 'resolved', 'needs_review', 'verified', 'rejected'];
 
     public const VALID_DEFECT_TYPES = ['server_error', 'broken_action', 'legacy_parity', 'visual_copy'];
+
+    public const PASS_COOKIE_NAME = 'qa_admin_active';
+
+    public static function createReviewerPassToken(User $admin): string
+    {
+        $payload = [
+            'admin_id' => $admin->id,
+            'name' => trim((string) ($admin->nombre_completo ?: $admin->name ?: 'Administrador')),
+            'email' => $admin->email,
+            'exp' => now()->addDays(7)->timestamp,
+        ];
+
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+        $payloadB64 = rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+        $sig = hash_hmac('sha256', $payloadB64, (string) config('app.key'));
+
+        return "{$payloadB64}.{$sig}";
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function verifyReviewerPassToken(?string $token): ?array
+    {
+        if (! is_string($token) || ! str_contains($token, '.')) {
+            return null;
+        }
+
+        $appKey = (string) config('app.key');
+        if ($appKey === '') {
+            return null;
+        }
+
+        [$payloadB64, $sig] = explode('.', $token, 2);
+        if ($payloadB64 === '' || $sig === '') {
+            return null;
+        }
+
+        $expectedSig = hash_hmac('sha256', $payloadB64, $appKey);
+        if (! hash_equals($expectedSig, $sig)) {
+            return null;
+        }
+
+        $padded = strtr($payloadB64, '-_', '+/');
+        $remainder = strlen($padded) % 4;
+        if ($remainder > 0) {
+            $padded .= str_repeat('=', 4 - $remainder);
+        }
+
+        $decodedJson = base64_decode($padded, true);
+        if ($decodedJson === false) {
+            return null;
+        }
+
+        $data = json_decode($decodedJson, true);
+        if (! is_array($data) || empty($data['admin_id']) || (int) ($data['exp'] ?? 0) < time()) {
+            return null;
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return array{
+     *     reviewer: array{id: int|string, name: string, email: string|null},
+     *     active_account: array{id: int|string, name: string, email: string|null, role: string}|null,
+     *     via_pass: bool
+     * }|null
+     */
+    public static function resolveReviewerFromRequest(Request $request): ?array
+    {
+        $user = null;
+        try {
+            $user = $request->user();
+        } catch (\Throwable) {
+            $user = null;
+        }
+
+        if ($user && $user->role === 'admin') {
+            $adminName = trim((string) ($user->nombre_completo ?: $user->name ?: 'Administrador'));
+
+            return [
+                'reviewer' => [
+                    'id' => $user->id,
+                    'name' => $adminName,
+                    'email' => $user->email,
+                ],
+                'active_account' => [
+                    'id' => $user->id,
+                    'name' => $adminName,
+                    'email' => $user->email,
+                    'role' => 'admin',
+                ],
+                'via_pass' => false,
+            ];
+        }
+
+        $token = $request->cookie(self::PASS_COOKIE_NAME);
+        $tokenData = self::verifyReviewerPassToken(is_string($token) ? $token : null);
+        if ($tokenData === null) {
+            return null;
+        }
+
+        $adminUser = null;
+        $dbChecked = false;
+        try {
+            $adminUser = User::find($tokenData['admin_id']);
+            $dbChecked = true;
+        } catch (\Throwable) {
+            $dbChecked = false;
+        }
+
+        if ($dbChecked) {
+            if (! $adminUser || ($adminUser->activo ?? 'si') !== 'si' || $adminUser->role !== 'admin') {
+                return null;
+            }
+        }
+
+        $activeAccount = null;
+        if ($user) {
+            $activeAccount = [
+                'id' => $user->id,
+                'name' => trim((string) ($user->nombre_completo ?: $user->name ?: $user->email)),
+                'email' => $user->email,
+                'role' => $user->role,
+            ];
+        }
+
+        return [
+            'reviewer' => [
+                'id' => $adminUser ? $adminUser->id : $tokenData['admin_id'],
+                'name' => $adminUser
+                    ? trim((string) ($adminUser->nombre_completo ?: $adminUser->name ?: 'Administrador'))
+                    : (string) ($tokenData['name'] ?? 'Administrador'),
+                'email' => $adminUser ? $adminUser->email : ($tokenData['email'] ?? null),
+            ],
+            'active_account' => $activeAccount,
+            'via_pass' => true,
+        ];
+    }
 
     public static function baseDirectory(): string
     {
@@ -157,6 +300,8 @@ class QaFeedbackBotController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorizeReviewer($request);
+
         $reports = self::sortReportsNewestFirst(self::readReports());
 
         $counts = [
@@ -184,6 +329,8 @@ class QaFeedbackBotController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $context = $this->authorizeReviewer($request);
+
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:5000'],
             'defect_type' => ['nullable', 'string', 'in:'.implode(',', self::VALID_DEFECT_TYPES)],
@@ -202,8 +349,6 @@ class QaFeedbackBotController extends Controller
             $decodedScreenshot = $this->parseBase64Screenshot((string) $validated['screenshot']);
         }
 
-        $user = $request->user();
-        $authorName = trim((string) ($user?->nombre_completo ?: $user?->name ?: 'Administrador'));
         $userAgent = $validated['user_agent'] ?? $request->userAgent();
         $now = now()->toIso8601String();
         $logExcerpt = $this->tailLaravelLog(35);
@@ -211,8 +356,7 @@ class QaFeedbackBotController extends Controller
         $createdReport = self::mutateReports(function (array $reports) use (
             $validated,
             $decodedScreenshot,
-            $user,
-            $authorName,
+            $context,
             $userAgent,
             $now,
             $logExcerpt
@@ -247,11 +391,8 @@ class QaFeedbackBotController extends Controller
                 'laravel_log_excerpt' => $logExcerpt,
                 'screenshot_url' => $screenshotUrl,
                 'screenshot_file' => $screenshotFile,
-                'author' => [
-                    'id' => $user?->id,
-                    'name' => $authorName,
-                    'email' => $user?->email,
-                ],
+                'author' => $context['reviewer'],
+                'tested_as' => $context['active_account'],
                 'agent_reply' => null,
                 'follow_up_message' => null,
                 'follow_ups' => [],
@@ -272,6 +413,8 @@ class QaFeedbackBotController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
+        $context = $this->authorizeReviewer($request);
+
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'in:'.implode(',', self::VALID_ADMIN_STATUSES)],
             'follow_up_message' => ['nullable', 'string', 'max:5000'],
@@ -283,8 +426,7 @@ class QaFeedbackBotController extends Controller
             ]);
         }
 
-        $user = $request->user();
-        $authorName = trim((string) ($user?->nombre_completo ?: $user?->name ?: 'Administrador'));
+        $authorName = $context['reviewer']['name'];
         $now = now()->toIso8601String();
 
         $updatedReport = self::mutateReports(function (array $reports) use (
@@ -347,8 +489,10 @@ class QaFeedbackBotController extends Controller
         ]);
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
+        $this->authorizeReviewer($request);
+
         $deletedScreenshot = self::mutateReports(function (array $reports) use ($id): array {
             $foundIndex = null;
             foreach ($reports as $index => $report) {
@@ -385,8 +529,10 @@ class QaFeedbackBotController extends Controller
         ]);
     }
 
-    public function screenshot(string $filename): BinaryFileResponse
+    public function screenshot(Request $request, string $filename): BinaryFileResponse
     {
+        $this->authorizeReviewer($request);
+
         $safeName = basename($filename);
         if (! preg_match('/^[A-Za-z0-9_.-]+\.(png|jpe?g|webp)$/i', $safeName)) {
             abort(404);
@@ -408,6 +554,42 @@ class QaFeedbackBotController extends Controller
             'Content-Type' => $mimeType,
             'Cache-Control' => 'private, max-age=86400',
         ]);
+    }
+
+    public function revokePass(Request $request): JsonResponse
+    {
+        Cookie::queue(Cookie::forget(self::PASS_COOKIE_NAME));
+
+        return response()->json(['revoked' => true]);
+    }
+
+    /**
+     * @return array{
+     *     reviewer: array{id: int|string, name: string, email: string|null},
+     *     active_account: array{id: int|string, name: string, email: string|null, role: string}|null,
+     *     via_pass: bool
+     * }
+     */
+    private function authorizeReviewer(Request $request): array
+    {
+        $context = self::resolveReviewerFromRequest($request);
+        if ($context !== null) {
+            return $context;
+        }
+
+        if (! $request->user()) {
+            if ($request->expectsJson()) {
+                throw new HttpResponseException(response()->json(['message' => 'Unauthenticated.'], 401));
+            }
+
+            throw new HttpResponseException(redirect()->route('login'));
+        }
+
+        if ($request->expectsJson()) {
+            throw new HttpResponseException(response()->json(['message' => 'No tienes permisos para acceder al Bot QA.'], 403));
+        }
+
+        throw new HttpResponseException(redirect()->route('dashboard'));
     }
 
     /**

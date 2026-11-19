@@ -226,11 +226,14 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Electron Auto Updater (Legacy URLs: /admin/electron/updater)
     Route::get('/electron/updater', [ElectronUpdaterController::class, 'index'])->name('electron.updater.index');
     Route::post('/electron/updater/upload', [ElectronUpdaterController::class, 'upload'])->name('electron.updater.upload');
+});
 
-    // QA Feedback Bot (Solo Administradores)
+// QA Feedback Bot (Administradores activos o revisores con pase HMAC-SHA256 vigente)
+Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/qa-bot/reports', [QaFeedbackBotController::class, 'index'])->name('qa-bot.index');
     Route::post('/qa-bot/reports', [QaFeedbackBotController::class, 'store'])->name('qa-bot.store');
     Route::patch('/qa-bot/reports/{id}', [QaFeedbackBotController::class, 'update'])->name('qa-bot.update');
     Route::delete('/qa-bot/reports/{id}', [QaFeedbackBotController::class, 'destroy'])->name('qa-bot.destroy');
     Route::get('/qa-bot/screenshots/{filename}', [QaFeedbackBotController::class, 'screenshot'])->name('qa-bot.screenshot');
+    Route::post('/qa-bot/revoke-pass', [QaFeedbackBotController::class, 'revokePass'])->name('qa-bot.revoke-pass');
 });

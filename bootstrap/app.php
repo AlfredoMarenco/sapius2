@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\QaFeedbackBotController;
 use App\Http\Middleware\ApiTokenAuth;
 use App\Http\Middleware\AuthenticateWebOrElectron;
 use App\Http\Middleware\CheckRole;
@@ -50,19 +51,9 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
-            $isAdmin = false;
+            $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
 
-            try {
-                $isAdmin = $request->user()?->role === 'admin';
-            } catch (Throwable) {
-                $isAdmin = false;
-            }
-
-            if (! $isAdmin) {
-                $isAdmin = $request->cookie('qa_admin_active') === '1';
-            }
-
-            if (! $isAdmin || $request->expectsJson()) {
+            if ($qaContext === null || $request->expectsJson()) {
                 return $response;
             }
 
@@ -96,7 +87,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 $csrfToken = null;
             }
 
-            $injection = "\n<script>window.__SAPIUS_QA_ADMIN__ = true; window.__SAPIUS_QA_EXCEPTION__ = ".json_encode($payload, $jsonFlags).';';
+            $injection = "\n<script>window.__SAPIUS_QA_ADMIN__ = true; window.__SAPIUS_QA_CONTEXT__ = ".json_encode($qaContext, $jsonFlags).'; window.__SAPIUS_QA_EXCEPTION__ = '.json_encode($payload, $jsonFlags).';';
             if (is_string($csrfToken) && $csrfToken !== '') {
                 $injection .= ' window.__SAPIUS_QA_CSRF__ = '.json_encode($csrfToken, $jsonFlags).';';
             }
