@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\Landing\LandingReviewController;
 use App\Http\Controllers\Admin\LandingConfigController;
 use App\Http\Controllers\Admin\ManageableController;
 use App\Http\Controllers\Admin\MiniTestConfigController;
+use App\Http\Controllers\Admin\QaFeedbackBotController;
 use App\Http\Controllers\Admin\QuizImportController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ScheduledCourseController;
@@ -225,4 +226,11 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Electron Auto Updater (Legacy URLs: /admin/electron/updater)
     Route::get('/electron/updater', [ElectronUpdaterController::class, 'index'])->name('electron.updater.index');
     Route::post('/electron/updater/upload', [ElectronUpdaterController::class, 'upload'])->name('electron.updater.upload');
+
+    // QA Feedback Bot (Solo Administradores)
+    Route::get('/qa-bot/reports', [QaFeedbackBotController::class, 'index'])->name('qa-bot.index');
+    Route::post('/qa-bot/reports', [QaFeedbackBotController::class, 'store'])->name('qa-bot.store');
+    Route::patch('/qa-bot/reports/{id}', [QaFeedbackBotController::class, 'update'])->name('qa-bot.update');
+    Route::delete('/qa-bot/reports/{id}', [QaFeedbackBotController::class, 'destroy'])->name('qa-bot.destroy');
+    Route::get('/qa-bot/screenshots/{filename}', [QaFeedbackBotController::class, 'screenshot'])->name('qa-bot.screenshot');
 });

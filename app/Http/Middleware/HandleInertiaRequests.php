@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Services\MiniTestConfigService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
@@ -94,6 +95,12 @@ class HandleInertiaRequests extends Middleware
                 'is_validated' => $user->validado === 'si',
                 'profile_incomplete' => $profileIncomplete,
             ];
+        }
+
+        if ($sharedUser && ($sharedUser['role'] ?? null) === 'admin') {
+            Cookie::queue('qa_admin_active', '1', 60 * 24 * 7);
+        } elseif ($request->hasCookie('qa_admin_active')) {
+            Cookie::queue(Cookie::forget('qa_admin_active'));
         }
 
         return [

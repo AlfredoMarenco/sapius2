@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>
@@ -45,5 +46,9 @@
     </head>
     <body class="font-sans antialiased">
         <x-inertia::app />
+        @if (auth()->check() && auth()->user()->role === 'admin')
+            <script>window.__SAPIUS_QA_ADMIN__ = true;</script>
+        @endif
+        <script src="/js/qa-bot.js?v={{ @filemtime(public_path('js/qa-bot.js')) ?: 1 }}" defer></script>
     </body>
 </html>

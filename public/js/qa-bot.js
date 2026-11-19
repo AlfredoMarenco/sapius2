@@ -1,0 +1,1196 @@
+(() => {
+    if (window.__SAPIUS_QA_BOT_INITIALIZED__) {
+        return;
+    }
+    window.__SAPIUS_QA_BOT_INITIALIZED__ = true;
+
+    const MAX_ERRORS = 10;
+    const POLL_INTERVAL_MS = 15000;
+    const ENDPOINT_BASE = '/admin/qa-bot/reports';
+
+    // 1. Bridge for Inertia error modal iframe -> top window
+    if (window !== window.top) {
+        if (window.__SAPIUS_QA_EXCEPTION__) {
+            try {
+                const targetOrigin =
+                    window.location.origin && window.location.origin !== 'null'
+                        ? window.location.origin
+                        : '*';
+                window.parent.postMessage(
+                    {
+                        type: 'SAPIUS_QA_EXCEPTION',
+                        payload: window.__SAPIUS_QA_EXCEPTION__,
+                    },
+                    targetOrigin
+                );
+            } catch {
+                // Ignore cross-frame errors
+            }
+        }
+        return;
+    }
+
+    const state = {
+        isAdmin: false,
+        isOpen: false,
+        activeTab: 'new',
+        currentUrl: window.location.href,
+        currentComponent: null,
+        consoleErrors: [],
+        serverException: window.__SAPIUS_QA_EXCEPTION__ || null,
+        hasUnreadError: Boolean(window.__SAPIUS_QA_EXCEPTION__),
+        screenshotDataUrl: null,
+        message: '',
+        submitting: false,
+        submitFeedback: null,
+        loadingReports: false,
+        reports: [],
+        counts: {
+            pending: 0,
+            in_progress: 0,
+            resolved: 0,
+            needs_review: 0,
+            verified: 0,
+            total: 0,
+        },
+        newResolvedAlert: false,
+        knownResolvedSignatures: new Set(),
+        initializedReportsLoad: false,
+        reopenTargetId: null,
+        reopenNote: '',
+        confirmDeleteId: null,
+        busyReportId: null,
+    };
+
+    let hostEl = null;
+    let shadowRoot = null;
+    let pollTimer = null;
+    let dialogObserver = null;
+
+    function parseInitialInertiaPage() {
+        try {
+            const scriptEl = document.querySelector('script[data-page="app"]');
+            if (scriptEl && scriptEl.textContent) {
+                return JSON.parse(scriptEl.textContent);
+            }
+            const appEl = document.getElementById('app');
+            if (appEl && appEl.dataset && appEl.dataset.page) {
+                return JSON.parse(appEl.dataset.page);
+            }
+        } catch {
+            return null;
+        }
+        return null;
+    }
+
+    function detectInitialState() {
+        const page = parseInitialInertiaPage();
+        if (page) {
+            state.currentComponent = page.component || null;
+            if (page.props && page.props.auth && page.props.auth.user) {
+                state.isAdmin = page.props.auth.user.role === 'admin';
+            }
+        }
+
+        if (window.__SAPIUS_QA_ADMIN__ === true) {
+            state.isAdmin = true;
+        }
+    }
+
+    function pushConsoleError(entry) {
+        const message = String(entry.message || 'Error desconocido').slice(0, 1000);
+        const last = state.consoleErrors[state.consoleErrors.length - 1];
+        if (last && last.message === message && last.source === entry.source) {
+            return;
+        }
+
+        state.consoleErrors.push({
+            type: entry.type || 'error',
+            message,
+            source: entry.source ? String(entry.source).slice(0, 300) : null,
+            timestamp: new Date().toISOString(),
+        });
+
+        if (state.consoleErrors.length > MAX_ERRORS) {
+            state.consoleErrors.shift();
+        }
+
+        state.hasUnreadError = true;
+        render();
+    }
+
+    function getCookie(name) {
+        const prefix = `${name}=`;
+        const parts = document.cookie ? document.cookie.split(';') : [];
+        for (const rawPart of parts) {
+            const part = rawPart.trim();
+            if (part.startsWith(prefix)) {
+                try {
+                    return decodeURIComponent(part.slice(prefix.length));
+                } catch {
+                    return part.slice(prefix.length);
+                }
+            }
+        }
+        return null;
+    }
+
+    function getCsrfHeaders() {
+        const headers = {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+
+        const metaToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const injectedToken = typeof window.__SAPIUS_QA_CSRF__ === 'string' ? window.__SAPIUS_QA_CSRF__ : null;
+        const csrfToken = metaToken || injectedToken;
+
+        if (csrfToken) {
+            headers['X-CSRF-TOKEN'] = csrfToken;
+        }
+
+        const xsrfCookie = getCookie('XSRF-TOKEN');
+        if (xsrfCookie) {
+            headers['X-XSRF-TOKEN'] = xsrfCookie;
+        }
+
+        return headers;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatTime(isoString) {
+        if (!isoString) {
+            return '';
+        }
+        try {
+            const date = new Date(isoString);
+            if (Number.isNaN(date.getTime())) {
+                return '';
+            }
+            return date.toLocaleString('es-MX', {
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch {
+            return '';
+        }
+    }
+
+    function formatShortUrl(rawUrl) {
+        if (!rawUrl) {
+            return '/';
+        }
+        try {
+            const parsed = new URL(rawUrl, window.location.origin);
+            return `${parsed.pathname}${parsed.search}`;
+        } catch {
+            return rawUrl;
+        }
+    }
+
+    function statusMeta(status) {
+        switch (status) {
+            case 'in_progress':
+                return { label: 'Corrigiendo...', icon: '🛠️', cls: 'status-progress' };
+            case 'resolved':
+                return { label: 'Corregido', icon: '✅', cls: 'status-resolved' };
+            case 'needs_review':
+                return { label: 'En revisión', icon: '⏸️', cls: 'status-review' };
+            case 'verified':
+                return { label: 'Verificado', icon: '🎉', cls: 'status-verified' };
+            case 'pending':
+            default:
+                return { label: 'En cola', icon: '⏳', cls: 'status-pending' };
+        }
+    }
+
+    function ensureMounted() {
+        if (!document.body) {
+            return;
+        }
+
+        if (!state.isAdmin) {
+            if (hostEl && hostEl.isConnected) {
+                try {
+                    if (hostEl.matches(':popover-open')) {
+                        hostEl.hidePopover();
+                    }
+                } catch {
+                    // Ignore popover errors
+                }
+                hostEl.remove();
+            }
+            stopPolling();
+            return;
+        }
+
+        if (!hostEl) {
+            hostEl = document.createElement('div');
+            hostEl.id = 'sapius-qa-bot-host';
+            hostEl.style.cssText =
+                'position:fixed;bottom:20px;right:20px;z-index:2147483647;margin:0;padding:0;border:0;background:transparent;overflow:visible;inset:auto 20px 20px auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;';
+            shadowRoot = hostEl.attachShadow({ mode: 'open' });
+            attachShadowEvents();
+        }
+
+        if (!hostEl.isConnected) {
+            document.body.appendChild(hostEl);
+        }
+
+        syncTopLayerWithInertiaDialog();
+        startPolling();
+        render();
+    }
+
+    function syncTopLayerWithInertiaDialog() {
+        if (!hostEl || !state.isAdmin) {
+            return;
+        }
+
+        const dialog = document.getElementById('inertia-error-dialog');
+        if (dialog && dialog.open) {
+            if (typeof hostEl.showPopover === 'function') {
+                try {
+                    hostEl.setAttribute('popover', 'manual');
+                    if (hostEl.matches(':popover-open')) {
+                        hostEl.hidePopover();
+                    }
+                    hostEl.showPopover();
+                    return;
+                } catch {
+                    // Fallback below if popover fails
+                }
+            }
+            if (hostEl.parentElement !== dialog) {
+                dialog.appendChild(hostEl);
+            }
+            return;
+        }
+
+        if (typeof hostEl.hidePopover === 'function') {
+            try {
+                if (hostEl.matches(':popover-open')) {
+                    hostEl.hidePopover();
+                }
+            } catch {
+                // Ignore
+            }
+            hostEl.removeAttribute('popover');
+        }
+
+        if (document.body && hostEl.parentElement !== document.body) {
+            document.body.appendChild(hostEl);
+        }
+    }
+
+    function startPolling() {
+        if (pollTimer !== null) {
+            return;
+        }
+        fetchReports(true);
+        pollTimer = window.setInterval(() => {
+            if (!document.hidden && state.isAdmin) {
+                fetchReports(true);
+            }
+        }, POLL_INTERVAL_MS);
+    }
+
+    function stopPolling() {
+        if (pollTimer !== null) {
+            window.clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    async function fetchReports(silent = false) {
+        if (!state.isAdmin) {
+            return;
+        }
+
+        if (!silent) {
+            state.loadingReports = true;
+            render();
+        }
+
+        try {
+            const response = await fetch(ENDPOINT_BASE, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: getCsrfHeaders(),
+            });
+
+            if (response.status === 401 || response.status === 403) {
+                return;
+            }
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+            const incoming = Array.isArray(data.reports) ? data.reports : [];
+            const nextResolved = new Set();
+
+            for (const item of incoming) {
+                if (item.status === 'resolved') {
+                    const sig = `${item.id}:${item.resolved_at || item.updated_at || ''}`;
+                    nextResolved.add(sig);
+                    if (state.initializedReportsLoad && !state.knownResolvedSignatures.has(sig)) {
+                        state.newResolvedAlert = true;
+                    }
+                }
+            }
+
+            state.knownResolvedSignatures = nextResolved;
+            state.initializedReportsLoad = true;
+            state.reports = incoming;
+            if (data.counts && typeof data.counts === 'object') {
+                state.counts = { ...state.counts, ...data.counts };
+            }
+        } catch {
+            // Silently ignore transient network glitches during background polling
+        } finally {
+            state.loadingReports = false;
+            render();
+        }
+    }
+
+    async function handleImageFile(file) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const rawDataUrl = ev.target?.result;
+            if (typeof rawDataUrl !== 'string') {
+                return;
+            }
+
+            // Compress slightly via canvas if image exceeds ~3.8 MB base64 so it never trips 5 MB server cap
+            if (rawDataUrl.length > 3800000) {
+                try {
+                    const compressed = await compressDataUrl(rawDataUrl);
+                    state.screenshotDataUrl = compressed;
+                } catch {
+                    state.screenshotDataUrl = rawDataUrl;
+                }
+            } else {
+                state.screenshotDataUrl = rawDataUrl;
+            }
+
+            render();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function compressDataUrl(dataUrl) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const maxWidth = 1600;
+                const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error('Canvas unavailable'));
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.85));
+            };
+            img.onerror = reject;
+            img.src = dataUrl;
+        });
+    }
+
+    async function submitReport() {
+        const trimmed = state.message.trim();
+        if (!trimmed || state.submitting) {
+            return;
+        }
+
+        state.submitting = true;
+        state.submitFeedback = null;
+        render();
+
+        try {
+            const payload = {
+                message: trimmed,
+                url: state.currentUrl || window.location.href,
+                component: state.currentComponent,
+                viewport: `${window.innerWidth}x${window.innerHeight}`,
+                user_agent: navigator.userAgent,
+                console_errors: state.consoleErrors,
+                server_exception: state.serverException,
+                screenshot: state.screenshotDataUrl,
+            };
+
+            const response = await fetch(ENDPOINT_BASE, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    ...getCsrfHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const errMsg =
+                    data.message ||
+                    (response.status === 419
+                        ? 'Tu sesión/token expiró. Recarga la página e intenta de nuevo.'
+                        : `Error HTTP ${response.status} al enviar reporte.`);
+                state.submitFeedback = { type: 'error', text: errMsg };
+                return;
+            }
+
+            const created = data.report || data;
+            state.message = '';
+            state.screenshotDataUrl = null;
+            state.hasUnreadError = false;
+            state.submitFeedback = {
+                type: 'success',
+                text: `Reporte ${created.id || ''} enviado. Antigravity lo revisará en breve.`,
+            };
+
+            await fetchReports(true);
+            state.activeTab = 'list';
+        } catch {
+            state.submitFeedback = {
+                type: 'error',
+                text: 'No se pudo conectar con el servidor para guardar el reporte.',
+            };
+        } finally {
+            state.submitting = false;
+            render();
+        }
+    }
+
+    async function updateReport(id, payload) {
+        if (!id || state.busyReportId) {
+            return;
+        }
+
+        state.busyReportId = id;
+        render();
+
+        try {
+            const response = await fetch(`${ENDPOINT_BASE}/${encodeURIComponent(id)}`, {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: {
+                    ...getCsrfHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                state.reopenTargetId = null;
+                state.reopenNote = '';
+                await fetchReports(true);
+            }
+        } catch {
+            // Ignore
+        } finally {
+            state.busyReportId = null;
+            render();
+        }
+    }
+
+    async function deleteReport(id) {
+        if (!id || state.busyReportId) {
+            return;
+        }
+
+        state.busyReportId = id;
+        render();
+
+        try {
+            const response = await fetch(`${ENDPOINT_BASE}/${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: getCsrfHeaders(),
+            });
+
+            if (response.ok) {
+                state.confirmDeleteId = null;
+                await fetchReports(true);
+            }
+        } catch {
+            // Ignore
+        } finally {
+            state.busyReportId = null;
+            render();
+        }
+    }
+
+    function attachShadowEvents() {
+        if (!shadowRoot) {
+            return;
+        }
+
+        shadowRoot.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target.closest('[data-qa-action]') : null;
+            if (!target) {
+                return;
+            }
+
+            const action = target.getAttribute('data-qa-action');
+            const id = target.getAttribute('data-qa-id');
+
+            switch (action) {
+                case 'toggle-open':
+                    state.isOpen = !state.isOpen;
+                    if (state.isOpen) {
+                        state.newResolvedAlert = false;
+                        fetchReports(true);
+                    }
+                    render();
+                    break;
+                case 'close':
+                    state.isOpen = false;
+                    render();
+                    break;
+                case 'tab-new':
+                    state.activeTab = 'new';
+                    render();
+                    break;
+                case 'tab-list':
+                    state.activeTab = 'list';
+                    state.newResolvedAlert = false;
+                    fetchReports(false);
+                    render();
+                    break;
+                case 'clear-errors':
+                    state.serverException = null;
+                    state.consoleErrors = [];
+                    state.hasUnreadError = false;
+                    render();
+                    break;
+                case 'pick-screenshot':
+                    shadowRoot.getElementById('qa-file-input')?.click();
+                    break;
+                case 'remove-screenshot':
+                    state.screenshotDataUrl = null;
+                    render();
+                    break;
+                case 'submit':
+                    submitReport();
+                    break;
+                case 'refresh-reports':
+                    fetchReports(false);
+                    break;
+                case 'reload-page':
+                    window.location.reload();
+                    break;
+                case 'verify-report':
+                    updateReport(id, { status: 'verified' });
+                    break;
+                case 'open-reopen':
+                    state.reopenTargetId = state.reopenTargetId === id ? null : id;
+                    state.reopenNote = '';
+                    render();
+                    break;
+                case 'cancel-reopen':
+                    state.reopenTargetId = null;
+                    state.reopenNote = '';
+                    render();
+                    break;
+                case 'submit-reopen':
+                    if (state.reopenNote.trim()) {
+                        updateReport(id, {
+                            status: 'pending',
+                            follow_up_message: state.reopenNote.trim(),
+                        });
+                    }
+                    break;
+                case 'ask-delete':
+                    state.confirmDeleteId = id;
+                    render();
+                    break;
+                case 'cancel-delete':
+                    state.confirmDeleteId = null;
+                    render();
+                    break;
+                case 'confirm-delete':
+                    deleteReport(id);
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        shadowRoot.addEventListener('input', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)) {
+                return;
+            }
+
+            if (target.id === 'qa-message-input') {
+                state.message = target.value;
+                const btn = shadowRoot.getElementById('qa-submit-btn');
+                if (btn instanceof HTMLButtonElement) {
+                    btn.disabled = !state.message.trim() || state.submitting;
+                }
+            } else if (target.id === 'qa-reopen-input') {
+                state.reopenNote = target.value;
+            }
+        });
+
+        shadowRoot.addEventListener('keydown', (event) => {
+            if (
+                event.target instanceof HTMLTextAreaElement &&
+                event.target.id === 'qa-message-input' &&
+                (event.ctrlKey || event.metaKey) &&
+                event.key === 'Enter'
+            ) {
+                event.preventDefault();
+                submitReport();
+            }
+        });
+
+        shadowRoot.addEventListener('change', (event) => {
+            const target = event.target;
+            if (target instanceof HTMLInputElement && target.id === 'qa-file-input' && target.files?.[0]) {
+                handleImageFile(target.files[0]);
+                target.value = '';
+            }
+        });
+
+        shadowRoot.addEventListener('paste', (event) => {
+            const items = event.clipboardData?.items;
+            if (!items) {
+                return;
+            }
+            for (const item of items) {
+                if (item.type && item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        event.preventDefault();
+                        handleImageFile(file);
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    function renderErrorPreview() {
+        const exc = state.serverException;
+        const jsErrors = state.consoleErrors;
+
+        if (!exc && jsErrors.length === 0) {
+            return '';
+        }
+
+        const lines = [];
+        if (exc) {
+            lines.push(
+                `<div class="err-line"><strong>HTTP ${escapeHtml(exc.status || 500)}</strong> — ${escapeHtml(exc.exception || 'Exception')}</div>`
+            );
+            if (exc.message) {
+                lines.push(`<div class="err-msg">${escapeHtml(exc.message)}</div>`);
+            }
+            if (exc.file) {
+                lines.push(`<div class="err-meta">Archivo: ${escapeHtml(exc.file)}</div>`);
+            }
+        }
+
+        if (jsErrors.length > 0) {
+            const latest = jsErrors[jsErrors.length - 1];
+            lines.push(
+                `<div class="err-line"><strong>JS (${jsErrors.length})</strong> — ${escapeHtml(latest.message)}</div>`
+            );
+        }
+
+        return `
+            <div class="error-box">
+                <div class="error-box-head">
+                    <span>⚠️ Contexto de error capturado</span>
+                    <button type="button" class="link-btn" data-qa-action="clear-errors">Limpiar</button>
+                </div>
+                ${lines.join('')}
+            </div>
+        `;
+    }
+
+    function renderNewTab() {
+        const shortUrl = formatShortUrl(state.currentUrl);
+        const componentBadge = state.currentComponent
+            ? `<span class="chip chip-comp">${escapeHtml(state.currentComponent)}</span>`
+            : '';
+
+        const feedbackHtml = state.submitFeedback
+            ? `<div class="alert ${state.submitFeedback.type === 'error' ? 'alert-error' : 'alert-success'}">${escapeHtml(state.submitFeedback.text)}</div>`
+            : '';
+
+        const previewHtml = state.screenshotDataUrl
+            ? `
+                <div class="shot-preview">
+                    <img src="${state.screenshotDataUrl}" alt="Captura adjunta" />
+                    <button type="button" class="shot-remove" data-qa-action="remove-screenshot">Quitar captura</button>
+                </div>
+            `
+            : '';
+
+        return `
+            <div class="tab-body">
+                <div class="context-bar">
+                    <span class="chip chip-url" title="${escapeHtml(state.currentUrl)}">${escapeHtml(shortUrl)}</span>
+                    ${componentBadge}
+                </div>
+                ${renderErrorPreview()}
+                ${feedbackHtml}
+                <label class="field-label" for="qa-message-input">¿Qué falló o qué cambio necesitas?</label>
+                <textarea
+                    id="qa-message-input"
+                    rows="4"
+                    placeholder="Ej. Al guardar el curso aparece error 500 o este botón debería decir Descargar... (Ctrl+V para pegar captura, Ctrl+Enter para enviar)"
+                >${escapeHtml(state.message)}</textarea>
+                ${previewHtml}
+                <input id="qa-file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+                <div class="actions-row">
+                    <button type="button" class="btn-secondary" data-qa-action="pick-screenshot">
+                        📎 ${state.screenshotDataUrl ? 'Cambiar captura' : 'Adjuntar captura'}
+                    </button>
+                    <button
+                        id="qa-submit-btn"
+                        type="button"
+                        class="btn-primary"
+                        data-qa-action="submit"
+                        ${!state.message.trim() || state.submitting ? 'disabled' : ''}
+                    >
+                        ${state.submitting ? 'Enviando...' : 'Enviar reporte'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderReportCard(report) {
+        const meta = statusMeta(report.status);
+        const isBusy = state.busyReportId === report.id;
+        const shortUrl = formatShortUrl(report.url);
+
+        const shotHtml = report.screenshot_url
+            ? `<a class="shot-link" href="${escapeHtml(report.screenshot_url)}" target="_blank" rel="noopener noreferrer">🖼️ Ver captura</a>`
+            : '';
+
+        const replyHtml = report.agent_reply
+            ? `
+                <div class="agent-reply">
+                    <div class="agent-reply-title">🤖 Respuesta técnica</div>
+                    <div>${escapeHtml(report.agent_reply)}</div>
+                </div>
+            `
+            : '';
+
+        const reopenBox =
+            state.reopenTargetId === report.id
+                ? `
+                    <div class="reopen-box">
+                        <textarea id="qa-reopen-input" rows="2" placeholder="Describe qué falta o sigue fallando...">${escapeHtml(state.reopenNote)}</textarea>
+                        <div class="reopen-actions">
+                            <button type="button" class="btn-xs btn-ghost" data-qa-action="cancel-reopen">Cancelar</button>
+                            <button type="button" class="btn-xs btn-primary-sm" data-qa-action="submit-reopen" data-qa-id="${escapeHtml(report.id)}" ${isBusy ? 'disabled' : ''}>Enviar nota</button>
+                        </div>
+                    </div>
+                `
+                : '';
+
+        const deleteControl =
+            state.confirmDeleteId === report.id
+                ? `
+                    <span class="confirm-delete">
+                        ¿Borrar?
+                        <button type="button" class="btn-xs btn-danger" data-qa-action="confirm-delete" data-qa-id="${escapeHtml(report.id)}" ${isBusy ? 'disabled' : ''}>Sí</button>
+                        <button type="button" class="btn-xs btn-ghost" data-qa-action="cancel-delete">No</button>
+                    </span>
+                `
+                : `<button type="button" class="btn-icon" title="Eliminar reporte" data-qa-action="ask-delete" data-qa-id="${escapeHtml(report.id)}">🗑️</button>`;
+
+        const resolvedActions =
+            report.status === 'resolved'
+                ? `
+                    <button type="button" class="btn-xs btn-reload" data-qa-action="reload-page">🔄 Recargar página para probar</button>
+                    <button type="button" class="btn-xs btn-ok" data-qa-action="verify-report" data-qa-id="${escapeHtml(report.id)}" ${isBusy ? 'disabled' : ''}>✓ Confirmar</button>
+                    <button type="button" class="btn-xs btn-ghost" data-qa-action="open-reopen" data-qa-id="${escapeHtml(report.id)}">Reabrir</button>
+                `
+                : report.status === 'needs_review'
+                    ? `<button type="button" class="btn-xs btn-ghost" data-qa-action="open-reopen" data-qa-id="${escapeHtml(report.id)}">Responder / Reenviar</button>`
+                    : '';
+
+        return `
+            <div class="report-card">
+                <div class="report-head">
+                    <span class="report-id">${escapeHtml(report.id)}</span>
+                    <span class="status-pill ${meta.cls}">${meta.icon} ${meta.label}</span>
+                    <span class="report-time">${escapeHtml(formatTime(report.created_at))}</span>
+                </div>
+                <div class="report-msg">${escapeHtml(report.message)}</div>
+                <div class="report-meta">
+                    <span title="${escapeHtml(report.url || '')}">${escapeHtml(shortUrl)}</span>
+                    ${report.component ? `<span>· ${escapeHtml(report.component)}</span>` : ''}
+                    ${shotHtml}
+                </div>
+                ${replyHtml}
+                <div class="report-footer">
+                    <div class="report-actions">${resolvedActions}</div>
+                    ${deleteControl}
+                </div>
+                ${reopenBox}
+            </div>
+        `;
+    }
+
+    function renderListTab() {
+        const itemsHtml =
+            state.loadingReports && state.reports.length === 0
+                ? '<div class="empty-state">Cargando reportes...</div>'
+                : state.reports.length === 0
+                    ? '<div class="empty-state">Aún no hay reportes registrados.</div>'
+                    : state.reports.map(renderReportCard).join('');
+
+        return `
+            <div class="tab-body">
+                <div class="list-toolbar">
+                    <div class="counters">
+                        <span>⏳ ${state.counts.pending || 0}</span>
+                        <span>🛠️ ${state.counts.in_progress || 0}</span>
+                        <span>✅ ${state.counts.resolved || 0}</span>
+                    </div>
+                    <button type="button" class="btn-xs btn-ghost" data-qa-action="refresh-reports">↻ Actualizar</button>
+                </div>
+                <div class="reports-scroll">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    function render() {
+        if (!shadowRoot || !state.isAdmin) {
+            return;
+        }
+
+        // Preserve textarea focus & cursor if user is typing during a background poll
+        const activeEl = shadowRoot.activeElement;
+        const activeId = activeEl instanceof HTMLElement ? activeEl.id : null;
+        const selStart = activeEl instanceof HTMLTextAreaElement ? activeEl.selectionStart : null;
+        const selEnd = activeEl instanceof HTMLTextAreaElement ? activeEl.selectionEnd : null;
+
+        const resolvedCount = Number(state.counts.resolved || 0);
+        const activeCount = Number(state.counts.pending || 0) + Number(state.counts.in_progress || 0);
+        const totalBadgeCount = Number(state.counts.total || state.reports.length || 0);
+
+        let badgeHtml = '';
+        if (state.hasUnreadError) {
+            badgeHtml = '<span class="fab-badge fab-badge-err">⚠️ Error detectado</span>';
+        } else if (state.newResolvedAlert || resolvedCount > 0) {
+            badgeHtml = `<span class="fab-badge fab-badge-ok">✅ ${resolvedCount} listo${resolvedCount === 1 ? '' : 's'}</span>`;
+        } else if (activeCount > 0) {
+            badgeHtml = `<span class="fab-badge fab-badge-pending">${activeCount}</span>`;
+        }
+
+        const panelHtml = state.isOpen
+            ? `
+                <div class="panel" role="dialog" aria-label="Bot de Revisión QA">
+                    <div class="panel-header">
+                        <div class="panel-title-wrap">
+                            <div class="panel-title">🛠️ Bot QA Sapius</div>
+                            <div class="panel-sub">Solo administradores · Escucha en vivo</div>
+                        </div>
+                        <button type="button" class="close-btn" data-qa-action="close" aria-label="Cerrar">✕</button>
+                    </div>
+                    <div class="tabs">
+                        <button type="button" class="tab-btn ${state.activeTab === 'new' ? 'active' : ''}" data-qa-action="tab-new">
+                            Nuevo Reporte
+                        </button>
+                        <button type="button" class="tab-btn ${state.activeTab === 'list' ? 'active' : ''}" data-qa-action="tab-list">
+                            Mis Reportes ${totalBadgeCount > 0 ? `<span class="tab-count">${totalBadgeCount}</span>` : ''}
+                        </button>
+                    </div>
+                    ${state.activeTab === 'new' ? renderNewTab() : renderListTab()}
+                </div>
+            `
+            : '';
+
+        shadowRoot.innerHTML = `
+            <style>
+                :host { all: initial; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+                * { box-sizing: border-box; }
+                .wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+                .fab {
+                    display: inline-flex; align-items: center; gap: 8px;
+                    padding: 10px 16px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.16);
+                    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                    color: #f8fafc; font-size: 13px; font-weight: 700; cursor: pointer;
+                    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.38);
+                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                }
+                .fab:hover { transform: translateY(-1px); box-shadow: 0 16px 32px rgba(15, 23, 42, 0.45); }
+                .fab-badge {
+                    padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700; line-height: 1.3;
+                }
+                .fab-badge-err {
+                    background: #ef4444; color: #fff; animation: qa-pulse 1.6s infinite;
+                }
+                .fab-badge-ok { background: #10b981; color: #fff; }
+                .fab-badge-pending { background: #6366f1; color: #fff; }
+                @keyframes qa-pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.85; transform: scale(1.04); }
+                }
+                .panel {
+                    width: 400px; max-width: calc(100vw - 24px); max-height: calc(100vh - 96px);
+                    display: flex; flex-direction: column;
+                    background: #ffffff; color: #0f172a;
+                    border: 1px solid #cbd5e1; border-radius: 16px;
+                    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
+                    overflow: hidden;
+                }
+                .panel-header {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 12px 16px; background: #0f172a; color: #f8fafc;
+                }
+                .panel-title { font-size: 14px; font-weight: 700; }
+                .panel-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+                .close-btn {
+                    background: rgba(255,255,255,0.1); border: none; color: #e2e8f0;
+                    width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 14px;
+                }
+                .close-btn:hover { background: rgba(255,255,255,0.2); }
+                .tabs {
+                    display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+                }
+                .tab-btn {
+                    flex: 1; padding: 10px 12px; border: none; background: transparent;
+                    font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer;
+                    border-bottom: 2px solid transparent; display: inline-flex; justify-content: center; align-items: center; gap: 6px;
+                }
+                .tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; background: #ffffff; }
+                .tab-count {
+                    background: #e0e7ff; color: #4338ca; padding: 1px 6px; border-radius: 9999px; font-size: 11px;
+                }
+                .tab-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+                .context-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+                .chip {
+                    font-size: 11px; padding: 3px 8px; border-radius: 6px; max-width: 100%;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                }
+                .chip-url { background: #f1f5f9; color: #334155; font-family: ui-monospace, monospace; }
+                .chip-comp { background: #eef2ff; color: #4338ca; font-weight: 600; }
+                .error-box {
+                    background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 10px;
+                    font-size: 11px; color: #991b1b; display: flex; flex-direction: column; gap: 4px;
+                }
+                .error-box-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+                .err-msg {
+                    font-family: ui-monospace, monospace; font-size: 11px; background: rgba(255,255,255,0.7);
+                    padding: 4px 6px; border-radius: 6px; word-break: break-word; max-height: 70px; overflow-y: auto;
+                }
+                .err-meta { color: #b91c1c; font-size: 10px; }
+                .link-btn {
+                    background: none; border: none; color: #b91c1c; font-size: 11px; text-decoration: underline; cursor: pointer; padding: 0;
+                }
+                .field-label { font-size: 12px; font-weight: 600; color: #1e293b; }
+                textarea {
+                    width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px;
+                    font-family: inherit; font-size: 13px; color: #0f172a; background: #ffffff; resize: vertical;
+                }
+                textarea:focus { outline: 2px solid #6366f1; border-color: #6366f1; }
+                .shot-preview {
+                    position: relative; border: 1px solid #cbd5e1; border-radius: 10px; padding: 6px; background: #f8fafc;
+                    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                }
+                .shot-preview img { max-height: 64px; max-width: 140px; border-radius: 6px; object-fit: cover; }
+                .shot-remove {
+                    background: #fee2e2; color: #b91c1c; border: none; border-radius: 6px;
+                    padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+                }
+                .actions-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+                .btn-primary {
+                    background: #4f46e5; color: #ffffff; border: none; border-radius: 10px;
+                    padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+                }
+                .btn-primary:hover:not(:disabled) { background: #4338ca; }
+                .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+                .btn-secondary {
+                    background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 10px;
+                    padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+                }
+                .btn-secondary:hover { background: #e2e8f0; }
+                .alert { padding: 8px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+                .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+                .alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+                .list-toolbar { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #475569; }
+                .counters { display: flex; gap: 10px; font-weight: 600; }
+                .reports-scroll { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 2px; }
+                .report-card {
+                    border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; background: #f8fafc;
+                    display: flex; flex-direction: column; gap: 6px;
+                }
+                .report-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+                .report-id { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; color: #334155; }
+                .status-pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; }
+                .status-pending { background: #fef3c7; color: #92400e; }
+                .status-progress { background: #dbeafe; color: #1e40af; }
+                .status-resolved { background: #d1fae5; color: #065f46; }
+                .status-review { background: #ffedd5; color: #9a3412; }
+                .status-verified { background: #e0e7ff; color: #3730a3; }
+                .report-time { margin-left: auto; font-size: 10px; color: #64748b; }
+                .report-msg { font-size: 12px; color: #0f172a; white-space: pre-wrap; word-break: break-word; }
+                .report-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 10px; color: #64748b; align-items: center; }
+                .shot-link { color: #4f46e5; text-decoration: none; font-weight: 600; }
+                .agent-reply {
+                    background: #eef2ff; border-left: 3px solid #4f46e5; padding: 7px 9px;
+                    border-radius: 6px; font-size: 12px; color: #1e1b4b; white-space: pre-wrap;
+                }
+                .agent-reply-title { font-size: 11px; font-weight: 700; margin-bottom: 2px; color: #4338ca; }
+                .report-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px; }
+                .report-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+                .btn-xs {
+                    border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+                }
+                .btn-reload { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+                .btn-ok { background: #4f46e5; color: #fff; }
+                .btn-ghost { background: #e2e8f0; color: #334155; }
+                .btn-primary-sm { background: #4f46e5; color: #fff; }
+                .btn-danger { background: #dc2626; color: #fff; }
+                .btn-icon { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; opacity: 0.7; }
+                .btn-icon:hover { opacity: 1; }
+                .confirm-delete { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #b91c1c; font-weight: 600; }
+                .reopen-box { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+                .reopen-actions { display: flex; justify-content: flex-end; gap: 6px; }
+                .empty-state { text-align: center; padding: 24px 12px; font-size: 12px; color: #64748b; }
+            </style>
+            <div class="wrap">
+                ${panelHtml}
+                <button type="button" class="fab" data-qa-action="toggle-open">
+                    <span>🛠️ Bot QA</span>
+                    ${badgeHtml}
+                </button>
+            </div>
+        `;
+
+        if (activeId) {
+            const restored = shadowRoot.getElementById(activeId);
+            if (restored instanceof HTMLElement) {
+                restored.focus();
+                if (restored instanceof HTMLTextAreaElement && selStart !== null && selEnd !== null) {
+                    restored.setSelectionRange(selStart, selEnd);
+                }
+            }
+        }
+    }
+
+    // Global error & Inertia listeners
+    window.addEventListener('error', (event) => {
+        pushConsoleError({
+            type: 'window.error',
+            message: event.message || String(event.error || 'Error JavaScript'),
+            source: event.filename ? `${event.filename}:${event.lineno}` : null,
+        });
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        const msg =
+            reason && typeof reason === 'object' && 'message' in reason
+                ? reason.message
+                : String(reason || 'Unhandled Promise rejection');
+        pushConsoleError({
+            type: 'unhandledrejection',
+            message: msg,
+        });
+    });
+
+    window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin && event.origin !== 'null') {
+            return;
+        }
+        if (event.data && event.data.type === 'SAPIUS_QA_EXCEPTION' && event.data.payload) {
+            state.serverException = event.data.payload;
+            state.hasUnreadError = true;
+            ensureMounted();
+            render();
+        }
+    });
+
+    function handleInertiaPageEvent(event) {
+        const page = event?.detail?.page;
+        state.currentUrl = window.location.href;
+        if (page) {
+            if (page.component) {
+                state.currentComponent = page.component;
+            }
+            if (page.props && Object.prototype.hasOwnProperty.call(page.props, 'auth')) {
+                state.isAdmin = page.props.auth?.user?.role === 'admin';
+                window.__SAPIUS_QA_ADMIN__ = state.isAdmin;
+            }
+        }
+        ensureMounted();
+    }
+
+    document.addEventListener('inertia:navigate', handleInertiaPageEvent);
+    document.addEventListener('inertia:success', handleInertiaPageEvent);
+
+    document.addEventListener('inertia:exception', (event) => {
+        const exc = event?.detail?.exception;
+        pushConsoleError({
+            type: 'inertia:exception',
+            message: exc?.message || 'Excepción de red o navegación en Inertia',
+        });
+    });
+
+    document.addEventListener('inertia:invalid', (event) => {
+        const resp = event?.detail?.response;
+        const status = resp?.status || 500;
+        if (!state.serverException) {
+            state.serverException = {
+                status,
+                exception: 'InertiaInvalidResponse',
+                message: `El servidor devolvió una respuesta HTML inesperada (HTTP ${status}).`,
+                url: window.location.href,
+                timestamp: new Date().toISOString(),
+            };
+        }
+        state.hasUnreadError = true;
+        ensureMounted();
+        window.setTimeout(syncTopLayerWithInertiaDialog, 50);
+    });
+
+    function boot() {
+        detectInitialState();
+        ensureMounted();
+
+        if (!dialogObserver && document.body) {
+            dialogObserver = new MutationObserver(() => {
+                syncTopLayerWithInertiaDialog();
+            });
+            dialogObserver.observe(document.body, { childList: true });
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
