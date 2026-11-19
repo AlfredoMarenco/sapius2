@@ -12,7 +12,9 @@ class QaFeedbackBotController extends Controller
 {
     public const VALID_ADMIN_STATUSES = ['pending', 'resolved', 'verified'];
 
-    public const VALID_AGENT_STATUSES = ['pending', 'in_progress', 'resolved', 'needs_review', 'verified'];
+    public const VALID_AGENT_STATUSES = ['pending', 'in_progress', 'resolved', 'needs_review', 'verified', 'rejected'];
+
+    public const VALID_DEFECT_TYPES = ['server_error', 'broken_action', 'legacy_parity', 'visual_copy'];
 
     public static function baseDirectory(): string
     {
@@ -163,6 +165,7 @@ class QaFeedbackBotController extends Controller
             'resolved' => 0,
             'needs_review' => 0,
             'verified' => 0,
+            'rejected' => 0,
             'total' => count($reports),
         ];
 
@@ -183,6 +186,7 @@ class QaFeedbackBotController extends Controller
     {
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:5000'],
+            'defect_type' => ['nullable', 'string', 'in:'.implode(',', self::VALID_DEFECT_TYPES)],
             'url' => ['nullable', 'string', 'max:2000'],
             'component' => ['nullable', 'string', 'max:255'],
             'viewport' => ['nullable', 'string', 'max:100'],
@@ -226,9 +230,13 @@ class QaFeedbackBotController extends Controller
                 $screenshotFile = $filename;
             }
 
+            $defectType = $validated['defect_type']
+                ?? (! empty($validated['server_exception']) ? 'server_error' : 'broken_action');
+
             $report = [
                 'id' => $id,
                 'status' => 'pending',
+                'defect_type' => $defectType,
                 'message' => trim((string) $validated['message']),
                 'url' => $validated['url'] ?? null,
                 'component' => $validated['component'] ?? null,

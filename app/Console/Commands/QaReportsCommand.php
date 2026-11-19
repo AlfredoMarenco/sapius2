@@ -112,8 +112,12 @@ class QaReportsCommand extends Command
                 $report['status'] = $newStatus;
                 if ($newStatus === 'resolved' || $newStatus === 'verified') {
                     $report['resolved_at'] = $now;
+                } elseif ($newStatus === 'rejected') {
+                    $report['resolved_at'] = null;
+                    $report['rejected_at'] = $now;
                 } elseif (in_array($newStatus, ['pending', 'in_progress', 'needs_review'], true)) {
                     $report['resolved_at'] = null;
+                    $report['rejected_at'] = null;
                 }
             }
 

@@ -87,6 +87,7 @@ test('admins can create, list, view screenshot, update, and delete qa reports', 
 
     $createResponse = $this->actingAs($admin)->postJson('/admin/qa-bot/reports', [
         'message' => 'El botón guardar arroja error 500 en cursos',
+        'defect_type' => 'legacy_parity',
         'url' => 'https://test.sapius.com.mx/admin/cursos',
         'component' => 'Admin/Courses/Index',
         'viewport' => '1440x900',
@@ -104,6 +105,7 @@ test('admins can create, list, view screenshot, update, and delete qa reports', 
     $createResponse->assertStatus(201)
         ->assertJsonPath('report.id', 'QA-001')
         ->assertJsonPath('report.status', 'pending')
+        ->assertJsonPath('report.defect_type', 'legacy_parity')
         ->assertJsonPath('report.screenshot_url', '/admin/qa-bot/screenshots/QA-001.png')
         ->assertJsonPath('report.author.email', $admin->email);
 
@@ -177,4 +179,19 @@ test('qa:reports artisan command lists, shows, and updates reports', function ()
     $showOutput = Artisan::output();
     expect($showOutput)->toContain('Se corrigió el controlador.');
     expect($showOutput)->toContain('"status": "resolved"');
+
+    $rejectReason = 'En esta fase de revisión solo se atienden correcciones de errores y paridad con el sistema original (sin nuevas funciones ni cambios a la estructura de la base de datos).';
+    $exitReject = Artisan::call('qa:reports', [
+        'action' => 'update',
+        'id' => 'QA-002',
+        '--status' => 'rejected',
+        '--reply' => $rejectReason,
+    ]);
+    expect($exitReject)->toBe(0);
+
+    $this->actingAs($admin)
+        ->getJson('/admin/qa-bot/reports')
+        ->assertOk()
+        ->assertJsonPath('counts.resolved', 1)
+        ->assertJsonPath('counts.rejected', 1);
 });

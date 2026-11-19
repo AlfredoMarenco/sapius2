@@ -40,6 +40,7 @@
         serverException: window.__SAPIUS_QA_EXCEPTION__ || null,
         hasUnreadError: Boolean(window.__SAPIUS_QA_EXCEPTION__),
         screenshotDataUrl: null,
+        defectType: window.__SAPIUS_QA_EXCEPTION__ ? 'server_error' : 'broken_action',
         message: '',
         submitting: false,
         submitFeedback: null,
@@ -51,6 +52,7 @@
             resolved: 0,
             needs_review: 0,
             verified: 0,
+            rejected: 0,
             total: 0,
         },
         newResolvedAlert: false,
@@ -198,6 +200,18 @@
         }
     }
 
+    const DEFECT_TYPES = [
+        { value: 'broken_action', label: '⚠️ Botón, enlace o formulario no funciona' },
+        { value: 'server_error', label: '💥 Error 500 / Pantalla de error' },
+        { value: 'legacy_parity', label: '🔄 Diferencia con Sapius original' },
+        { value: 'visual_copy', label: '🎨 Error visual / Diseño o texto erróneo' },
+    ];
+
+    function defectTypeLabel(type) {
+        const match = DEFECT_TYPES.find((item) => item.value === type);
+        return match ? match.label : '⚠️ Fallo reportado';
+    }
+
     function statusMeta(status) {
         switch (status) {
             case 'in_progress':
@@ -208,6 +222,8 @@
                 return { label: 'En revisión', icon: '⏸️', cls: 'status-review' };
             case 'verified':
                 return { label: 'Verificado', icon: '🎉', cls: 'status-verified' };
+            case 'rejected':
+                return { label: 'Rechazado (Solo correcciones)', icon: '🚫', cls: 'status-rejected' };
             case 'pending':
             default:
                 return { label: 'En cola', icon: '⏳', cls: 'status-pending' };
@@ -429,6 +445,7 @@
         try {
             const payload = {
                 message: trimmed,
+                defect_type: state.defectType,
                 url: state.currentUrl || window.location.href,
                 component: state.currentComponent,
                 viewport: `${window.innerWidth}x${window.innerHeight}`,
@@ -670,6 +687,8 @@
             if (target instanceof HTMLInputElement && target.id === 'qa-file-input' && target.files?.[0]) {
                 handleImageFile(target.files[0]);
                 target.value = '';
+            } else if (target instanceof HTMLSelectElement && target.id === 'qa-defect-type') {
+                state.defectType = target.value;
             }
         });
 
@@ -749,19 +768,29 @@
             `
             : '';
 
+        const defectOptionsHtml = DEFECT_TYPES.map(
+            (opt) =>
+                `<option value="${opt.value}" ${state.defectType === opt.value ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`
+        ).join('');
+
         return `
             <div class="tab-body">
+                <div class="scope-banner">
+                    🔒 Solo correcciones de errores y paridad con Sapius original (no nuevas funciones ni cambios de BD).
+                </div>
                 <div class="context-bar">
                     <span class="chip chip-url" title="${escapeHtml(state.currentUrl)}">${escapeHtml(shortUrl)}</span>
                     ${componentBadge}
                 </div>
                 ${renderErrorPreview()}
                 ${feedbackHtml}
-                <label class="field-label" for="qa-message-input">¿Qué falló o qué cambio necesitas?</label>
+                <label class="field-label" for="qa-defect-type">Tipo de fallo</label>
+                <select id="qa-defect-type">${defectOptionsHtml}</select>
+                <label class="field-label" for="qa-message-input">Describe el fallo a corregir</label>
                 <textarea
                     id="qa-message-input"
                     rows="4"
-                    placeholder="Ej. Al guardar el curso aparece error 500 o este botón debería decir Descargar... (Ctrl+V para pegar captura, Ctrl+Enter para enviar)"
+                    placeholder="Describe qué falló, qué acción hiciste y qué debería ocurrir... (Ctrl+V para pegar captura, Ctrl+Enter para enviar)"
                 >${escapeHtml(state.message)}</textarea>
                 ${previewHtml}
                 <input id="qa-file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
@@ -792,10 +821,15 @@
             ? `<a class="shot-link" href="${escapeHtml(report.screenshot_url)}" target="_blank" rel="noopener noreferrer">🖼️ Ver captura</a>`
             : '';
 
+        const isRejected = report.status === 'rejected';
+        const defectBadgeHtml = report.defect_type
+            ? `<span class="defect-chip">${escapeHtml(defectTypeLabel(report.defect_type))}</span>`
+            : '';
+
         const replyHtml = report.agent_reply
             ? `
-                <div class="agent-reply">
-                    <div class="agent-reply-title">🤖 Respuesta técnica</div>
+                <div class="agent-reply ${isRejected ? 'agent-reply-rejected' : ''}">
+                    <div class="agent-reply-title">${isRejected ? '🚫 Fuera de alcance (Solo correcciones)' : '🤖 Respuesta técnica'}</div>
                     <div>${escapeHtml(report.agent_reply)}</div>
                 </div>
             `
@@ -843,6 +877,7 @@
                     <span class="status-pill ${meta.cls}">${meta.icon} ${meta.label}</span>
                     <span class="report-time">${escapeHtml(formatTime(report.created_at))}</span>
                 </div>
+                ${defectBadgeHtml ? `<div>${defectBadgeHtml}</div>` : ''}
                 <div class="report-msg">${escapeHtml(report.message)}</div>
                 <div class="report-meta">
                     <span title="${escapeHtml(report.url || '')}">${escapeHtml(shortUrl)}</span>
@@ -874,6 +909,7 @@
                         <span>⏳ ${state.counts.pending || 0}</span>
                         <span>🛠️ ${state.counts.in_progress || 0}</span>
                         <span>✅ ${state.counts.resolved || 0}</span>
+                        ${state.counts.rejected > 0 ? `<span>🚫 ${state.counts.rejected}</span>` : ''}
                     </div>
                     <button type="button" class="btn-xs btn-ghost" data-qa-action="refresh-reports">↻ Actualizar</button>
                 </div>
@@ -989,6 +1025,10 @@
                     background: #e0e7ff; color: #4338ca; padding: 1px 6px; border-radius: 9999px; font-size: 11px;
                 }
                 .tab-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+                .scope-banner {
+                    background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+                    border-radius: 8px; padding: 7px 10px; font-size: 11px; font-weight: 600; line-height: 1.35;
+                }
                 .context-bar { display: flex; flex-wrap: wrap; gap: 6px; }
                 .chip {
                     font-size: 11px; padding: 3px 8px; border-radius: 6px; max-width: 100%;
@@ -1010,6 +1050,11 @@
                     background: none; border: none; color: #b91c1c; font-size: 11px; text-decoration: underline; cursor: pointer; padding: 0;
                 }
                 .field-label { font-size: 12px; font-weight: 600; color: #1e293b; }
+                select {
+                    width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 10px;
+                    font-family: inherit; font-size: 12px; color: #0f172a; background: #ffffff;
+                }
+                select:focus { outline: 2px solid #6366f1; border-color: #6366f1; }
                 textarea {
                     width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px;
                     font-family: inherit; font-size: 13px; color: #0f172a; background: #ffffff; resize: vertical;
@@ -1054,6 +1099,11 @@
                 .status-resolved { background: #d1fae5; color: #065f46; }
                 .status-review { background: #ffedd5; color: #9a3412; }
                 .status-verified { background: #e0e7ff; color: #3730a3; }
+                .status-rejected { background: #fee2e2; color: #991b1b; }
+                .defect-chip {
+                    display: inline-block; font-size: 10px; font-weight: 600; color: #475569;
+                    background: #e2e8f0; border-radius: 6px; padding: 2px 7px;
+                }
                 .report-time { margin-left: auto; font-size: 10px; color: #64748b; }
                 .report-msg { font-size: 12px; color: #0f172a; white-space: pre-wrap; word-break: break-word; }
                 .report-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 10px; color: #64748b; align-items: center; }
@@ -1063,6 +1113,8 @@
                     border-radius: 6px; font-size: 12px; color: #1e1b4b; white-space: pre-wrap;
                 }
                 .agent-reply-title { font-size: 11px; font-weight: 700; margin-bottom: 2px; color: #4338ca; }
+                .agent-reply-rejected { background: #fef2f2; border-left-color: #dc2626; color: #7f1d1d; }
+                .agent-reply-rejected .agent-reply-title { color: #b91c1c; }
                 .report-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px; }
                 .report-actions { display: flex; flex-wrap: wrap; gap: 5px; }
                 .btn-xs {
@@ -1127,6 +1179,7 @@
         }
         if (event.data && event.data.type === 'SAPIUS_QA_EXCEPTION' && event.data.payload) {
             state.serverException = event.data.payload;
+            state.defectType = 'server_error';
             state.hasUnreadError = true;
             ensureMounted();
             render();
@@ -1171,6 +1224,7 @@
                 timestamp: new Date().toISOString(),
             };
         }
+        state.defectType = 'server_error';
         state.hasUnreadError = true;
         ensureMounted();
         window.setTimeout(syncTopLayerWithInertiaDialog, 50);
