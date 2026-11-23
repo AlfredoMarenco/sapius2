@@ -716,14 +716,19 @@ class CourseBuilderController extends Controller
         }
 
         $allowedMimes = ['video/mp4', 'video/quicktime', 'application/mp4', 'application/octet-stream'];
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $chunkMime = $finfo ? finfo_file($finfo, $chunk->getRealPath()) : null;
-        if ($finfo) {
-            finfo_close($finfo);
-        }
 
-        if ($chunkMime && ! in_array($chunkMime, $allowedMimes, true)) {
-            return response()->json(['error' => 'Tipo MIME no permitido para video MP4.'], 422);
+        // Only the first chunk carries the MP4 container header; intermediate chunks are raw
+        // bytes that finfo may misdetect. The fully assembled file is validated again below.
+        if ($index === 0) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $chunkMime = $finfo ? finfo_file($finfo, $chunk->getRealPath()) : null;
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+
+            if ($chunkMime && ! in_array($chunkMime, $allowedMimes, true)) {
+                return response()->json(['error' => 'Tipo MIME no permitido para video MP4.'], 422);
+            }
         }
 
         $tempDir = storage_path('app/chunks/'.$identifier);
