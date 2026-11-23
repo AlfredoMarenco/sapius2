@@ -1078,7 +1078,11 @@ return;
                                                 <div className="flex items-center gap-3">
                                                     {module.image ? (
                                                         <img
-                                                            src={module.image}
+                                                            src={
+                                                                /^(https?:)?\/\//.test(module.image) || module.image.startsWith('/')
+                                                                    ? module.image
+                                                                    : `/cursos/image/${encodeURIComponent(module.image)}`
+                                                            }
                                                             alt={module.title}
                                                             className="h-6 w-6 rounded-md object-cover"
                                                         />
