@@ -187,7 +187,6 @@ trait CreatesLegacySchema
                 $table->string('ruta');
                 $table->string('tipo')->default('pdf');
                 $table->integer('downloadable')->default(0);
-                $table->integer('posicion')->default(1);
                 $table->string('programable')->default('no');
                 $table->string('activo')->default('si');
                 $table->timestamps();

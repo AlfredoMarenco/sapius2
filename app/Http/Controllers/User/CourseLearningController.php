@@ -252,7 +252,6 @@ class CourseLearningController extends Controller
             },
             'media' => function ($q) {
                 $q->where('activo', 'si')
-                    ->orderBy('posicion', 'asc')
                     ->orderBy('id', 'asc');
             },
             'homeworks' => function ($q) use ($user) {
