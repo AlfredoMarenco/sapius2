@@ -27,6 +27,7 @@ export default function Login({
 }: Props) {
     const { recaptcha_site_key } = usePage<any>().props;
     const [captchaToken, setCaptchaToken] = useState<string>('');
+    const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
     return (
         <>
@@ -40,6 +41,10 @@ export default function Login({
             <Form
                 {...store.form()}
                 resetOnSuccess={['password']}
+                onFinish={() => {
+                    setCaptchaToken('');
+                    setCaptchaResetKey((k) => k + 1);
+                }}
                 className="flex flex-col gap-6"
             >
                 {({ processing, errors }) => (
@@ -93,6 +98,7 @@ export default function Login({
                                     siteKey={recaptcha_site_key}
                                     onVerify={(token) => setCaptchaToken(token)}
                                     onExpired={() => setCaptchaToken('')}
+                                    resetKey={captchaResetKey}
                                     errorMessage={(errors as any)['g-recaptcha-response']}
                                 />
                             )}

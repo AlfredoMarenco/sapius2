@@ -14,6 +14,8 @@ interface RecaptchaWidgetProps {
     onError?: () => void;
     errorMessage?: string;
     className?: string;
+    /** Change this value to force a reset (reCAPTCHA tokens are single-use). */
+    resetKey?: number;
 }
 
 export default function RecaptchaWidget({
@@ -23,9 +25,29 @@ export default function RecaptchaWidget({
     onError,
     errorMessage,
     className = 'mt-3 mb-2 flex flex-col items-center justify-center',
+    resetKey = 0,
 }: RecaptchaWidgetProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (resetKey === 0 || widgetIdRef.current === null || !window.grecaptcha?.reset) {
+            return;
+        }
+        try {
+            window.grecaptcha.reset(widgetIdRef.current);
+        } catch (e) {
+            console.error('Error resetting reCAPTCHA:', e);
+        }
+        const hiddenInput = containerRef.current
+            ?.closest('form')
+            ?.querySelector('input[name="g-recaptcha-response"]') as HTMLInputElement | null;
+        if (hiddenInput) {
+            hiddenInput.value = '';
+        }
+        if (onExpired) onExpired();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resetKey]);
 
     useEffect(() => {
         if (!siteKey) return;

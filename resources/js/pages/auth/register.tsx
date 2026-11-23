@@ -15,6 +15,7 @@ import AuthLayout from '@/layouts/auth-layout';
 export default function Register() {
     const { recaptcha_site_key } = usePage<any>().props;
     const [captchaToken, setCaptchaToken] = useState<string>('');
+    const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
     return (
         <>
@@ -28,6 +29,10 @@ export default function Register() {
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
+                onFinish={() => {
+                    setCaptchaToken('');
+                    setCaptchaResetKey((k) => k + 1);
+                }}
                 disableWhileProcessing
                 className="flex flex-col gap-5"
             >
@@ -134,6 +139,7 @@ export default function Register() {
                                     siteKey={recaptcha_site_key}
                                     onVerify={(token) => setCaptchaToken(token)}
                                     onExpired={() => setCaptchaToken('')}
+                                    resetKey={captchaResetKey}
                                     errorMessage={(errors as any)['g-recaptcha-response']}
                                 />
                             )}
