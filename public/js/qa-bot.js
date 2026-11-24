@@ -46,6 +46,7 @@
         hasUnreadError: Boolean(window.__SAPIUS_QA_EXCEPTION__),
         screenshotDataUrl: null,
         defectType: window.__SAPIUS_QA_EXCEPTION__ ? 'server_error' : 'broken_action',
+        perspective: 'designer',
         message: '',
         submitting: false,
         submitFeedback: null,
@@ -231,6 +232,27 @@
         { value: 'legacy_parity', label: '🔄 Diferencia con Sapius original' },
         { value: 'visual_copy', label: '🎨 Error visual / Diseño o texto erróneo' },
     ];
+
+    const PERSPECTIVES = [
+        { value: 'designer', label: '🎨 Diseñador (UI/UX, visual, fuentes, espaciado)' },
+        { value: 'student', label: '🎓 Alumno (Navegación, comodidad, claridad de estudio)' },
+        { value: 'admin', label: '💼 Administrador (Gestión, cobros, control operativo)' },
+        { value: 'engineering', label: '⚙️ Técnico / Estabilidad (Bugs, errores 500, paridad)' },
+    ];
+
+    function perspectiveMeta(value) {
+        switch (value) {
+            case 'student':
+                return { label: 'Enfoque: Alumno', icon: '🎓', cls: 'chip-student' };
+            case 'admin':
+                return { label: 'Enfoque: Admin', icon: '💼', cls: 'chip-admin' };
+            case 'engineering':
+                return { label: 'Enfoque: Técnico', icon: '⚙️', cls: 'chip-engineering' };
+            case 'designer':
+            default:
+                return { label: 'Enfoque: Diseñador', icon: '🎨', cls: 'chip-designer' };
+        }
+    }
 
     function defectTypeLabel(type) {
         const match = DEFECT_TYPES.find((item) => item.value === type);
@@ -471,6 +493,7 @@
             const payload = {
                 message: trimmed,
                 defect_type: state.defectType,
+                perspective: state.perspective,
                 url: state.currentUrl || window.location.href,
                 component: state.currentComponent,
                 viewport: `${window.innerWidth}x${window.innerHeight}`,
@@ -735,8 +758,18 @@
             if (target instanceof HTMLInputElement && target.id === 'qa-file-input' && target.files?.[0]) {
                 handleImageFile(target.files[0]);
                 target.value = '';
+            } else if (target instanceof HTMLSelectElement && target.id === 'qa-perspective') {
+                state.perspective = target.value;
+                if (target.value === 'designer' && state.defectType === 'broken_action') {
+                    state.defectType = 'visual_copy';
+                    render();
+                }
             } else if (target instanceof HTMLSelectElement && target.id === 'qa-defect-type') {
                 state.defectType = target.value;
+                if (target.value === 'visual_copy' && state.perspective !== 'designer') {
+                    state.perspective = 'designer';
+                    render();
+                }
             }
         });
 
@@ -825,6 +858,11 @@
                 `<option value="${opt.value}" ${state.defectType === opt.value ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`
         ).join('');
 
+        const perspectiveOptionsHtml = PERSPECTIVES.map(
+            (opt) =>
+                `<option value="${opt.value}" ${state.perspective === opt.value ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`
+        ).join('');
+
         return `
             <div class="tab-body">
                 <div class="scope-banner">
@@ -837,6 +875,8 @@
                 </div>
                 ${renderErrorPreview()}
                 ${feedbackHtml}
+                <label class="field-label" for="qa-perspective">Enfoque / Perspectiva del reporte</label>
+                <select id="qa-perspective">${perspectiveOptionsHtml}</select>
                 <label class="field-label" for="qa-defect-type">Tipo de fallo</label>
                 <select id="qa-defect-type">${defectOptionsHtml}</select>
                 <label class="field-label" for="qa-message-input">Describe el fallo a corregir</label>
@@ -878,6 +918,9 @@
         const defectBadgeHtml = report.defect_type
             ? `<span class="defect-chip">${escapeHtml(defectTypeLabel(report.defect_type))}</span>`
             : '';
+
+        const pMeta = perspectiveMeta(report.perspective || 'designer');
+        const perspectiveBadgeHtml = `<span class="perspective-chip ${pMeta.cls}">${pMeta.icon} ${escapeHtml(pMeta.label)}</span>`;
 
         const replyHtml = report.agent_reply
             ? `
@@ -948,7 +991,10 @@
                 </div>
                 ${authorHtml}
                 ${testedAsHtml}
-                ${defectBadgeHtml ? `<div>${defectBadgeHtml}</div>` : ''}
+                <div class="badges-row">
+                    ${perspectiveBadgeHtml}
+                    ${defectBadgeHtml}
+                </div>
                 <div class="report-msg">${escapeHtml(report.message)}</div>
                 <div class="report-meta">
                     <span title="${escapeHtml(report.url || '')}">${escapeHtml(shortUrl)}</span>
@@ -1189,10 +1235,18 @@
                 .status-review { background: #ffedd5; color: #9a3412; }
                 .status-verified { background: #e0e7ff; color: #3730a3; }
                 .status-rejected { background: #fee2e2; color: #991b1b; }
+                .badges-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
                 .defect-chip {
                     display: inline-block; font-size: 10px; font-weight: 600; color: #475569;
                     background: #e2e8f0; border-radius: 6px; padding: 2px 7px;
                 }
+                .perspective-chip {
+                    display: inline-block; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 7px;
+                }
+                .chip-designer { background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; }
+                .chip-student { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+                .chip-admin { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+                .chip-engineering { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
                 .report-author { font-size: 11px; color: #1e293b; }
                 .report-author .author-email { color: #64748b; font-size: 10px; }
                 .report-tested-as {

@@ -19,6 +19,8 @@ class QaFeedbackBotController extends Controller
 
     public const VALID_DEFECT_TYPES = ['server_error', 'broken_action', 'legacy_parity', 'visual_copy'];
 
+    public const VALID_PERSPECTIVES = ['designer', 'student', 'admin', 'engineering'];
+
     public const PASS_COOKIE_NAME = 'qa_admin_active';
 
     public static function createReviewerPassToken(User $admin): string
@@ -342,6 +344,7 @@ class QaFeedbackBotController extends Controller
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:5000'],
             'defect_type' => ['nullable', 'string', 'in:'.implode(',', self::VALID_DEFECT_TYPES)],
+            'perspective' => ['nullable', 'string', 'in:'.implode(',', self::VALID_PERSPECTIVES)],
             'url' => ['nullable', 'string', 'max:2000'],
             'component' => ['nullable', 'string', 'max:255'],
             'viewport' => ['nullable', 'string', 'max:100'],
@@ -385,10 +388,17 @@ class QaFeedbackBotController extends Controller
             $defectType = $validated['defect_type']
                 ?? (! empty($validated['server_exception']) ? 'server_error' : 'broken_action');
 
+            $perspective = $validated['perspective'] ?? match ($defectType) {
+                'visual_copy' => 'designer',
+                'server_error' => 'engineering',
+                default => ($context['active_account']['role'] ?? '') === 'alumno' ? 'student' : 'admin',
+            };
+
             $report = [
                 'id' => $id,
                 'status' => 'pending',
                 'defect_type' => $defectType,
+                'perspective' => $perspective,
                 'message' => trim((string) $validated['message']),
                 'url' => $validated['url'] ?? null,
                 'component' => $validated['component'] ?? null,

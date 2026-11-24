@@ -325,3 +325,40 @@ test('qa reports are private: reviewers cannot see, update, delete or view scree
     $this->actingAs($admin1)->get($screenshotUrl)
         ->assertOk();
 });
+
+test('qa reports support perspective selection and filtering', function () {
+    $admin = $this->assignLegacyRole(User::factory()->create(['name' => 'Admin QA']), 'admin');
+
+    $resDesigner = $this->actingAs($admin)->postJson('/admin/qa-bot/reports', [
+        'message' => 'Ajuste de tipografía e iconos',
+        'defect_type' => 'visual_copy',
+        'perspective' => 'designer',
+    ])->assertStatus(201);
+    $resDesigner->assertJsonPath('report.perspective', 'designer');
+
+    $resStudent = $this->actingAs($admin)->postJson('/admin/qa-bot/reports', [
+        'message' => 'Fricción en visualizador de PDFs para alumno',
+        'defect_type' => 'broken_action',
+        'perspective' => 'student',
+    ])->assertStatus(201);
+    $resStudent->assertJsonPath('report.perspective', 'student');
+
+    // Test Artisan filter by perspective
+    $exitListDesigner = Artisan::call('qa:reports', [
+        'action' => 'list',
+        '--perspective' => 'designer',
+    ]);
+    expect($exitListDesigner)->toBe(0);
+    $outputDesigner = Artisan::output();
+    expect($outputDesigner)->toContain('Ajuste de tipografía e iconos');
+    expect($outputDesigner)->not->toContain('Fricción en visualizador de PDFs');
+
+    $exitListStudent = Artisan::call('qa:reports', [
+        'action' => 'list',
+        '--perspective' => 'student',
+    ]);
+    expect($exitListStudent)->toBe(0);
+    $outputStudent = Artisan::output();
+    expect($outputStudent)->toContain('Fricción en visualizador de PDFs');
+    expect($outputStudent)->not->toContain('Ajuste de tipografía e iconos');
+});

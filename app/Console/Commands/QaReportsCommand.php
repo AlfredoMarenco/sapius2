@@ -11,6 +11,7 @@ class QaReportsCommand extends Command
                             {action=list : Acción a ejecutar (list|show|update)}
                             {id? : ID del reporte (ej. QA-001)}
                             {--status= : Filtro de estado en list o nuevo estado en update}
+                            {--perspective= : Filtro opcional por perspectiva (designer|student|admin|engineering)}
                             {--reply= : Respuesta de Antigravity para el revisor}';
 
     protected $description = 'Gestiona los reportes QA enviados desde el bot flotante en storage/app/qa-bot/reports.json';
@@ -38,6 +39,14 @@ class QaReportsCommand extends Command
             $reports = array_values(array_filter(
                 $reports,
                 fn (array $report): bool => ($report['status'] ?? null) === $statusFilter
+            ));
+        }
+
+        $perspectiveFilter = $this->option('perspective');
+        if (is_string($perspectiveFilter) && $perspectiveFilter !== '') {
+            $reports = array_values(array_filter(
+                $reports,
+                fn (array $report): bool => ($report['perspective'] ?? null) === $perspectiveFilter
             ));
         }
 

@@ -21,9 +21,9 @@ const EXPERIENCE_KPIS = [
         icon: (
             <svg
                 viewBox="0 0 40 40"
-                className="relative z-10 h-10 w-10 stroke-[#101E33]"
+                className="relative z-10 h-12 w-12 stroke-[#101E33] sm:h-13 sm:w-13"
                 fill="none"
-                strokeWidth="1.5"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
@@ -44,9 +44,9 @@ const EXPERIENCE_KPIS = [
         icon: (
             <svg
                 viewBox="0 0 40 40"
-                className="relative z-10 h-10 w-10 stroke-[#101E33]"
+                className="relative z-10 h-12 w-12 stroke-[#101E33] sm:h-13 sm:w-13"
                 fill="none"
-                strokeWidth="1.5"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
@@ -62,9 +62,9 @@ const EXPERIENCE_KPIS = [
         icon: (
             <svg
                 viewBox="0 0 40 40"
-                className="relative z-10 h-10 w-10 stroke-[#101E33]"
+                className="relative z-10 h-12 w-12 stroke-[#101E33] sm:h-13 sm:w-13"
                 fill="none"
-                strokeWidth="1.5"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
@@ -85,9 +85,9 @@ const EXPERIENCE_KPIS = [
         icon: (
             <svg
                 viewBox="0 0 40 40"
-                className="relative z-10 h-10 w-10 stroke-[#101E33]"
+                className="relative z-10 h-12 w-12 stroke-[#101E33] sm:h-13 sm:w-13"
                 fill="none"
-                strokeWidth="1.5"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
@@ -105,9 +105,9 @@ const EXPERIENCE_KPIS = [
         icon: (
             <svg
                 viewBox="0 0 40 40"
-                className="relative z-10 h-10 w-10 stroke-[#101E33]"
+                className="relative z-10 h-12 w-12 stroke-[#101E33] sm:h-13 sm:w-13"
                 fill="none"
-                strokeWidth="1.5"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
@@ -482,7 +482,7 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                                         : ''
                                 }`}
                             >
-                                {/* Squircle 3D oficial de Canva + SVG lineal encima */}
+                                {/* Squircle 3D oficial de Canva + SVG lineal centrado ópticamente en la masa de color */}
                                 <div className="relative flex h-22 w-22 items-center justify-center sm:h-24 sm:w-24">
                                     <img
                                         src="/img/brand2026/badge-squircle-peach.png"
@@ -491,7 +491,10 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                                         draggable={false}
                                         className="pointer-events-none absolute inset-0 h-full w-full object-contain select-none"
                                     />
-                                    {kpi.icon}
+                                    {/* Offset óptico (-translate-y-1.5 -translate-x-0.5) para compensar la sombra proyectada inferior/derecha del PNG */}
+                                    <div className="relative z-10 flex items-center justify-center -translate-y-1.5 -translate-x-0.5">
+                                        {kpi.icon}
+                                    </div>
                                 </div>
 
                                 <div className="mt-3 font-display text-3xl font-extrabold tracking-tight text-[#101E33] sm:text-[2.15rem]">
