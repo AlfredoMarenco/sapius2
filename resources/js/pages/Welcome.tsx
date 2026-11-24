@@ -130,22 +130,12 @@ const SUMA_STEPS = [
         title: 'Comienza por lo básico',
         description: 'Aprende los conceptos y fundamentos de cada tema.',
         icon: (
-            <svg
-                viewBox="0 0 40 40"
-                className="h-9 w-9 stroke-[#101E33]"
-                fill="none"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <img
+                src="/img/brand2026/suma/suma-icon-1.png"
+                alt=""
                 aria-hidden="true"
-            >
-                <path d="M8 10.5c3.8 0 8.5 1.2 12 3.5 3.5-2.3 8.2-3.5 12-3.5v18.5c-3.8 0-8.5 1.2-12 3.5-3.5-2.3-8.2-3.5-12-3.5V10.5Z" />
-                <path d="M20 14v18.5" />
-                <path d="M11.5 16h5" />
-                <path d="M11.5 20.5h5" />
-                <path d="M23.5 16h5" />
-                <path d="M23.5 20.5h5" />
-            </svg>
+                className="h-11 w-11 object-contain select-none"
+            />
         ),
     },
     {
@@ -153,27 +143,12 @@ const SUMA_STEPS = [
         description:
             'Cada nuevo tema se relaciona con los anteriores y agrega información.',
         icon: (
-            <svg
-                viewBox="0 0 40 40"
-                className="h-9 w-9 stroke-[#101E33]"
-                fill="none"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <img
+                src="/img/brand2026/suma/suma-icon-2.png"
+                alt=""
                 aria-hidden="true"
-            >
-                <circle cx="20" cy="18" r="7.5" />
-                <path d="M16.5 29h7" />
-                <path d="M17.5 32.5h5" />
-                <path d="M20 6.5v2" />
-                <path d="m11.5 10 1.4 1.4" />
-                <path d="m28.5 10-1.4 1.4" />
-                <circle cx="20" cy="18" r="2.2" />
-                <path d="M20 13.5v2.3" />
-                <path d="M20 20.2v2.3" />
-                <path d="M15.5 18h2.3" />
-                <path d="M22.2 18h2.3" />
-            </svg>
+                className="h-11 w-11 object-contain select-none"
+            />
         ),
     },
     {
@@ -181,44 +156,24 @@ const SUMA_STEPS = [
         description:
             'Se incorporan contenidos de mayor complejidad conforme se consolidan las bases.',
         icon: (
-            <svg
-                viewBox="0 0 40 40"
-                className="h-9 w-9 stroke-[#101E33]"
-                fill="none"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <img
+                src="/img/brand2026/suma/suma-icon-3.png"
+                alt=""
                 aria-hidden="true"
-            >
-                <path d="M9 31h22" />
-                <path d="M10.5 26h5v5h-5z" />
-                <path d="M17.5 20.5h5V31h-5z" />
-                <path d="M24.5 15h5v16h-5z" />
-                <path d="m11 16 7-5.5 4.5 3 6-5.5" />
-                <path d="M25 8h3.5v3.5" />
-            </svg>
+                className="h-11 w-11 object-contain select-none"
+            />
         ),
     },
     {
         title: 'Integra lo aprendido',
         description: 'Conecta todos los conocimientos y aprende a aplicarlos.',
         icon: (
-            <svg
-                viewBox="0 0 40 40"
-                className="h-9 w-9 stroke-[#101E33]"
-                fill="none"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <img
+                src="/img/brand2026/suma/suma-icon-4.png"
+                alt=""
                 aria-hidden="true"
-            >
-                <circle cx="13" cy="13" r="3.5" />
-                <circle cx="27" cy="13" r="3.5" />
-                <circle cx="20" cy="27" r="3.8" />
-                <path d="M16.5 13h7" />
-                <path d="m14.8 16 3.5 7.6" />
-                <path d="m25.2 16-3.5 7.6" />
-            </svg>
+                className="h-11 w-11 object-contain select-none"
+            />
         ),
     },
     {
@@ -226,19 +181,12 @@ const SUMA_STEPS = [
         description:
             'Mediante actividades y simuladores identifica errores y fortalece tus áreas de oportunidad.',
         icon: (
-            <svg
-                viewBox="0 0 40 40"
-                className="h-9 w-9 stroke-[#101E33]"
-                fill="none"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <img
+                src="/img/brand2026/suma/suma-icon-5.png"
+                alt=""
                 aria-hidden="true"
-            >
-                <circle cx="18" cy="18" r="8.5" />
-                <path d="m24.5 24.5 6.5 6.5" />
-                <path d="m14.5 18.2 2.4 2.4 4.8-4.9" />
-            </svg>
+                className="h-11 w-11 object-contain select-none"
+            />
         ),
     },
 ];
