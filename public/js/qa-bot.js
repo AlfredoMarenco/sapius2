@@ -924,8 +924,12 @@
                     : '';
 
         const authorName = report.author?.name || 'Administrador';
-        const authorEmail = report.author?.email ? ` <span class="author-email">(${escapeHtml(report.author.email)})</span>` : '';
-        const authorHtml = `<div class="report-author">👤 <strong>Solicitó:</strong> ${escapeHtml(authorName)}${authorEmail}</div>`;
+        const isCurrentReviewer =
+            !state.reviewer?.id ||
+            !report.author?.id ||
+            String(report.author.id) === String(state.reviewer.id);
+        const authorDisplay = isCurrentReviewer ? 'Tú' : authorName;
+        const authorHtml = `<div class="report-author">👤 <strong>Solicitó:</strong> ${escapeHtml(authorDisplay)}</div>`;
 
         const showTestedAs =
             report.tested_as &&

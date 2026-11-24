@@ -300,9 +300,17 @@ class QaFeedbackBotController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeReviewer($request);
+        $context = $this->authorizeReviewer($request);
+        $reviewerId = (string) ($context['reviewer']['id'] ?? '');
 
-        $reports = self::sortReportsNewestFirst(self::readReports());
+        $allReports = self::sortReportsNewestFirst(self::readReports());
+
+        // Private filtering: each reviewer only sees their own submitted reports
+        $reports = array_values(array_filter($allReports, function (array $report) use ($reviewerId): bool {
+            $authorId = (string) ($report['author']['id'] ?? '');
+
+            return $authorId !== '' && $authorId === $reviewerId;
+        }));
 
         $counts = [
             'pending' => 0,
@@ -414,6 +422,7 @@ class QaFeedbackBotController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $context = $this->authorizeReviewer($request);
+        $reviewerId = (string) ($context['reviewer']['id'] ?? '');
 
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'in:'.implode(',', self::VALID_ADMIN_STATUSES)],
@@ -433,6 +442,7 @@ class QaFeedbackBotController extends Controller
             $id,
             $validated,
             $authorName,
+            $reviewerId,
             $now
         ): array {
             $foundIndex = null;
@@ -448,6 +458,10 @@ class QaFeedbackBotController extends Controller
             }
 
             $report = $reports[$foundIndex];
+            $authorId = (string) ($report['author']['id'] ?? '');
+            if ($authorId !== '' && $authorId !== $reviewerId) {
+                abort(403, 'No tienes permiso para actualizar este reporte.');
+            }
 
             $followUp = isset($validated['follow_up_message'])
                 ? trim((string) $validated['follow_up_message'])
@@ -491,9 +505,10 @@ class QaFeedbackBotController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->authorizeReviewer($request);
+        $context = $this->authorizeReviewer($request);
+        $reviewerId = (string) ($context['reviewer']['id'] ?? '');
 
-        $deletedScreenshot = self::mutateReports(function (array $reports) use ($id): array {
+        $deletedScreenshot = self::mutateReports(function (array $reports) use ($id, $reviewerId): array {
             $foundIndex = null;
             foreach ($reports as $index => $report) {
                 if (($report['id'] ?? null) === $id) {
@@ -504,6 +519,11 @@ class QaFeedbackBotController extends Controller
 
             if ($foundIndex === null) {
                 abort(404, 'Reporte QA no encontrado.');
+            }
+
+            $authorId = (string) ($reports[$foundIndex]['author']['id'] ?? '');
+            if ($authorId !== '' && $authorId !== $reviewerId) {
+                abort(403, 'No tienes permiso para eliminar este reporte.');
             }
 
             $screenshotFile = $reports[$foundIndex]['screenshot_file'] ?? null;
@@ -531,11 +551,33 @@ class QaFeedbackBotController extends Controller
 
     public function screenshot(Request $request, string $filename): BinaryFileResponse
     {
-        $this->authorizeReviewer($request);
+        $context = $this->authorizeReviewer($request);
+        $reviewerId = (string) ($context['reviewer']['id'] ?? '');
 
         $safeName = basename($filename);
         if (! preg_match('/^[A-Za-z0-9_.-]+\.(png|jpe?g|webp)$/i', $safeName)) {
             abort(404);
+        }
+
+        // Validate that the reviewer owns the report associated with this screenshot
+        $reports = self::readReports();
+        $isOwner = false;
+        foreach ($reports as $report) {
+            $reportFile = $report['screenshot_file'] ?? null;
+            if (! $reportFile && ! empty($report['screenshot_url'])) {
+                $reportFile = basename((string) $report['screenshot_url']);
+            }
+            if ($reportFile === $safeName) {
+                $authorId = (string) ($report['author']['id'] ?? '');
+                if ($authorId === '' || $authorId === $reviewerId) {
+                    $isOwner = true;
+                }
+                break;
+            }
+        }
+
+        if (! $isOwner) {
+            abort(403, 'No tienes permiso para ver esta captura.');
         }
 
         $path = self::screenshotsDirectory().DIRECTORY_SEPARATOR.$safeName;

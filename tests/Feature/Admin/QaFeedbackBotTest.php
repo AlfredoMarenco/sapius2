@@ -273,3 +273,55 @@ test('qa:reports artisan command lists, shows, and updates reports', function ()
         ->assertJsonPath('counts.resolved', 1)
         ->assertJsonPath('counts.rejected', 1);
 });
+
+test('qa reports are private: reviewers cannot see, update, delete or view screenshots of other reviewers', function () {
+    $admin1 = $this->assignLegacyRole(User::factory()->create(['name' => 'Admin Uno']), 'admin');
+    $admin2 = $this->assignLegacyRole(User::factory()->create(['name' => 'Admin Dos']), 'admin');
+
+    $tinyPngBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+    // Admin 1 creates report
+    $res1 = $this->actingAs($admin1)->postJson('/admin/qa-bot/reports', [
+        'message' => 'Reporte privado de Admin 1',
+        'screenshot' => $tinyPngBase64,
+    ]);
+    $res1->assertStatus(201);
+    $report1Id = $res1->json('report.id');
+    $screenshotUrl = $res1->json('report.screenshot_url');
+
+    // Admin 2 creates report
+    $res2 = $this->actingAs($admin2)->postJson('/admin/qa-bot/reports', [
+        'message' => 'Reporte privado de Admin 2',
+    ]);
+    $res2->assertStatus(201);
+    $report2Id = $res2->json('report.id');
+
+    // Admin 1 only sees their own reports
+    $list1 = $this->actingAs($admin1)->getJson('/admin/qa-bot/reports');
+    $list1->assertOk()
+        ->assertJsonPath('counts.total', 1)
+        ->assertJsonPath('reports.0.id', $report1Id);
+
+    // Admin 2 only sees their own reports
+    $list2 = $this->actingAs($admin2)->getJson('/admin/qa-bot/reports');
+    $list2->assertOk()
+        ->assertJsonPath('counts.total', 1)
+        ->assertJsonPath('reports.0.id', $report2Id);
+
+    // Admin 2 cannot update Admin 1 report
+    $this->actingAs($admin2)->patchJson("/admin/qa-bot/reports/{$report1Id}", [
+        'follow_up_message' => 'Intento de modificar ajeno',
+    ])->assertForbidden();
+
+    // Admin 2 cannot delete Admin 1 report
+    $this->actingAs($admin2)->deleteJson("/admin/qa-bot/reports/{$report1Id}")
+        ->assertForbidden();
+
+    // Admin 2 cannot view Admin 1 screenshot
+    $this->actingAs($admin2)->get($screenshotUrl)
+        ->assertForbidden();
+
+    // Admin 1 CAN view their own screenshot
+    $this->actingAs($admin1)->get($screenshotUrl)
+        ->assertOk();
+});
