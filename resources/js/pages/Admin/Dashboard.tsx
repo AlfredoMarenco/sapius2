@@ -149,13 +149,13 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                     key={cohort.id}
                                     className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-xs transition-all hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900"
                                 >
-                                    {/* Portada del curso */}
-                                    <div className="relative aspect-video w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800">
+                                    {/* Portada del curso con aspect ratio balanceado */}
+                                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-neutral-800">
                                         {cohort.course?.image ? (
                                             <img
                                                 src={cohort.course.image.startsWith('http') ? cohort.course.image : `/media/stream/${cohort.course.image}`}
                                                 alt={cohort.course.title}
-                                                className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                className="size-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
                                                 onError={(e) => {
                                                     const target = e.currentTarget as HTMLImageElement;
                                                     target.onerror = null;
@@ -163,64 +163,79 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                                 }}
                                             />
                                         ) : (
-                                            <div className="flex size-full items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50 text-blue-600">
-                                                <BookOpen className="size-10 opacity-60" />
+                                            <div className="flex size-full items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 text-brand-navy">
+                                                <BookOpen className="size-12 opacity-40 text-[#101E33]" />
                                             </div>
                                         )}
-                                        <div className="absolute top-2.5 left-2.5">
-                                            <span className="rounded-md bg-[#101E33]/80 backdrop-blur-sm px-2 py-0.5 text-[11px] font-semibold text-white shadow">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                                        <div className="absolute top-3 left-3">
+                                            <span className="rounded-lg bg-[#101E33]/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm border border-white/10">
                                                 Cohorte #{cohort.id}
                                             </span>
                                         </div>
-                                        <div className="absolute top-2.5 right-2.5">
-                                            <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white shadow">
-                                                {cohort.enrollments_count} alumnos
+                                        <div className="absolute top-3 right-3">
+                                            <span className="rounded-lg bg-[#FF6B52] px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                                                {cohort.enrollments_count} {cohort.enrollments_count === 1 ? 'alumno' : 'alumnos'}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Contenido de la tarjeta */}
-                                    <div className="flex flex-1 flex-col p-4">
-                                        <div className="mb-1.5">
-                                            <span className="inline-block rounded bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 truncate max-w-full dark:bg-neutral-800 dark:text-neutral-300">
+                                    <div className="flex flex-1 flex-col p-5">
+                                        <div className="mb-2">
+                                            <span className="inline-block rounded-md bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600 truncate max-w-full dark:bg-neutral-800 dark:text-neutral-300">
                                                 {cohort.internal_id}
                                             </span>
                                         </div>
-                                        <h3 className="text-sm sm:text-base font-bold text-[#101E33] line-clamp-1 group-hover:text-[#FF6B52] transition-colors dark:text-neutral-100">
+                                        <h3 
+                                            className="text-base font-bold text-[#101E33] hover:text-[#FF6B52] transition-colors dark:text-neutral-100 leading-snug line-clamp-2"
+                                            title={cohort.course?.title || 'Curso Programado'}
+                                        >
                                             {cohort.course?.title || 'Curso Programado'}
                                         </h3>
-                                        {cohort.course?.description && (
-                                            <p className="mt-1.5 text-xs text-neutral-500 line-clamp-2">
-                                                {stripHtml(cohort.course.description)}
-                                            </p>
-                                        )}
+                                        
+                                        {/* Descripción no truncada agresivamente (hasta 4 líneas completas o scroll suave) */}
+                                        <div className="mt-2 flex-1">
+                                            {cohort.course?.description ? (
+                                                <p 
+                                                    className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed line-clamp-4"
+                                                    title={stripHtml(cohort.course.description)}
+                                                >
+                                                    {stripHtml(cohort.course.description)}
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-slate-400 italic">
+                                                    Sin descripción registrada para este curso.
+                                                </p>
+                                            )}
+                                        </div>
 
                                         {/* Fechas de inicio y fin */}
-                                        <div className="mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="size-3.5 text-blue-600" />
+                                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between text-xs text-slate-500 font-medium">
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar className="size-3.5 text-[#101E33]" />
                                                 <span>{cohort.start_date || 'N/A'}</span>
                                             </div>
-                                            <span>al</span>
-                                            <div className="flex items-center gap-1">
+                                            <span className="text-slate-300">&rarr;</span>
+                                            <div className="flex items-center gap-1.5">
                                                 <Clock className="size-3.5 text-[#FF6B52]" />
                                                 <span>{cohort.end_date || 'N/A'}</span>
                                             </div>
                                         </div>
 
                                         {/* Botones de acción directa */}
-                                        <div className="mt-3.5 flex items-center gap-2">
+                                        <div className="mt-4 flex items-center gap-2">
                                             <Link
                                                 href={`/admin/curso/${cohort.id}`}
-                                                className="flex-1 inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#101E33] px-3 text-xs font-semibold text-white hover:bg-[#192B47] transition-colors shadow-xs"
+                                                className="flex-1 inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#101E33] px-3 text-xs font-bold text-white hover:bg-[#192B47] transition-all shadow-xs"
                                             >
                                                 <Users className="size-3.5" />
                                                 Gestión de Alumnos
                                             </Link>
                                             <a
                                                 href={`/admin/exportAllResults/${cohort.id}`}
-                                                className="inline-flex size-9 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 hover:text-emerald-600 transition-colors shadow-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-                                                title="Exportar Calificaciones"
+                                                className="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-colors shadow-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                                                title="Exportar Calificaciones en Excel"
                                             >
                                                 <Download className="size-4" />
                                             </a>
