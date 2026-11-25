@@ -31,11 +31,13 @@ export default function Login({
 
     return (
         <>
-            <Head title="Iniciar Sesión" />
+            <Head title="Iniciar Sesión | Sapius" />
 
-            <div className="mb-6 text-center space-y-1">
-                <h2 className="text-2xl font-black text-brand-navy tracking-tight">Bienvenido de nuevo</h2>
-                <p className="text-xs font-semibold text-slate-500">Ingresa tus credenciales para acceder a la plataforma</p>
+            <div className="mb-6 space-y-1">
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-[#101E33] tracking-tight">Iniciar Sesión</h2>
+                <p className="text-sm font-medium text-slate-500">
+                    Ingresa tus credenciales para acceder a tus cursos y materiales.
+                </p>
             </div>
 
             <Form
@@ -45,14 +47,14 @@ export default function Login({
                     setCaptchaToken('');
                     setCaptchaResetKey((k) => k + 1);
                 }}
-                className="flex flex-col gap-5"
+                className="flex flex-col gap-4"
             >
                 {({ processing, errors }) => (
                     <>
                         <input type="hidden" name="g-recaptcha-response" value={captchaToken} />
 
-                        <div className="grid gap-5">
-                            <div className="grid gap-2">
+                        <div className="grid gap-4">
+                            <div className="grid gap-1.5">
                                 <Label htmlFor="username" className="text-xs font-bold text-slate-700 ml-0.5">
                                     Usuario o Correo Electrónico
                                 </Label>
@@ -64,13 +66,13 @@ export default function Login({
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="username"
-                                    placeholder="usuario o correo@ejemplo.com"
-                                    className="h-12 border border-slate-200 rounded-xl px-4 text-sm font-medium focus-visible:ring-brand-coral focus-visible:border-brand-coral"
+                                    placeholder="ejemplo@correo.com o tu_usuario"
+                                    className="h-11 border border-slate-200 rounded-xl px-3.5 text-sm font-medium focus-visible:ring-[#FF6B52] focus-visible:border-[#FF6B52]"
                                 />
                                 <InputError message={errors.username} />
                             </div>
 
-                            <div className="grid gap-2">
+                            <div className="grid gap-1.5">
                                 <div className="flex items-center justify-between ml-0.5">
                                     <Label htmlFor="password" title="Contraseña" className="text-xs font-bold text-slate-700">
                                         Contraseña
@@ -78,7 +80,7 @@ export default function Login({
                                     {canResetPassword && (
                                         <TextLink
                                             href={request()}
-                                            className="text-xs font-bold text-brand-coral hover:text-brand-coral/80 transition-colors"
+                                            className="text-xs font-bold text-[#FF6B52] hover:text-[#e0553e] transition-colors"
                                             tabIndex={5}
                                         >
                                             ¿Olvidaste tu contraseña?
@@ -92,7 +94,7 @@ export default function Login({
                                     tabIndex={2}
                                     autoComplete="current-password"
                                     placeholder="••••••••"
-                                    className="h-12 border border-slate-200 rounded-xl px-4 text-sm font-medium focus-visible:ring-brand-coral focus-visible:border-brand-coral"
+                                    className="h-11 border border-slate-200 rounded-xl px-3.5 text-sm font-medium focus-visible:ring-[#FF6B52] focus-visible:border-[#FF6B52]"
                                 />
                                 <InputError message={errors.password} />
                             </div>
@@ -112,7 +114,7 @@ export default function Login({
                                     id="remember"
                                     name="remember"
                                     tabIndex={3}
-                                    className="rounded border-slate-300 data-[state=checked]:bg-brand-coral data-[state=checked]:border-brand-coral"
+                                    className="rounded border-slate-300 data-[state=checked]:bg-[#FF6B52] data-[state=checked]:border-[#FF6B52]"
                                 />
                                 <Label htmlFor="remember" className="text-xs font-medium text-slate-600 cursor-pointer select-none">
                                     Recordar mi sesión
@@ -121,26 +123,26 @@ export default function Login({
 
                             <Button
                                 type="submit"
-                                className="mt-2 h-12 rounded-xl bg-brand-coral hover:bg-brand-coral/90 text-white font-bold text-sm tracking-wide shadow-lg shadow-brand-coral/25 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                className="mt-2 h-11 rounded-xl bg-[#FF6B52] hover:bg-[#e0553e] text-white font-bold text-sm tracking-wide shadow-md shadow-[#FF6B52]/25 transition-all hover:scale-[1.01] active:scale-[0.99]"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"
                             >
                                 {processing ? <Spinner className="mr-2" /> : null}
-                                Iniciar Sesión
+                                Entrar a mi Cuenta
                             </Button>
                         </div>
 
                         {canRegister && (
-                            <div className="text-center mt-3 pt-3 border-t border-slate-100">
+                            <div className="text-center mt-3 pt-4 border-t border-slate-100">
                                 <p className="text-xs text-slate-600">
                                     ¿Aún no tienes cuenta?{' '}
                                     <TextLink 
                                         href={register()} 
                                         tabIndex={5}
-                                        className="text-brand-coral font-bold hover:underline ml-1"
+                                        className="text-[#FF6B52] font-bold hover:underline ml-1"
                                     >
-                                        Crear una cuenta
+                                        Crear una cuenta nueva
                                     </TextLink>
                                 </p>
                             </div>
