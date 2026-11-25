@@ -24,12 +24,13 @@ import {
     MoreVertical,
     CheckCircle2,
     XCircle,
+    ChevronLeft,
     ChevronRight,
     Tag,
     Copy
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface Course {
     id: number;
@@ -47,6 +48,8 @@ interface Props {
 
 export default function Index({ courses }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [perPage, setPerPage] = useState(10);
 
     const handleToggleCourse = (id: number) => {
         router.patch(`/admin/courses/${id}/toggle`, {}, {
@@ -67,10 +70,30 @@ export default function Index({ courses }: Props) {
         }
     };
 
-    const filteredCourses = courses.filter((c) =>
-        c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.category?.name && c.category.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const filteredCourses = useMemo(() => {
+        return courses.filter((c) =>
+            c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.category?.name && c.category.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    }, [courses, searchTerm]);
+
+    const totalPages = Math.ceil(filteredCourses.length / perPage) || 1;
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+
+    const paginatedCourses = useMemo(() => {
+        const start = (safeCurrentPage - 1) * perPage;
+        return filteredCourses.slice(start, start + perPage);
+    }, [filteredCourses, safeCurrentPage, perPage]);
+
+    const handleSearchChange = (val: string) => {
+        setSearchTerm(val);
+        setCurrentPage(1);
+    };
+
+    const handlePerPageChange = (num: number) => {
+        setPerPage(num);
+        setCurrentPage(1);
+    };
 
     return (
         <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
@@ -104,26 +127,42 @@ export default function Index({ courses }: Props) {
                 </div>
             </div>
 
-            {/* Buscador */}
-            <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                <input
-                    type="text"
-                    placeholder="Buscar curso por título o categoría..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-900 shadow-xs focus:border-[#101E33] focus:outline-none focus:ring-1 focus:ring-[#101E33] dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100"
-                />
+            {/* Buscador y Selector de Cantidad */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative max-w-md w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    <input
+                        type="text"
+                        placeholder="Buscar curso por título o categoría..."
+                        value={searchTerm}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-900 shadow-xs focus:border-[#101E33] focus:outline-none focus:ring-1 focus:ring-[#101E33] dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100"
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-neutral-500 self-end sm:self-auto">
+                    <span>Mostrar:</span>
+                    <select
+                        value={perPage}
+                        onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                        className="h-8 rounded-lg border border-neutral-200 bg-white px-2 text-xs font-semibold text-neutral-700 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
+                    >
+                        <option value={10}>10 por página</option>
+                        <option value={20}>20 por página</option>
+                        <option value={50}>50 por página</option>
+                        <option value={100}>100 por página</option>
+                    </select>
+                </div>
             </div>
 
             {/* Mobile Cards View */}
             <div className="space-y-3 md:hidden">
-                {filteredCourses.length === 0 ? (
+                {paginatedCourses.length === 0 ? (
                     <div className="rounded-xl border border-neutral-200/80 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
                         No se encontraron cursos registrados.
                     </div>
                 ) : (
-                    filteredCourses.map((course) => (
+                    paginatedCourses.map((course) => (
                         <div
                             key={course.id}
                             className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-xs space-y-3 dark:border-neutral-800 dark:bg-neutral-900"
@@ -203,14 +242,14 @@ export default function Index({ courses }: Props) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredCourses.length === 0 ? (
+                        {paginatedCourses.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="py-12 text-center text-neutral-400 text-sm">
                                     No se encontraron cursos registrados.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredCourses.map((course) => (
+                            paginatedCourses.map((course) => (
                                 <TableRow key={course.id} className="group">
                                     <TableCell>
                                         <div className="flex items-center gap-3 min-w-0">
@@ -289,6 +328,70 @@ export default function Index({ courses }: Props) {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Controles de Paginación Compartidos (Desktop y Mobile) */}
+            {filteredCourses.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-neutral-200/80 bg-white p-3.5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
+                    <span className="text-xs text-neutral-500">
+                        Mostrando <span className="font-semibold text-neutral-700 dark:text-neutral-300">{(safeCurrentPage - 1) * perPage + 1}</span> a{' '}
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                            {Math.min(safeCurrentPage * perPage, filteredCourses.length)}
+                        </span>{' '}
+                        de <span className="font-semibold text-neutral-700 dark:text-neutral-300">{filteredCourses.length}</span> cursos
+                    </span>
+
+                    <div className="flex items-center gap-1.5 self-center sm:self-auto">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={safeCurrentPage <= 1}
+                            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                            className="h-8 px-2.5 text-xs gap-1 rounded-lg"
+                        >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            Anterior
+                        </Button>
+
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter((p) => p === 1 || p === totalPages || Math.abs(p - safeCurrentPage) <= 1)
+                                .map((p, idx, arr) => {
+                                    const prev = arr[idx - 1];
+                                    return (
+                                        <div key={p} className="flex items-center">
+                                            {prev && p - prev > 1 && (
+                                                <span className="px-1 text-xs text-neutral-400">...</span>
+                                            )}
+                                            <Button
+                                                variant={p === safeCurrentPage ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(p)}
+                                                className={`h-8 w-8 p-0 text-xs rounded-lg ${
+                                                    p === safeCurrentPage
+                                                        ? 'bg-[#101E33] text-white hover:bg-[#192B47]'
+                                                        : ''
+                                                }`}
+                                            >
+                                                {p}
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={safeCurrentPage >= totalPages}
+                            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                            className="h-8 px-2.5 text-xs gap-1 rounded-lg"
+                        >
+                            Siguiente
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
