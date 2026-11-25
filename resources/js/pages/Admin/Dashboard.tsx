@@ -149,13 +149,23 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                     key={cohort.id}
                                     className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-xs transition-all hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900"
                                 >
-                                    {/* Portada del curso con aspect ratio balanceado */}
-                                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-neutral-800">
+                                    {/* Portada del curso: Se muestra completa de alto y ancho (object-contain) sin recortes */}
+                                    <div className="relative w-full h-56 sm:h-64 overflow-hidden bg-slate-900/95 dark:bg-black flex items-center justify-center p-2">
+                                        {/* Fondo difuminado decorativo con la misma imagen para rellenar los bordes con elegancia */}
+                                        {cohort.course?.image && (
+                                            <div 
+                                                className="absolute inset-0 bg-cover bg-center blur-xl opacity-30 scale-110 pointer-events-none"
+                                                style={{
+                                                    backgroundImage: `url(${cohort.course.image.startsWith('http') ? cohort.course.image : `/media/stream/${cohort.course.image}`})`
+                                                }}
+                                            />
+                                        )}
+
                                         {cohort.course?.image ? (
                                             <img
                                                 src={cohort.course.image.startsWith('http') ? cohort.course.image : `/media/stream/${cohort.course.image}`}
                                                 alt={cohort.course.title}
-                                                className="size-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                                                className="relative z-10 max-h-full max-w-full object-contain rounded-lg drop-shadow-md transition-transform duration-300 group-hover:scale-[1.02]"
                                                 onError={(e) => {
                                                     const target = e.currentTarget as HTMLImageElement;
                                                     target.onerror = null;
@@ -163,24 +173,24 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                                 }}
                                             />
                                         ) : (
-                                            <div className="flex size-full items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 text-brand-navy">
-                                                <BookOpen className="size-12 opacity-40 text-[#101E33]" />
+                                            <div className="relative z-10 flex size-full items-center justify-center text-white/50">
+                                                <BookOpen className="size-14 opacity-40 text-white" />
                                             </div>
                                         )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-                                        <div className="absolute top-3 left-3">
+                                        
+                                        <div className="absolute top-3 left-3 z-20">
                                             <span className="rounded-lg bg-[#101E33]/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm border border-white/10">
                                                 Cohorte #{cohort.id}
                                             </span>
                                         </div>
-                                        <div className="absolute top-3 right-3">
+                                        <div className="absolute top-3 right-3 z-20">
                                             <span className="rounded-lg bg-[#FF6B52] px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
                                                 {cohort.enrollments_count} {cohort.enrollments_count === 1 ? 'alumno' : 'alumnos'}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Contenido de la tarjeta */}
+                                    {/* Contenido de la tarjeta: Título y descripción completos sin truncar */}
                                     <div className="flex flex-1 flex-col p-5">
                                         <div className="mb-2">
                                             <span className="inline-block rounded-md bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600 truncate max-w-full dark:bg-neutral-800 dark:text-neutral-300">
@@ -188,19 +198,15 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                             </span>
                                         </div>
                                         <h3 
-                                            className="text-base font-bold text-[#101E33] hover:text-[#FF6B52] transition-colors dark:text-neutral-100 leading-snug line-clamp-2"
-                                            title={cohort.course?.title || 'Curso Programado'}
+                                            className="text-base font-bold text-[#101E33] hover:text-[#FF6B52] transition-colors dark:text-neutral-100 leading-snug"
                                         >
                                             {cohort.course?.title || 'Curso Programado'}
                                         </h3>
                                         
-                                        {/* Descripción no truncada agresivamente (hasta 4 líneas completas o scroll suave) */}
-                                        <div className="mt-2 flex-1">
+                                        {/* Descripción completa sin corte alguno */}
+                                        <div className="mt-2.5 flex-1">
                                             {cohort.course?.description ? (
-                                                <p 
-                                                    className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed line-clamp-4"
-                                                    title={stripHtml(cohort.course.description)}
-                                                >
+                                                <p className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
                                                     {stripHtml(cohort.course.description)}
                                                 </p>
                                             ) : (
@@ -211,7 +217,7 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                         </div>
 
                                         {/* Fechas de inicio y fin */}
-                                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between text-xs text-slate-500 font-medium">
+                                        <div className="mt-5 pt-3 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between text-xs text-slate-500 font-medium">
                                             <div className="flex items-center gap-1.5">
                                                 <Calendar className="size-3.5 text-[#101E33]" />
                                                 <span>{cohort.start_date || 'N/A'}</span>
