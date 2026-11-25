@@ -244,7 +244,7 @@
     "src": "node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs"
   },
   "resources/css/app.css": {
-    "file": "assets/app-7riV146g.css",
+    "file": "assets/app-oVsGmX1v.css",
     "name": "app",
     "names": [
       "app.css"
@@ -253,7 +253,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-DLPVMBt1.js",
+    "file": "assets/app-TXPFWIgT.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,

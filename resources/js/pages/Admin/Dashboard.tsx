@@ -203,12 +203,13 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                             {cohort.course?.title || 'Curso Programado'}
                                         </h3>
                                         
-                                        {/* Descripción completa sin corte alguno */}
+                                        {/* Descripción completa con formato de texto enriquecido (negritas, cursivas, listas, párrafos y saltos de línea) */}
                                         <div className="mt-2.5 flex-1">
                                             {cohort.course?.description ? (
-                                                <p className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
-                                                    {stripHtml(cohort.course.description)}
-                                                </p>
+                                                <div 
+                                                    className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed space-y-2 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4 [&>strong]:font-bold [&>b]:font-bold [&>a]:text-[#FF6B52] [&>a]:underline"
+                                                    dangerouslySetInnerHTML={{ __html: cohort.course.description }}
+                                                />
                                             ) : (
                                                 <p className="text-xs text-slate-400 italic">
                                                     Sin descripción registrada para este curso.
