@@ -36,7 +36,7 @@ export default function UserShow({ user, enrollments = [] }: UserDetailProps) {
         <>
             <Head title={`Expediente: ${user.name}`} />
 
-            <div className="p-6 max-w-5xl mx-auto space-y-6">
+            <div className="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6">
                 <div>
                     <Button asChild variant="ghost" size="sm" className="-ml-3 text-neutral-600">
                         <Link href="/admin/users">
