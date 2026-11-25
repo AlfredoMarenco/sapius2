@@ -31,11 +31,11 @@ export default function Login({
 
     return (
         <>
-            <Head title="Acceso de Usuario" />
+            <Head title="Iniciar Sesión" />
 
-            <div className="mb-8 text-center space-y-1">
-                <h2 className="text-2xl font-black text-brand-navy tracking-tight uppercase">Bienvenido</h2>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">Ingresa a tu cuenta de usuario</p>
+            <div className="mb-6 text-center space-y-1">
+                <h2 className="text-2xl font-black text-brand-navy tracking-tight">Bienvenido de nuevo</h2>
+                <p className="text-xs font-semibold text-slate-500">Ingresa tus credenciales para acceder a la plataforma</p>
             </div>
 
             <Form
@@ -45,15 +45,17 @@ export default function Login({
                     setCaptchaToken('');
                     setCaptchaResetKey((k) => k + 1);
                 }}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-5"
             >
                 {({ processing, errors }) => (
                     <>
                         <input type="hidden" name="g-recaptcha-response" value={captchaToken} />
 
-                        <div className="grid gap-6">
+                        <div className="grid gap-5">
                             <div className="grid gap-2">
-                                <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60 ml-1">Nombre de Usuario o Correo</Label>
+                                <Label htmlFor="username" className="text-xs font-bold text-slate-700 ml-0.5">
+                                    Usuario o Correo Electrónico
+                                </Label>
                                 <Input
                                     id="username"
                                     type="text"
@@ -62,19 +64,21 @@ export default function Login({
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="username"
-                                    placeholder="Ej: marencocode o usuario@correo.com"
-                                    className="h-14 border-2 rounded-2xl px-5 font-bold focus-visible:ring-brand-navy focus-visible:border-brand-navy"
+                                    placeholder="usuario o correo@ejemplo.com"
+                                    className="h-12 border border-slate-200 rounded-xl px-4 text-sm font-medium focus-visible:ring-brand-coral focus-visible:border-brand-coral"
                                 />
                                 <InputError message={errors.username} />
                             </div>
 
                             <div className="grid gap-2">
-                                <div className="flex items-center ml-1">
-                                    <Label htmlFor="password" title="Contraseña" className="text-[10px] font-black uppercase tracking-widest text-brand-navy/60">Contraseña</Label>
+                                <div className="flex items-center justify-between ml-0.5">
+                                    <Label htmlFor="password" title="Contraseña" className="text-xs font-bold text-slate-700">
+                                        Contraseña
+                                    </Label>
                                     {canResetPassword && (
                                         <TextLink
                                             href={request()}
-                                            className="ml-auto text-[9px] font-black uppercase tracking-widest text-brand-coral hover:text-brand-coral/80"
+                                            className="text-xs font-bold text-brand-coral hover:text-brand-coral/80 transition-colors"
                                             tabIndex={5}
                                         >
                                             ¿Olvidaste tu contraseña?
@@ -88,7 +92,7 @@ export default function Login({
                                     tabIndex={2}
                                     autoComplete="current-password"
                                     placeholder="••••••••"
-                                    className="h-14 border-2 rounded-2xl px-5 font-bold focus-visible:ring-brand-navy focus-visible:border-brand-navy"
+                                    className="h-12 border border-slate-200 rounded-xl px-4 text-sm font-medium focus-visible:ring-brand-coral focus-visible:border-brand-coral"
                                 />
                                 <InputError message={errors.password} />
                             </div>
@@ -103,38 +107,40 @@ export default function Login({
                                 />
                             )}
 
-                            <div className="flex items-center space-x-3 ml-1">
+                            <div className="flex items-center space-x-2.5 ml-0.5">
                                 <Checkbox
                                     id="remember"
                                     name="remember"
                                     tabIndex={3}
-                                    className="rounded-md border-2 border-brand-navy/20 data-[state=checked]:bg-brand-navy data-[state=checked]:border-brand-navy"
+                                    className="rounded border-slate-300 data-[state=checked]:bg-brand-coral data-[state=checked]:border-brand-coral"
                                 />
-                                <Label htmlFor="remember" className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Recordar mi sesión</Label>
+                                <Label htmlFor="remember" className="text-xs font-medium text-slate-600 cursor-pointer select-none">
+                                    Recordar mi sesión
+                                </Label>
                             </div>
 
                             <Button
                                 type="submit"
-                                className="mt-4 h-14 rounded-2xl bg-brand-navy hover:bg-brand-navy/90 font-black uppercase tracking-widest text-xs shadow-xl shadow-brand-navy/20"
+                                className="mt-2 h-12 rounded-xl bg-brand-coral hover:bg-brand-coral/90 text-white font-bold text-sm tracking-wide shadow-lg shadow-brand-coral/25 transition-all hover:scale-[1.01] active:scale-[0.99]"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"
                             >
                                 {processing ? <Spinner className="mr-2" /> : null}
-                                Entrar al Panel
+                                Iniciar Sesión
                             </Button>
                         </div>
 
                         {canRegister && (
-                            <div className="text-center mt-4">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                            <div className="text-center mt-3 pt-3 border-t border-slate-100">
+                                <p className="text-xs text-slate-600">
                                     ¿Aún no tienes cuenta?{' '}
                                     <TextLink 
                                         href={register()} 
                                         tabIndex={5}
-                                        className="text-brand-blue font-black hover:underline ml-1"
+                                        className="text-brand-coral font-bold hover:underline ml-1"
                                     >
-                                        Regístrate aquí
+                                        Crear una cuenta
                                     </TextLink>
                                 </p>
                             </div>
