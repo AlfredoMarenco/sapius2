@@ -169,7 +169,14 @@ class ElectronPanelController extends Controller
                     ], 403)
                 );
             }
-            $macs = array_filter(array_map(fn ($m) => strtolower(trim($m)), explode(',', (string) $user->mac_address)));
+            $macs = [];
+            if (Schema::hasColumn('users', 'mac_address')) {
+                $macs = array_filter(array_map(fn ($m) => strtolower(trim($m)), explode(',', (string) $user->mac_address)));
+            } else {
+                $cachedMac = \Illuminate\Support\Facades\Cache::get('user_mac_address:'.$user->id);
+                $macs = array_filter(array_map(fn ($m) => strtolower(trim($m)), explode(',', (string) $cachedMac)));
+            }
+
             if (! in_array($mac, $macs, true)) {
                 throw new HttpResponseException(
                     response()->json([
