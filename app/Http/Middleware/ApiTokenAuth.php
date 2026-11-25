@@ -21,13 +21,20 @@ class ApiTokenAuth
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        if (! Schema::hasColumn('users', 'api_token')) {
-            return response()->json(['message' => 'Unauthenticated. Token column unavailable.'], 401);
+        $user = null;
+        if (Schema::hasColumn('users', 'api_token')) {
+            $user = User::where('api_token', $token)
+                ->where('activo', 'si')
+                ->first();
+        } else {
+            // Fallback para entornos donde users no tiene api_token (congelamiento de BD)
+            $cachedUserId = \Illuminate\Support\Facades\Cache::get('electron_api_token:'.$token);
+            if ($cachedUserId) {
+                $user = User::where('id', $cachedUserId)
+                    ->where('activo', 'si')
+                    ->first();
+            }
         }
-
-        $user = User::where('api_token', $token)
-            ->where('activo', 'si')
-            ->first();
 
         if (! $user) {
             return response()->json(['message' => 'Unauthenticated. Invalid token.'], 401);

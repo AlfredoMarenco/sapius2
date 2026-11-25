@@ -72,4 +72,71 @@ Route::namespace('App\Http\Controllers\Api')->group(function () {
         Route::get('/electron/opinion/check/{curso_programado_id}', 'ElectronPanelController@checkOpinionPending');
         Route::post('/electron/opinion/submit', 'ElectronPanelController@submitOpinion');
     });
+
+    // Endpoint directo para reportes QA desde Electron Desktop (sin requerir cookie de admin)
+    Route::post('/electron/qa-report', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'title' => 'nullable|string|max:255',
+            'description' => 'required|string|max:5000',
+            'defect_type' => 'nullable|string|max:100',
+            'severity' => 'nullable|string|max:50',
+            'app_version' => 'nullable|string|max:50',
+            'current_server' => 'nullable|string|max:255',
+            'mac_address' => 'nullable|string|max:100',
+            'user_email' => 'nullable|string|max:255',
+            'user_name' => 'nullable|string|max:255',
+            'current_view' => 'nullable|string|max:100',
+            'active_tab' => 'nullable|string|max:100',
+            'console_logs' => 'nullable|array',
+            'timestamp' => 'nullable|string',
+        ]);
+
+        $reportsFile = storage_path('app/qa-bot/reports.json');
+        $reports = [];
+        if (file_exists($reportsFile)) {
+            $reports = json_decode(file_get_contents($reportsFile), true) ?: [];
+        }
+
+        $nextIdNum = 1;
+        foreach ($reports as $r) {
+            if (isset($r['id']) && preg_match('/QA-(\d+)/', $r['id'], $m)) {
+                $num = (int) $m[1];
+                if ($num >= $nextIdNum) $nextIdNum = $num + 1;
+            }
+        }
+        $id = sprintf('QA-%03d', $nextIdNum);
+
+        $newReport = [
+            'id' => $id,
+            'status' => 'pending',
+            'defect_type' => $validated['defect_type'] ?? 'desktop_issue',
+            'perspective' => 'engineering',
+            'message' => trim(($validated['title'] ? '['.$validated['title'].'] ' : '').$validated['description']),
+            'url' => $validated['current_server'] ?? 'Electron App',
+            'component' => 'Desktop / '.($validated['current_view'] ?? 'App'),
+            'viewport' => 'Electron Desktop',
+            'user_agent' => 'SapiusDesktop/'.$validated['app_version'].' (MAC: '.($validated['mac_address'] ?? 'N/A').')',
+            'console_errors' => $validated['console_logs'] ?? [],
+            'server_exception' => null,
+            'laravel_log_excerpt' => [],
+            'screenshot_url' => null,
+            'author' => [
+                'id' => 0,
+                'name' => $validated['user_name'] ?? 'Usuario Desktop',
+                'email' => $validated['user_email'] ?? 'desktop@sapius.com.mx',
+            ],
+            'agent_reply' => null,
+            'created_at' => now()->toIso8601String(),
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        array_unshift($reports, $newReport);
+        @file_put_contents($reportsFile, json_encode($reports, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Reporte QA registrado con ID '.$id,
+            'id' => $id,
+        ]);
+    });
 });

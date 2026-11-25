@@ -41,12 +41,6 @@ class AuthController extends Controller
             ], 403);
         }
 
-        if (! Schema::hasColumn('users', 'api_token')) {
-            return response()->json([
-                'message' => 'Autenticación de escritorio no disponible en este entorno de pruebas.',
-            ], 503);
-        }
-
         // Destroy existing web session if any to enforce single active session
         if (Schema::hasColumn('users', 'session_id')) {
             $previous_session = $user->session_id;
@@ -61,8 +55,14 @@ class AuthController extends Controller
         }
 
         // Generate a new API token every time a new login occurs from Electron to invalidate previous Electron instances
-        $user->api_token = Str::random(80);
-        $user->save();
+        $generatedToken = Str::random(80);
+        if (Schema::hasColumn('users', 'api_token')) {
+            $user->api_token = $generatedToken;
+            $user->save();
+        } else {
+            // Soporte fallback sin alterar la tabla users (Cache de token por 30 días)
+            \Illuminate\Support\Facades\Cache::put('electron_api_token:'.$generatedToken, $user->id, now()->addDays(30));
+        }
 
         return response()->json([
             'user' => [
@@ -71,7 +71,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'rol' => $user->rol, // Roles handled via User::getRolAttribute()
             ],
-            'api_token' => $user->api_token,
+            'api_token' => $generatedToken,
         ]);
     }
 
