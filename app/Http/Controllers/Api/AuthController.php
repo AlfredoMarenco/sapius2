@@ -113,26 +113,32 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if (! Schema::hasColumn('users', 'mac_address')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Control de dirección MAC no disponible en este entorno de pruebas.',
-                'is_blocked' => false,
-            ], 503);
+        $macs = [];
+        if (Schema::hasColumn('users', 'mac_address')) {
+            if (! $user->mac_address) {
+                // Link MAC address for the first time
+                $user->mac_address = $normalizedMac;
+                $user->save();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Dirección MAC vinculada con éxito.',
+                ]);
+            }
+            $macs = array_filter(array_map(fn ($mac) => strtolower(trim($mac)), explode(',', (string) $user->mac_address)));
+        } else {
+            // Soporte fallback sin alterar la tabla users (Cache de MAC vinculado al usuario)
+            $cachedMac = \Illuminate\Support\Facades\Cache::get('user_mac_address:'.$user->id);
+            if (! $cachedMac) {
+                \Illuminate\Support\Facades\Cache::forever('user_mac_address:'.$user->id, $normalizedMac);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Dirección MAC vinculada con éxito.',
+                ]);
+            }
+            $macs = array_filter(array_map(fn ($mac) => strtolower(trim($mac)), explode(',', (string) $cachedMac)));
         }
 
-        if (! $user->mac_address) {
-            // Link MAC address for the first time
-            $user->mac_address = $normalizedMac;
-            $user->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Dirección MAC vinculada con éxito.',
-            ]);
-        }
-
-        $macs = array_filter(array_map(fn ($mac) => strtolower(trim($mac)), explode(',', (string) $user->mac_address)));
         if (! in_array($normalizedMac, $macs, true)) {
             return response()->json([
                 'success' => false,
