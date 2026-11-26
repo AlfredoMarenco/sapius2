@@ -46,6 +46,7 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
     const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<number, number>>({});
     const [revealedQuestionIds, setRevealedQuestionIds] = useState<Record<number, boolean>>({});
+    const [navFilter, setNavFilter] = useState<'all' | 'unanswered' | 'answered'>('all');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     const answersRef = useRef<Record<number, number>>(answers);
@@ -447,35 +448,84 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                         <div className="lg:col-span-1">
                             <Card className="shadow-md sticky top-24 border-slate-200/80">
                                 <CardContent className="p-4">
-                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
-                                        Navegación de Reactivos
-                                    </h3>
-                                    <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-4 gap-2">
-                                        {questions.map((q, idx) => {
-                                            const isAnswered = Boolean(answers[q.id]);
-                                            const targetGroupIdx = questionToGroupMap[q.id] ?? 0;
-                                            const isCurrent = targetGroupIdx === currentGroupIndex;
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                            Navegación de Reactivos
+                                        </h3>
+                                        <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                            {answeredCount}/{questions.length}
+                                        </span>
+                                    </div>
 
-                                            return (
-                                                <button
-                                                    key={q.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setCurrentGroupIndex(targetGroupIdx);
-                                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                    }}
-                                                    className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-semibold transition-all ${
-                                                        isCurrent ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
-                                                    } ${
-                                                        isAnswered
-                                                            ? 'bg-indigo-600 text-white'
-                                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                                    }`}
-                                                >
-                                                    {idx + 1}
-                                                </button>
-                                            );
-                                        })}
+                                    {questions.length > 15 && (
+                                        <div className="grid grid-cols-3 gap-1 mb-3 p-1 bg-slate-100 rounded-lg text-[11px] font-semibold">
+                                            <button
+                                                type="button"
+                                                onClick={() => setNavFilter('all')}
+                                                className={`py-1 rounded-md transition-colors cursor-pointer ${
+                                                    navFilter === 'all'
+                                                        ? 'bg-white text-slate-900 shadow-xs'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                Todas
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setNavFilter('unanswered')}
+                                                className={`py-1 rounded-md transition-colors cursor-pointer ${
+                                                    navFilter === 'unanswered'
+                                                        ? 'bg-white text-amber-700 shadow-xs'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                Pend. ({unansweredCount})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setNavFilter('answered')}
+                                                className={`py-1 rounded-md transition-colors cursor-pointer ${
+                                                    navFilter === 'answered'
+                                                        ? 'bg-white text-indigo-700 shadow-xs'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                Resp. ({answeredCount})
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <div className="max-h-[42vh] overflow-y-auto pr-1">
+                                        <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-5 gap-1.5">
+                                            {questions.map((q, idx) => {
+                                                const isAnswered = Boolean(answers[q.id]);
+                                                if (navFilter === 'unanswered' && isAnswered) return null;
+                                                if (navFilter === 'answered' && !isAnswered) return null;
+
+                                                const targetGroupIdx = questionToGroupMap[q.id] ?? 0;
+                                                const isCurrent = targetGroupIdx === currentGroupIndex;
+
+                                                return (
+                                                    <button
+                                                        key={q.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCurrentGroupIndex(targetGroupIdx);
+                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                        }}
+                                                        className={`h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-all cursor-pointer ${
+                                                            isCurrent ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                                                        } ${
+                                                            isAnswered
+                                                                ? 'bg-indigo-600 text-white'
+                                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        {idx + 1}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                     <div className="mt-6 border-t border-slate-100 pt-4 space-y-2">
                                         <div className="flex items-center text-xs font-medium text-slate-600">
