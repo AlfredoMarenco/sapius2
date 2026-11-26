@@ -174,6 +174,23 @@ class ElectronPanelController extends Controller
                 $macs = array_filter(array_map(fn ($m) => strtolower(trim($m)), explode(',', (string) $user->mac_address)));
             } else {
                 $cachedMac = \Illuminate\Support\Facades\Cache::get('user_mac_address:'.$user->id);
+                if (! $cachedMac) {
+                    $sessionsFile = storage_path('app/electron-auth/sessions.json');
+                    if (is_file($sessionsFile)) {
+                        $decoded = json_decode((string) @file_get_contents($sessionsFile), true);
+                        $cachedMac = $decoded['macs'][(string) $user->id] ?? null;
+                    }
+                    if (! $cachedMac && $mac !== '') {
+                        $cachedMac = $mac;
+                        $sessions = is_file($sessionsFile) ? (json_decode((string) @file_get_contents($sessionsFile), true) ?: []) : [];
+                        $sessions['macs'][(string) $user->id] = $mac;
+                        @mkdir(dirname($sessionsFile), 0775, true);
+                        @file_put_contents($sessionsFile, json_encode($sessions, JSON_PRETTY_PRINT), LOCK_EX);
+                    }
+                    if ($cachedMac) {
+                        \Illuminate\Support\Facades\Cache::forever('user_mac_address:'.$user->id, $cachedMac);
+                    }
+                }
                 $macs = array_filter(array_map(fn ($m) => strtolower(trim($m)), explode(',', (string) $cachedMac)));
             }
 
@@ -953,32 +970,17 @@ class ElectronPanelController extends Controller
         }
 
         $caducidadRaw = $examen->tiempo_caducidad ?? ($examen->Prueba?->tiempo_caducidad ?? null);
-        if (! empty($caducidadRaw)) {
-            $caducidadSeconds = $this->parseDurationToSeconds($caducidadRaw);
-            if ($caducidadSeconds > 0 && $examen->updated_at) {
-                $elapsedCaducidad = max(0, (int) Carbon::parse($examen->updated_at)->diffInSeconds(now(), false));
-                if ($elapsedCaducidad > $caducidadSeconds) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'El tiempo de caducidad de la retroalimentación ha concluido.',
-                    ], 403);
-                }
-            } else {
-                try {
-                    if (now()->gt(Carbon::parse($caducidadRaw))) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'El tiempo de caducidad de la retroalimentación ha concluido.',
-                        ], 403);
-                    }
-                } catch (\Throwable $e) {
-                    // Ignore unparseable value
-                }
-            }
+        $caducidadSeconds = ! empty($caducidadRaw) ? $this->parseDurationToSeconds($caducidadRaw) : 0;
+        $vigenciaSeconds = $this->parseDurationToSeconds($examen->Prueba?->tiempo_vigencia ?? null);
+
+        if ($examen->retro_visualizado === 'si' && $vigenciaSeconds <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La retroalimentación de este examen ya fue visualizada.',
+            ], 403);
         }
 
-        $vigenciaSeconds = $this->parseDurationToSeconds($examen->Prueba?->tiempo_vigencia ?? null);
-        if ($vigenciaSeconds > 0 && $examen->updated_at) {
+        if ($examen->retro_visualizado === 'si' && $vigenciaSeconds > 0 && $examen->updated_at) {
             $elapsedVigencia = max(0, (int) Carbon::parse($examen->updated_at)->diffInSeconds(now(), false));
             if ($elapsedVigencia > $vigenciaSeconds) {
                 return response()->json([
@@ -988,16 +990,22 @@ class ElectronPanelController extends Controller
             }
         }
 
-        if ($examen->retro_visualizado === 'si' && $vigenciaSeconds <= 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'La retroalimentación de este examen ya fue visualizada.',
-            ], 403);
+        if ($examen->retro_visualizado == 'no' && $caducidadSeconds > 0 && $examen->updated_at) {
+            $effectiveWindow = max($caducidadSeconds, $vigenciaSeconds, 86400);
+            $elapsedCaducidad = max(0, (int) Carbon::parse($examen->updated_at)->diffInSeconds(now(), false));
+            if ($elapsedCaducidad > $effectiveWindow) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El tiempo de caducidad de la retroalimentación ha concluido.',
+                ], 403);
+            }
         }
 
         if ($examen->retro_visualizado == 'no') {
+            $examen->timestamps = false;
             $examen->retro_visualizado = 'si';
             $examen->save();
+            $examen->timestamps = true;
         }
 
         $rawAnswers = json_decode($examen->respuestas_json ?? '[]');

@@ -60,8 +60,9 @@ class AuthController extends Controller
             $user->api_token = $generatedToken;
             $user->save();
         } else {
-            // Soporte fallback sin alterar la tabla users (Cache de token por 30 días)
+            // Soporte fallback sin alterar la tabla users (Cache + archivo persistente resistente a optimize:clear)
             \Illuminate\Support\Facades\Cache::put('electron_api_token:'.$generatedToken, $user->id, now()->addDays(30));
+            $this->persistElectronSession('tokens', $generatedToken, $user->id);
         }
 
         return response()->json([
@@ -127,10 +128,17 @@ class AuthController extends Controller
             }
             $macs = array_filter(array_map(fn ($mac) => strtolower(trim($mac)), explode(',', (string) $user->mac_address)));
         } else {
-            // Soporte fallback sin alterar la tabla users (Cache de MAC vinculado al usuario)
+            // Soporte fallback sin alterar la tabla users (Cache + archivo persistente resistente a optimize:clear)
             $cachedMac = \Illuminate\Support\Facades\Cache::get('user_mac_address:'.$user->id);
             if (! $cachedMac) {
+                $cachedMac = $this->readElectronSession('macs', (string) $user->id);
+                if ($cachedMac) {
+                    \Illuminate\Support\Facades\Cache::forever('user_mac_address:'.$user->id, $cachedMac);
+                }
+            }
+            if (! $cachedMac) {
                 \Illuminate\Support\Facades\Cache::forever('user_mac_address:'.$user->id, $normalizedMac);
+                $this->persistElectronSession('macs', (string) $user->id, $normalizedMac);
                 return response()->json([
                     'success' => true,
                     'message' => 'Dirección MAC vinculada con éxito.',
@@ -273,5 +281,31 @@ class AuthController extends Controller
             'is_grave_block' => $isGraveBlock,
             'history' => $history,
         ]);
+    }
+
+    private function persistElectronSession(string $bucket, string $key, mixed $value): void
+    {
+        $file = storage_path('app/electron-auth/sessions.json');
+        $data = ['tokens' => [], 'macs' => []];
+        if (is_file($file)) {
+            $decoded = json_decode((string) @file_get_contents($file), true);
+            if (is_array($decoded)) {
+                $data['tokens'] = is_array($decoded['tokens'] ?? null) ? $decoded['tokens'] : [];
+                $data['macs'] = is_array($decoded['macs'] ?? null) ? $decoded['macs'] : [];
+            }
+        }
+        $data[$bucket][$key] = $value;
+        @mkdir(dirname($file), 0775, true);
+        @file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX);
+    }
+
+    private function readElectronSession(string $bucket, string $key): mixed
+    {
+        $file = storage_path('app/electron-auth/sessions.json');
+        if (! is_file($file)) {
+            return null;
+        }
+        $decoded = json_decode((string) @file_get_contents($file), true);
+        return is_array($decoded) ? ($decoded[$bucket][$key] ?? null) : null;
     }
 }
