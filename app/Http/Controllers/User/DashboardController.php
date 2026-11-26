@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\UserStrikeHistory;
 use App\Models\LessonUnlock;
-use App\Services\CourseAccessService;
+use App\Services\EnrollmentAccessService;
 use App\Services\CourseCategoryService;
 use App\Services\StrikeService;
 use Carbon\Carbon;
@@ -21,7 +21,7 @@ class DashboardController extends Controller
     /**
      * Display the student dashboard showing enrolled active courses.
      */
-    public function index(Request $request, CourseAccessService $accessService)
+    public function index(Request $request, EnrollmentAccessService $accessService)
     {
         $user = $request->user();
         $now = Carbon::now();
