@@ -82,16 +82,26 @@ class DashboardController extends Controller
 
             // Calculate next available lesson for smart resume
             $nextLessonId = null;
-            $cohortUnlocks = $unlocksByCohort->get($scheduled->id, collect());
             if ($course->modules) {
                 foreach ($course->modules as $mod) {
-                    $modSchedule = $accessService->evaluateSchedule($scheduled->id, $mod->id, $cohortUnlocks->get($mod->id));
+                    $modSchedule = $accessService->evaluateSchedule(
+                        $scheduled->id,
+                        $user->id,
+                        $mod->id,
+                        null,
+                        $mod->lessons?->pluck('id')
+                    );
                     if (! $modSchedule['is_available']) {
                         continue;
                     }
                     if ($mod->lessons) {
                         foreach ($mod->lessons as $lesson) {
-                            $lessonSchedule = $accessService->evaluateSchedule($scheduled->id, $lesson->id, $cohortUnlocks->get($lesson->id));
+                            $lessonSchedule = $accessService->evaluateSchedule(
+                                $scheduled->id,
+                                $user->id,
+                                $lesson->id,
+                                $mod->id
+                            );
                             if ($lessonSchedule['is_available'] && ! in_array($lesson->id, $completedLessonIds)) {
                                 $nextLessonId = $lesson->id;
                                 break 2;
