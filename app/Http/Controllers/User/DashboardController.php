@@ -5,6 +5,8 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\UserStrikeHistory;
+use App\Models\LessonUnlock;
+use App\Services\CourseAccessService;
 use App\Services\CourseCategoryService;
 use App\Services\StrikeService;
 use Carbon\Carbon;
@@ -19,7 +21,7 @@ class DashboardController extends Controller
     /**
      * Display the student dashboard showing enrolled active courses.
      */
-    public function index(Request $request)
+    public function index(Request $request, CourseAccessService $accessService)
     {
         $user = $request->user();
         $now = Carbon::now();
@@ -48,7 +50,12 @@ class DashboardController extends Controller
             })
             ->get();
 
-        $enrolledCourses = $enrollments->map(function ($enrollment) use ($user, $now) {
+        $unlocksByCohort = LessonUnlock::where('user_id', $user->id)
+            ->get()
+            ->groupBy('curso_programado_id')
+            ->map(fn ($items) => $items->keyBy('leccion_id'));
+
+        $enrolledCourses = $enrollments->map(function ($enrollment) use ($user, $now, $accessService, $unlocksByCohort) {
             $scheduled = $enrollment->scheduledCourse;
             if (! $scheduled || ! $scheduled->course) {
                 return null;
@@ -73,13 +80,19 @@ class DashboardController extends Controller
 
             $progress = $totalLessons > 0 ? round((count($completedLessonIds) / $totalLessons) * 100) : 0;
 
-            // Calculate next lesson for smart resume
+            // Calculate next available lesson for smart resume
             $nextLessonId = null;
+            $cohortUnlocks = $unlocksByCohort->get($scheduled->id, collect());
             if ($course->modules) {
                 foreach ($course->modules as $mod) {
+                    $modSchedule = $accessService->evaluateSchedule($scheduled->id, $mod->id, $cohortUnlocks->get($mod->id));
+                    if (! $modSchedule['is_available']) {
+                        continue;
+                    }
                     if ($mod->lessons) {
                         foreach ($mod->lessons as $lesson) {
-                            if (! in_array($lesson->id, $completedLessonIds)) {
+                            $lessonSchedule = $accessService->evaluateSchedule($scheduled->id, $lesson->id, $cohortUnlocks->get($lesson->id));
+                            if ($lessonSchedule['is_available'] && ! in_array($lesson->id, $completedLessonIds)) {
                                 $nextLessonId = $lesson->id;
                                 break 2;
                             }
