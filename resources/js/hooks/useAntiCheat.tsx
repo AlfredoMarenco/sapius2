@@ -12,6 +12,11 @@ export interface AntiCheatOptions {
 }
 
 interface AntiCheatAuthUser {
+    id?: number | string;
+    name?: string;
+    nombre_completo?: string;
+    email?: string;
+    username?: string;
     strikes?: number;
     role?: string;
     is_blocked?: boolean;
@@ -115,6 +120,18 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
     const [showWarning, setShowWarning] = useState(false);
     const [warningMessage, setWarningMessage] = useState('');
     const [unlockCountdown, setUnlockCountdown] = useState<number | null>(null);
+    const [fullscreenEl, setFullscreenEl] = useState<Element | null>(null);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
+            return;
+        }
+        const syncFullscreen = () => {
+            setFullscreenEl(document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', syncFullscreen);
+        return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+    }, []);
 
     if (safeInitialStrikes !== prevAuthStrikes) {
         setPrevAuthStrikes(safeInitialStrikes);
@@ -800,28 +817,34 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
         releaseInstantDomShield,
     ]);
 
-    // Componente de Marca de Agua Dinámica
+    // Componente de Marca de Agua Forense Dinámica
     const Watermark = () => {
         if (!enabled || !watermarkText || typeof document === 'undefined') {
             return null;
         }
 
-        const marks = Array.from({ length: 20 });
-        const portalTarget = document.fullscreenElement || document.body;
+        const fullName = authUser?.nombre_completo || authUser?.name || 'Alumno';
+        const emailOrText = authUser?.email || authUser?.username || watermarkText;
+        const userId = authUser?.id ?? '0';
+        const todayStr = new Date().toLocaleDateString('es-MX');
+        const forensicText = `${fullName} · ${emailOrText} · ID #${userId} · ${todayStr} · PROHIBIDA SU CAPTURA`;
+
+        const marks = Array.from({ length: 24 });
+        const portalTarget = fullscreenEl || document.body;
 
         return createPortal(
             <div
                 data-anticheat-portal="true"
                 className={`pointer-events-none fixed inset-0 z-50 flex flex-wrap items-center justify-around overflow-hidden transition-opacity ${
-                    isBlurred ? 'opacity-20' : 'opacity-[0.03]'
+                    isBlurred ? 'opacity-25' : 'opacity-[0.075]'
                 }`}
             >
                 {marks.map((_, i) => (
                     <div
                         key={i}
-                        className="m-10 -rotate-45 whitespace-nowrap text-2xl font-bold text-black md:text-4xl dark:text-white"
+                        className="m-8 -rotate-30 whitespace-nowrap text-sm font-extrabold tracking-wider text-black md:text-base dark:text-white"
                     >
-                        {watermarkText}
+                        {forensicText}
                     </div>
                 ))}
             </div>,
@@ -835,7 +858,7 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
             return null;
         }
 
-        const portalTarget = document.fullscreenElement || document.body;
+        const portalTarget = fullscreenEl || document.body;
 
         return createPortal(
             <div data-anticheat-portal="true">
