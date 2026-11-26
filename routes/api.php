@@ -46,6 +46,7 @@ Route::namespace('App\Http\Controllers\Api')->group(function () {
 
         // Secure Delivery
         Route::get('/electron/pdf/{leccion_id}', 'ElectronPanelController@securePdf');
+        Route::get('/electron/medias/stream/{path}', 'ElectronPanelController@streamMedia')->where('path', '.*');
 
         // Interactive PDFs
         Route::get('/electron/material-pdfs/{id}/show', 'ElectronPanelController@getMaterialPdfDetails');

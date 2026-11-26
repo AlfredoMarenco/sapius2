@@ -1156,6 +1156,48 @@ class ElectronPanelController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="sapius_secure.pdf"',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
+
+    public function streamMedia(Request $request, string $path)
+    {
+        $this->validateMacAddress($request);
+
+        $decodedPath = urldecode($path);
+        $resolved = $this->resolveSafePathInDirs($decodedPath, [
+            storage_path('app/files/medias'),
+            storage_path('app/public/files/medias'),
+            storage_path('app/public/medias'),
+            storage_path('app/public'),
+            storage_path('app'),
+        ], false) ?? $this->resolveSafePathInDirs($decodedPath, [
+            storage_path('app/files/medias'),
+            storage_path('app/public/files/medias'),
+            storage_path('app/public/medias'),
+            storage_path('app/public'),
+        ], true);
+
+        if (! $resolved || ! file_exists($resolved)) {
+            return response()->json(['success' => false, 'message' => 'Archivo multimedia no encontrado.'], 404);
+        }
+
+        $ext = strtolower(pathinfo($resolved, PATHINFO_EXTENSION));
+        $mimeMap = [
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+            'mov' => 'video/quicktime',
+            'm4v' => 'video/x-m4v',
+            'mp3' => 'audio/mpeg',
+            'pdf' => 'application/pdf',
+        ];
+        $mime = $mimeMap[$ext] ?? (mime_content_type($resolved) ?: 'application/octet-stream');
+
+        return Response::file($resolved, [
+            'Content-Type' => $mime,
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
             'Pragma' => 'no-cache',
             'Expires' => '0',
         ]);
