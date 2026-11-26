@@ -157,8 +157,6 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
                         className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-neutral-900 via-neutral-800 to-neutral-900 rounded-xl relative shadow-xl border border-neutral-700/60"
                         onContextMenu={(e) => e.preventDefault()}
                     >
-                        <StrikeAlert />
-                        <Watermark />
                         {/* Barra superior de lectura */}
                         <div className="bg-neutral-950/90 backdrop-blur-sm border-b border-neutral-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-white shrink-0">
                             <div className="flex items-center gap-2">

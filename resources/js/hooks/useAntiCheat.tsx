@@ -1,6 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface AntiCheatOptions {
     enabled?: boolean;
@@ -269,10 +270,14 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
             `
                     : ''
             }
-            html[data-anticheat-shield="active"] main {
+            html[data-anticheat-shield="active"] main:not(:has([data-anticheat-portal="true"])) {
                 filter: blur(28px) !important;
                 user-select: none !important;
                 pointer-events: none !important;
+            }
+            html[data-anticheat-shield="active"] [data-anticheat-portal="true"] {
+                filter: none !important;
+                pointer-events: auto !important;
             }
             html[data-anticheat-shield="active"] .anticheat-blackout {
                 opacity: 0 !important;
@@ -679,14 +684,16 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
 
     // Componente de Marca de Agua Dinámica
     const Watermark = () => {
-        if (!enabled || !watermarkText) {
-return null;
-}
+        if (!enabled || !watermarkText || typeof document === 'undefined') {
+            return null;
+        }
 
         const marks = Array.from({ length: 20 });
+        const portalTarget = document.fullscreenElement || document.body;
 
-        return (
+        return createPortal(
             <div
+                data-anticheat-portal="true"
                 className={`pointer-events-none fixed inset-0 z-50 flex flex-wrap items-center justify-around overflow-hidden transition-opacity ${
                     isBlurred ? 'opacity-20' : 'opacity-[0.03]'
                 }`}
@@ -699,18 +706,21 @@ return null;
                         {watermarkText}
                     </div>
                 ))}
-            </div>
+            </div>,
+            portalTarget,
         );
     };
 
     // Componente de Alerta de Strike y Escudo de Protección (Membretada Sapius)
     const StrikeAlert = () => {
-        if (!enabled) {
-return null;
-}
+        if (!enabled || typeof document === 'undefined') {
+            return null;
+        }
 
-        return (
-            <>
+        const portalTarget = document.fullscreenElement || document.body;
+
+        return createPortal(
+            <div data-anticheat-portal="true">
                 {showWarning ? (
                     <div className="fixed inset-0 z-[99999] flex select-none flex-col items-center justify-center bg-[#052442]/95 px-4 text-white backdrop-blur-md">
                         <img
@@ -769,7 +779,8 @@ return null;
                         </p>
                     </div>
                 ) : null}
-            </>
+            </div>,
+            portalTarget,
         );
     };
 
