@@ -284,7 +284,7 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
                             </button>
 
                             <div
-                                className={`anticheat-blackout relative shadow-[0_25px_60px_-15px_rgba(0,0,0,0.75)] rounded-sm bg-white transition-all duration-150 [&_canvas]:pointer-events-none [&_canvas]:select-none ${
+                                className={`anticheat-blackout relative shadow-[0_25px_60px_-15px_rgba(0,0,0,0.75)] rounded-sm bg-white [&_canvas]:pointer-events-none [&_canvas]:select-none ${
                                     isBlurred ? 'opacity-0 invisible blur-xl' : 'opacity-100 visible'
                                 }`}
                             >

@@ -121,6 +121,8 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
     }
 
     const lastStrikeAtRef = useRef<number>(0);
+    const lastStrikeActionRef = useRef<string>('');
+    const lastModifierDownAtRef = useRef<number>(0);
     const strikeCountRef = useRef<number>(safeInitialStrikes);
     const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -131,6 +133,7 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
     const activateInstantDomShield = useCallback(() => {
         if (typeof document !== 'undefined') {
             document.documentElement.setAttribute('data-anticheat-shield', 'active');
+            void document.documentElement.offsetHeight;
         }
     }, []);
 
@@ -163,12 +166,29 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
             );
             setShowWarning(true);
 
-            // Antirrebote para combinaciones de varias teclas (ej. Ctrl + Alt + ImprPant = 1 strike por intento)
-            if (now - lastStrikeAtRef.current < STRIKE_COOLDOWN_MS) {
+            const highSeverityActions = [
+                'Browser Screenshot',
+                'Snipping Tool',
+                'Mac Screenshot',
+                'PrintScreen',
+                'Screen Capture',
+                'DevTools',
+                'F12',
+                'Copy',
+                'Shortcut Print',
+                'Save',
+            ];
+            const isUpgradeFromModifier =
+                ['Restricted Key / Modifier', 'Shift'].includes(lastStrikeActionRef.current) &&
+                highSeverityActions.includes(action);
+
+            // Antirrebote para combinaciones de varias teclas (permite escalar si primero se detectó solo el modificador)
+            if (!isUpgradeFromModifier && now - lastStrikeAtRef.current < STRIKE_COOLDOWN_MS) {
                 return;
             }
 
             lastStrikeAtRef.current = now;
+            lastStrikeActionRef.current = action;
 
             try {
                 const response = await axios.post('/alumno/strike', {
@@ -279,10 +299,26 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 filter: none !important;
                 pointer-events: auto !important;
             }
-            html[data-anticheat-shield="active"] .anticheat-blackout {
+            html[data-anticheat-shield="active"] .anticheat-blackout,
+            html[data-anticheat-shield="active"] main canvas {
+                display: none !important;
                 opacity: 0 !important;
                 visibility: hidden !important;
                 filter: blur(32px) !important;
+                transition: none !important;
+                animation: none !important;
+            }
+            #sapius-instant-shield {
+                display: none;
+                opacity: 0;
+                visibility: hidden;
+                transition: none !important;
+                animation: none !important;
+            }
+            html[data-anticheat-shield="active"] #sapius-instant-shield {
+                display: flex !important;
+                opacity: 1 !important;
+                visibility: visible !important;
             }
             @media print {
                 body * {
@@ -520,6 +556,7 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 e.key === 'Shift' || (e.code && e.code.startsWith('Shift')) || e.shiftKey;
 
             if (isControlPress || isAltPress || isMetaPress || isShiftPress) {
+                lastModifierDownAtRef.current = Date.now();
                 e.preventDefault();
                 e.stopPropagation();
                 activateInstantDomShield();
@@ -582,6 +619,19 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
 
             activateInstantDomShield();
             setIsWindowBlurred(true);
+
+            if (Date.now() - lastModifierDownAtRef.current < 2000) {
+                lastModifierDownAtRef.current = 0;
+                registerStrike(
+                    'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
+                    'Screen Capture',
+                );
+            }
+        };
+
+        const handleMouseLeave = () => {
+            activateInstantDomShield();
+            setIsWindowBlurred(true);
         };
 
         const handleFocus = () => {
@@ -641,6 +691,7 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('blur', handleBlur);
         window.addEventListener('focus', handleFocus);
+        document.documentElement.addEventListener('mouseleave', handleMouseLeave);
         document.addEventListener('copy', handleCopyOrCut, { capture: true });
         document.addEventListener('cut', handleCopyOrCut, { capture: true });
         document.addEventListener('paste', handlePaste, { capture: true });
@@ -651,11 +702,20 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
             if (document.hidden || !document.hasFocus()) {
                 activateInstantDomShield();
                 setIsWindowBlurred(true);
+
+                if (Date.now() - lastModifierDownAtRef.current < 2000) {
+                    lastModifierDownAtRef.current = 0;
+                    registerStrike(
+                        'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
+                        'Screen Capture',
+                    );
+                }
             }
         }, 250);
 
         return () => {
             window.clearInterval(focusWatchInterval);
+            document.documentElement.removeEventListener('mouseleave', handleMouseLeave);
             if (focusTimeoutRef.current) {
                 clearTimeout(focusTimeoutRef.current);
             }
@@ -721,6 +781,18 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
 
         return createPortal(
             <div data-anticheat-portal="true">
+                {/* Escudo instantáneo de 0ms controlado por CSS puro antes de que React re-renderice */}
+                <div
+                    id="sapius-instant-shield"
+                    className="fixed inset-0 z-[99980] flex select-none flex-col items-center justify-center bg-[#052442] px-4 text-white"
+                >
+                    <h2 className="mb-3 text-center text-2xl font-black text-white md:text-4xl">
+                        🔒 Contenido Protegido
+                    </h2>
+                    <p className="max-w-xl text-center text-sm text-white/80 md:text-base">
+                        Protección activa contra capturas y grabaciones de pantalla.
+                    </p>
+                </div>
                 {showWarning ? (
                     <div className="fixed inset-0 z-[99999] flex select-none flex-col items-center justify-center bg-[#052442]/95 px-4 text-white backdrop-blur-md">
                         <img

@@ -1196,8 +1196,6 @@ class ElectronPanelController extends Controller
             'Content-Type' => $mime,
             'Accept-Ranges' => 'bytes',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
-        ]);
-    }
             'Pragma' => 'no-cache',
             'Expires' => '0',
         ]);
