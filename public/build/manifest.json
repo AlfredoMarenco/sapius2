@@ -239,12 +239,8 @@
     "file": "assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2",
     "src": "node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.woff2"
   },
-  "node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs": {
-    "file": "assets/pdf.worker.min-Dswkl-cV.mjs",
-    "src": "node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs"
-  },
   "resources/css/app.css": {
-    "file": "assets/app-DulZQasB.css",
+    "file": "assets/app-B1Bs3OLg.css",
     "name": "app",
     "names": [
       "app.css"
@@ -253,7 +249,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-DHJX5i69.js",
+    "file": "assets/app-PfA-Nw-W.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -261,7 +257,6 @@
       "assets/app-hwy9GS06.css"
     ],
     "assets": [
-      "assets/pdf.worker.min-Dswkl-cV.mjs",
       "assets/KaTeX_AMS-Regular-BQhdFMY1.woff2",
       "assets/KaTeX_AMS-Regular-DMm9YOAa.woff",
       "assets/KaTeX_AMS-Regular-DRggAlZN.ttf",

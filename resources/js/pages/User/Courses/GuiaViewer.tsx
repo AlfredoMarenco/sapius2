@@ -8,10 +8,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { useAntiCheat } from '@/hooks/useAntiCheat';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    '../../../../../node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.min.js?v=6.3.289';
 
 interface GuiaViewerProps {
     scheduled: {
@@ -37,6 +34,7 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
     const [numPages, setNumPages] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
     const [zoom, setZoom] = useState(1.0);
+    const [reloadKey, setReloadKey] = useState(0);
 
     const pdfSource = useMemo(
         () => (guia ? { url: guia.stream_url } : null),
@@ -136,8 +134,33 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
                         </div>
 
                         <div className="flex-1 overflow-auto p-6 flex justify-center items-start">
-                            <div className="shadow-2xl bg-white">
-                                <Document file={pdfSource} options={pdfOptions} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+                            <div className="shadow-2xl bg-white min-h-[400px] min-w-[300px] flex items-center justify-center">
+                                <Document
+                                    key={reloadKey}
+                                    file={pdfSource}
+                                    options={pdfOptions}
+                                    onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                                    loading={
+                                        <div className="p-12 text-center text-neutral-600 text-sm">
+                                            Cargando guía digital...
+                                        </div>
+                                    }
+                                    error={
+                                        <div className="p-12 text-center space-y-3">
+                                            <p className="text-sm text-red-600 font-medium">
+                                                No se pudo cargar el documento PDF.
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setReloadKey((k) => k + 1)}
+                                            >
+                                                Reintentar
+                                            </Button>
+                                        </div>
+                                    }
+                                >
                                     <Page
                                         pageNumber={currentPage}
                                         scale={zoom}
