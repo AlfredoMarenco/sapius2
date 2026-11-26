@@ -11,7 +11,8 @@ class QaReportsCommand extends Command
                             {action=list : Acción a ejecutar (list|show|update)}
                             {id? : ID del reporte (ej. QA-001)}
                             {--status= : Filtro de estado en list o nuevo estado en update}
-                            {--perspective= : Filtro opcional por perspectiva (designer|student|admin|engineering)}
+                            {--perspective= : Filtro opcional por perspectiva (designer|student|admin|engineering|desktop)}
+                            {--platform= : Filtro opcional por plataforma (desktop|web)}
                             {--reply= : Respuesta de Antigravity para el revisor}';
 
     protected $description = 'Gestiona los reportes QA enviados desde el bot flotante en storage/app/qa-bot/reports.json';
@@ -47,6 +48,20 @@ class QaReportsCommand extends Command
             $reports = array_values(array_filter(
                 $reports,
                 fn (array $report): bool => ($report['perspective'] ?? null) === $perspectiveFilter
+            ));
+        }
+
+        $platformFilter = $this->option('platform');
+        if (is_string($platformFilter) && $platformFilter !== '') {
+            $reports = array_values(array_filter(
+                $reports,
+                function (array $report) use ($platformFilter): bool {
+                    $platform = strtolower((string) ($report['platform'] ?? ''));
+                    $component = (string) ($report['component'] ?? '');
+                    $viewport = (string) ($report['viewport'] ?? '');
+                    $isDesktop = $platform === 'desktop' || str_contains($component, 'Desktop') || str_contains($viewport, 'Desktop');
+                    return $platformFilter === 'desktop' ? $isDesktop : !$isDesktop;
+                }
             ));
         }
 
