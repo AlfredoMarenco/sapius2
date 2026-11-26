@@ -36,10 +36,13 @@ interface GuiaViewerProps {
 
 export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
     const { auth } = usePage<any>().props;
+    const userId = auth?.user?.id ?? '0';
+    const userName = auth?.user?.name || auth?.user?.nombre_completo || 'Alumno';
     const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+    const forensicLabel = `${userName} (${userEmail}) · ID #${userId} · PROPIEDAD DE SAPIUS · PROHIBIDA SU CAPTURA`;
     const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
         enabled: true,
-        watermarkText: userEmail,
+        watermarkText: `${userEmail} · ID #${userId}`,
     });
 
     const [numPages, setNumPages] = useState(0);
@@ -95,7 +98,16 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
     };
 
     const pdfSource = useMemo(
-        () => (guia ? { url: guia.stream_url } : null),
+        () =>
+            guia
+                ? {
+                      url: guia.stream_url,
+                      httpHeaders: {
+                          'X-Sapius-Guia-Stream': '1',
+                      },
+                      withCredentials: true,
+                  }
+                : null,
         [guia],
     );
 
@@ -143,7 +155,10 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
                     <div
                         ref={viewerRef}
                         className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-neutral-900 via-neutral-800 to-neutral-900 rounded-xl relative shadow-xl border border-neutral-700/60"
+                        onContextMenu={(e) => e.preventDefault()}
                     >
+                        <StrikeAlert />
+                        <Watermark />
                         {/* Barra superior de lectura */}
                         <div className="bg-neutral-950/90 backdrop-blur-sm border-b border-neutral-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-white shrink-0">
                             <div className="flex items-center gap-2">
@@ -270,7 +285,22 @@ export default function GuiaViewer({ scheduled, guia }: GuiaViewerProps) {
                                 <ChevronLeft className="w-6 h-6" />
                             </button>
 
-                            <div className="shadow-[0_25px_60px_-15px_rgba(0,0,0,0.75)] rounded-sm bg-white transition-all duration-300">
+                            <div
+                                className={`anticheat-blackout relative shadow-[0_25px_60px_-15px_rgba(0,0,0,0.75)] rounded-sm bg-white transition-all duration-150 [&_canvas]:pointer-events-none [&_canvas]:select-none ${
+                                    isBlurred ? 'opacity-0 invisible blur-xl' : 'opacity-100 visible'
+                                }`}
+                            >
+                                {/* Marca de agua forense permanente sobre las páginas del libro */}
+                                <div className="pointer-events-none fixed-none absolute inset-0 z-20 overflow-hidden select-none flex flex-wrap items-center justify-around opacity-[0.06]">
+                                    {Array.from({ length: 8 }).map((_, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="-rotate-30 whitespace-nowrap text-[11px] font-extrabold tracking-wider text-neutral-900 m-6"
+                                        >
+                                            {forensicLabel}
+                                        </span>
+                                    ))}
+                                </div>
                                 <Document
                                     key={reloadKey}
                                     file={pdfSource}

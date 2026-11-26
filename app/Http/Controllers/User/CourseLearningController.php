@@ -402,6 +402,13 @@ class CourseLearningController extends Controller
         $fileGuia = FileGuia::where('curso_programado_id', $curso_programado_id)->first();
 
         if ($request->boolean('stream')) {
+            if (
+                $request->header('X-Sapius-Guia-Stream') !== '1' ||
+                in_array($request->header('Sec-Fetch-Dest'), ['document', 'iframe', 'embed', 'object'], true)
+            ) {
+                return redirect()->route('alumno.curso.guia', ['curso_programado_id' => $curso_programado_id]);
+            }
+
             if (! $fileGuia || ! $fileGuia->url) {
                 abort(404, 'Guía no encontrada.');
             }
@@ -454,8 +461,10 @@ class CourseLearningController extends Controller
             return response()->file($resolved, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="guia-sapius.pdf"',
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
                 'Pragma' => 'no-cache',
+                'X-Frame-Options' => 'DENY',
+                'X-Content-Type-Options' => 'nosniff',
             ]);
         }
 

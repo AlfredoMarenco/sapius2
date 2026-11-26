@@ -274,6 +274,11 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 user-select: none !important;
                 pointer-events: none !important;
             }
+            html[data-anticheat-shield="active"] .anticheat-blackout {
+                opacity: 0 !important;
+                visibility: hidden !important;
+                filter: blur(32px) !important;
+            }
             @media print {
                 body * {
                     visibility: hidden !important;
@@ -370,15 +375,38 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 return;
             }
 
-            // 2c. DevTools con combinación (Ctrl/Cmd + Shift + I/J/C) (bloqueado siempre)
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['i', 'j', 'c'].includes(keyLower)) {
+            // 2c. DevTools con combinación (Ctrl/Cmd + Shift + I/J/C) y captura de navegador (Ctrl/Cmd + Shift + S)
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['i', 'j', 'c', 's'].includes(keyLower)) {
                 e.preventDefault();
                 e.stopPropagation();
                 activateInstantDomShield();
                 setIsModifierHeld(true);
 
                 if (!e.repeat) {
-                    registerStrike('Intento de inspeccionar elemento', 'DevTools');
+                    registerStrike(
+                        keyLower === 's'
+                            ? 'Intento de captura de pantalla del navegador (Ctrl+Shift+S)'
+                            : 'Intento de inspeccionar elemento',
+                        keyLower === 's' ? 'Browser Screenshot' : 'DevTools',
+                    );
+                }
+
+                return;
+            }
+
+            // 2c-bis. Windows Game Bar (Win+G / Win+Alt+R)
+            if (e.metaKey && (keyLower === 'g' || (e.altKey && keyLower === 'r'))) {
+                e.preventDefault();
+                e.stopPropagation();
+                activateInstantDomShield();
+                setIsModifierHeld(true);
+                clearClipboard();
+
+                if (!e.repeat) {
+                    registerStrike(
+                        'Intento de grabación/captura de pantalla (Game Bar)',
+                        'Screen Capture',
+                    );
                 }
 
                 return;
@@ -614,7 +642,15 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
         document.addEventListener('selectstart', handleSelectStart, { capture: true });
         document.addEventListener('dragstart', handleDragStart, { capture: true });
 
+        const focusWatchInterval = window.setInterval(() => {
+            if (document.hidden || !document.hasFocus()) {
+                activateInstantDomShield();
+                setIsWindowBlurred(true);
+            }
+        }, 250);
+
         return () => {
+            window.clearInterval(focusWatchInterval);
             if (focusTimeoutRef.current) {
                 clearTimeout(focusTimeoutRef.current);
             }
