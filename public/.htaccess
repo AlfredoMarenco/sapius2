@@ -24,6 +24,12 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
+# Asegurar tipo MIME correcto para módulos JavaScript (.mjs y .js)
+<IfModule mod_mime.c>
+    AddType text/javascript .mjs
+    AddType text/javascript .js
+</IfModule>
+
 # Evitar caché de metadatos del auto-updater Electron (latest.yml)
 <FilesMatch "\.(yml|yaml)$">
     <IfModule mod_headers.c>
