@@ -1,6 +1,7 @@
 import React from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
 import {
     ChevronLeft,
     CheckCircle2,
@@ -55,6 +56,13 @@ interface Props {
 }
 
 export default function Progress({ scheduled, enrollment_id, modules = [], completedLessons = [] }: Props) {
+    const { auth } = usePage<any>().props;
+    const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+        enabled: true,
+        watermarkText: userEmail,
+    });
+
     let totalLessons = 0;
     let completedCount = 0;
 
@@ -72,8 +80,13 @@ export default function Progress({ scheduled, enrollment_id, modules = [], compl
     return (
         <>
             <Head title={`Mi Progreso - ${scheduled.title}`} />
+            <StrikeAlert />
+            <Watermark />
 
-            <div className="max-w-4xl mx-auto p-6 space-y-6">
+            <div
+                className={`max-w-4xl mx-auto p-6 space-y-6 select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}
+                onContextMenu={(e) => e.preventDefault()}
+            >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link

@@ -113,7 +113,10 @@ class StrikeService
             return 34;
         }
 
-        if ($normalized === 'right click' || str_contains($normalized, 'clic derecho')) {
+        if (
+            in_array($normalized, ['right click', 'window blur', 'external tool', 'focus loss'], true)
+            || str_contains($normalized, 'clic derecho')
+        ) {
             return 20;
         }
 

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +67,13 @@ export default function Preview({
     isScheduleAvailable = true,
     exams = [],
 }: PreviewProps) {
+    const { auth } = usePage<any>().props;
+    const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+        enabled: true,
+        watermarkText: userEmail,
+    });
+
     const attemptsAllowed = Number(quiz.attempts_allowed ?? 1);
     const attemptsLeft = Math.max(0, attemptsAllowed - attemptsCount);
     const canTake = isScheduleAvailable && (hasActiveAttempt || attemptsAllowed <= 0 || attemptsLeft > 0);
@@ -80,8 +88,13 @@ export default function Preview({
     return (
         <>
             <Head title={`Examen: ${quiz.title}`} />
+            <StrikeAlert />
+            <Watermark />
 
-            <div className="py-10 px-4">
+            <div
+                className={`py-10 px-4 select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}
+                onContextMenu={(e) => e.preventDefault()}
+            >
                 <div className="max-w-4xl mx-auto">
                     <Card className="shadow-lg border-t-4 border-t-indigo-500">
                         <CardHeader>

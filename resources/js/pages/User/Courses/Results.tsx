@@ -1,6 +1,7 @@
 import React from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
 import { ChevronLeft, Download, Award, CheckCircle2, Clock, Lock, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -40,6 +41,13 @@ interface Props {
 }
 
 export default function Results({ enrollment, exams = [], pendingQuizzes = [] }: Props) {
+    const { auth } = usePage<any>().props;
+    const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+        enabled: true,
+        watermarkText: userEmail,
+    });
+
     const finishedExams = exams.filter((e) => e.finalizado === 'si');
     const passedCount = finishedExams.filter((e) => Number(e.score) >= Number(e.min_score)).length;
     const avgScore =
@@ -50,8 +58,13 @@ export default function Results({ enrollment, exams = [], pendingQuizzes = [] }:
     return (
         <>
             <Head title={`Mis Calificaciones - ${enrollment.course_title}`} />
+            <StrikeAlert />
+            <Watermark />
 
-            <div className="max-w-5xl mx-auto p-6 space-y-6">
+            <div
+                className={`max-w-5xl mx-auto p-6 space-y-6 select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}
+                onContextMenu={(e) => e.preventDefault()}
+            >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link

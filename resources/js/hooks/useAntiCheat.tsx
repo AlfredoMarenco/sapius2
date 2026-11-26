@@ -114,6 +114,7 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
     const [strikeCount, setStrikeCount] = useState<number>(safeInitialStrikes);
     const [showWarning, setShowWarning] = useState(false);
     const [warningMessage, setWarningMessage] = useState('');
+    const [unlockCountdown, setUnlockCountdown] = useState<number | null>(null);
 
     if (safeInitialStrikes !== prevAuthStrikes) {
         setPrevAuthStrikes(safeInitialStrikes);
@@ -123,6 +124,10 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
     const lastStrikeAtRef = useRef<number>(0);
     const lastStrikeActionRef = useRef<string>('');
     const lastModifierDownAtRef = useRef<number>(0);
+    const hasWindowFocusRef = useRef<boolean>(
+        typeof document !== 'undefined' ? document.hasFocus() : true,
+    );
+    const isMouseInsideRef = useRef<boolean>(true);
     const strikeCountRef = useRef<number>(safeInitialStrikes);
     const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -133,6 +138,13 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
     const activateInstantDomShield = useCallback(() => {
         if (typeof document !== 'undefined') {
             document.documentElement.setAttribute('data-anticheat-shield', 'active');
+            document.querySelectorAll('video, audio').forEach((el) => {
+                try {
+                    (el as HTMLMediaElement).pause();
+                } catch {
+                    // Ignorar errores de reproducción
+                }
+            });
             void document.documentElement.offsetHeight;
         }
     }, []);
@@ -250,6 +262,31 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
         }
     }, [isBlurred, releaseInstantDomShield]);
 
+    useEffect(() => {
+        if (unlockCountdown === null) {
+            return;
+        }
+
+        if (unlockCountdown <= 0) {
+            setShowWarning(false);
+            setIsWindowBlurred(false);
+            setIsModifierHeld(false);
+            setUnlockCountdown(null);
+            releaseInstantDomShield();
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            if (typeof document !== 'undefined' && (!document.hasFocus() || document.hidden || !isMouseInsideRef.current)) {
+                setUnlockCountdown(null);
+                return;
+            }
+            setUnlockCountdown((prev) => (prev !== null ? prev - 1 : null));
+        }, 1000);
+
+        return () => window.clearTimeout(timer);
+    }, [unlockCountdown, releaseInstantDomShield]);
+
     // Enforce desktop policy and inject permanent anti-cheat stylesheet when enabled
     useEffect(() => {
         if (typeof document === 'undefined') {
@@ -300,7 +337,8 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 pointer-events: auto !important;
             }
             html[data-anticheat-shield="active"] .anticheat-blackout,
-            html[data-anticheat-shield="active"] main canvas {
+            html[data-anticheat-shield="active"] main canvas,
+            html[data-anticheat-shield="active"] main video {
                 display: none !important;
                 opacity: 0 !important;
                 visibility: hidden !important;
@@ -617,8 +655,10 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 focusTimeoutRef.current = null;
             }
 
+            hasWindowFocusRef.current = false;
             activateInstantDomShield();
             setIsWindowBlurred(true);
+            setUnlockCountdown(null);
 
             if (Date.now() - lastModifierDownAtRef.current < 2000) {
                 lastModifierDownAtRef.current = 0;
@@ -626,23 +666,27 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                     'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
                     'Screen Capture',
                 );
+            } else {
+                registerStrike(
+                    'Apertura de herramienta externa o pérdida de foco de la ventana',
+                    'Window Blur',
+                );
             }
         };
 
         const handleMouseLeave = () => {
+            isMouseInsideRef.current = false;
             activateInstantDomShield();
             setIsWindowBlurred(true);
+            setUnlockCountdown(null);
+        };
+
+        const handleMouseEnter = () => {
+            isMouseInsideRef.current = true;
         };
 
         const handleFocus = () => {
-            if (focusTimeoutRef.current) {
-                clearTimeout(focusTimeoutRef.current);
-            }
-
-            focusTimeoutRef.current = setTimeout(() => {
-                setIsWindowBlurred(false);
-                setIsModifierHeld(false);
-            }, 600);
+            hasWindowFocusRef.current = true;
         };
 
         // 4. Prevenir copiar, cortar, pegar, seleccionar y arrastrar
@@ -692,6 +736,7 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
         window.addEventListener('blur', handleBlur);
         window.addEventListener('focus', handleFocus);
         document.documentElement.addEventListener('mouseleave', handleMouseLeave);
+        document.documentElement.addEventListener('mouseenter', handleMouseEnter);
         document.addEventListener('copy', handleCopyOrCut, { capture: true });
         document.addEventListener('cut', handleCopyOrCut, { capture: true });
         document.addEventListener('paste', handlePaste, { capture: true });
@@ -700,22 +745,35 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
 
         const focusWatchInterval = window.setInterval(() => {
             if (document.hidden || !document.hasFocus()) {
+                const wasFocused = hasWindowFocusRef.current;
+                hasWindowFocusRef.current = false;
                 activateInstantDomShield();
                 setIsWindowBlurred(true);
+                setUnlockCountdown(null);
 
-                if (Date.now() - lastModifierDownAtRef.current < 2000) {
-                    lastModifierDownAtRef.current = 0;
-                    registerStrike(
-                        'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
-                        'Screen Capture',
-                    );
+                if (wasFocused) {
+                    if (Date.now() - lastModifierDownAtRef.current < 2000) {
+                        lastModifierDownAtRef.current = 0;
+                        registerStrike(
+                            'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
+                            'Screen Capture',
+                        );
+                    } else {
+                        registerStrike(
+                            'Apertura de herramienta externa o pérdida de foco de la ventana',
+                            'Window Blur',
+                        );
+                    }
                 }
+            } else {
+                hasWindowFocusRef.current = true;
             }
         }, 250);
 
         return () => {
             window.clearInterval(focusWatchInterval);
             document.documentElement.removeEventListener('mouseleave', handleMouseLeave);
+            document.documentElement.removeEventListener('mouseenter', handleMouseEnter);
             if (focusTimeoutRef.current) {
                 clearTimeout(focusTimeoutRef.current);
             }
@@ -830,25 +888,35 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
 
                         <button
                             type="button"
-                            onClick={() => {
-                                setShowWarning(false);
-                                setIsModifierHeld(false);
-                            }}
-                            className="cursor-pointer rounded-full bg-[#e11d48] px-8 py-4 text-lg font-bold text-white shadow-lg transition-colors hover:bg-rose-700 hover:shadow-rose-900/50"
+                            disabled={unlockCountdown !== null}
+                            onClick={() => setUnlockCountdown(5)}
+                            className="cursor-pointer rounded-full bg-[#e11d48] px-8 py-4 text-lg font-bold text-white shadow-lg transition-colors hover:bg-rose-700 hover:shadow-rose-900/50 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                            Entendido, no lo volveré a hacer
+                            {unlockCountdown !== null
+                                ? `Verificando ventana segura... (${unlockCountdown}s) — Mantén el cursor dentro`
+                                : 'Entendido, reanudar lectura (5s)'}
                         </button>
                     </div>
                 ) : isWindowBlurred ? (
-                    <div className="fixed inset-0 z-[99990] flex select-none flex-col items-center justify-center bg-[#052442]/85 px-4 text-white backdrop-blur-md">
+                    <div className="fixed inset-0 z-[99990] flex select-none flex-col items-center justify-center bg-[#052442]/95 px-4 text-white backdrop-blur-md">
                         <h2 className="mb-4 text-center text-2xl font-black text-white md:text-4xl">
                             🔒 Contenido Protegido
                         </h2>
-                        <p className="max-w-2xl text-center text-base text-white/90 md:text-xl">
-                            Se detectó una ventana o herramienta externa activa. Las capturas y
-                            recortes de pantalla están bloqueados en Sapius. Haz clic dentro de esta
-                            ventana para continuar.
+                        <p className="mb-8 max-w-2xl text-center text-base text-white/90 md:text-xl">
+                            Se detectó una ventana o herramienta externa activa, o el cursor salió del
+                            área protegida. Las capturas y grabaciones de pantalla están bloqueadas en
+                            Sapius.
                         </p>
+                        <button
+                            type="button"
+                            disabled={unlockCountdown !== null}
+                            onClick={() => setUnlockCountdown(5)}
+                            className="cursor-pointer rounded-full bg-[#e11d48] px-8 py-4 text-base font-bold text-white shadow-lg transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70 md:text-lg"
+                        >
+                            {unlockCountdown !== null
+                                ? `Verificando ventana segura... (${unlockCountdown}s) — Mantén el cursor dentro`
+                                : 'Reanudar contenido (5s)'}
+                        </button>
                     </div>
                 ) : null}
             </div>,

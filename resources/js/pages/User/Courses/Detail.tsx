@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
 import {
     BookOpen,
     CheckCircle2,
@@ -81,11 +82,23 @@ export default function Detail({
     completedLessonIds = [],
     globalProgress = 0,
 }: CourseDetailProps) {
+    const { auth } = usePage<any>().props;
+    const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
+    const { isBlurred, Watermark, StrikeAlert } = useAntiCheat({
+        enabled: true,
+        watermarkText: userEmail,
+    });
+
     return (
         <>
             <Head title={scheduled.title} />
+            <StrikeAlert />
+            <Watermark />
 
-            <div className="space-y-8 p-6 max-w-6xl mx-auto">
+            <div
+                className={`space-y-8 p-6 max-w-6xl mx-auto select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}
+                onContextMenu={(e) => e.preventDefault()}
+            >
                 {/* Back button & Self-tracking links */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button asChild variant="ghost" size="sm" className="-ml-3 text-neutral-600 dark:text-neutral-400">
