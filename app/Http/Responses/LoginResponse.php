@@ -13,7 +13,7 @@ class LoginResponse implements LoginResponseContract
     {
         $user = $request->user();
 
-        if ($user) {
+        if ($user && config('elearning.enforce_single_session', true)) {
             $currentSessionId = $request->hasSession() ? $request->session()->getId() : Session::getId();
             $previousSession = $user->session_id ?? null;
 

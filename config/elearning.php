@@ -5,4 +5,6 @@ return [
     'captcha_secret_key' => env('CAPTCHA_SECRET_KEY'),
     'support_whatsapp' => env('SUPPORT_WHATSAPP', '529992988744'),
     'unlock_whatsapp' => env('UNLOCK_WHATSAPP', '529993648594'),
+    'qa_bot_enabled' => (bool) env('QA_BOT_ENABLED', true),
+    'enforce_single_session' => (bool) env('ENFORCE_SINGLE_SESSION', true),
 ];

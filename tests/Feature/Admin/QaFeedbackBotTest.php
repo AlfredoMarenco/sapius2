@@ -362,3 +362,18 @@ test('qa reports support perspective selection and filtering', function () {
     expect($outputStudent)->toContain('Fricción en visualizador de PDFs');
     expect($outputStudent)->not->toContain('Ajuste de tipografía e iconos');
 });
+
+test('qa bot is completely disabled and endpoints return 404 when qa_bot_enabled is false', function () {
+    config(['elearning.qa_bot_enabled' => false]);
+
+    $admin = $this->assignLegacyRole(User::factory()->create(), 'admin');
+
+    $response = $this->actingAs($admin)->get(route('appearance.edit'));
+    $response->assertOk();
+    $response->assertCookieMissing(QaFeedbackBotController::PASS_COOKIE_NAME);
+    $response->assertDontSee('window.__SAPIUS_QA_ADMIN__ = true', false);
+    $response->assertDontSee('/js/qa-bot.js', false);
+
+    $this->actingAs($admin)->getJson('/admin/qa-bot/reports')->assertNotFound();
+    $this->actingAs($admin)->postJson('/admin/qa-bot/reports', ['message' => 'Test'])->assertNotFound();
+});

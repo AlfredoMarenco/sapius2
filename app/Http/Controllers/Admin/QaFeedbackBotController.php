@@ -23,6 +23,11 @@ class QaFeedbackBotController extends Controller
 
     public const PASS_COOKIE_NAME = 'qa_admin_active';
 
+    public static function isEnabled(): bool
+    {
+        return (bool) config('elearning.qa_bot_enabled', true);
+    }
+
     public static function createReviewerPassToken(User $admin): string
     {
         $payload = [
@@ -91,6 +96,10 @@ class QaFeedbackBotController extends Controller
      */
     public static function resolveReviewerFromRequest(Request $request): ?array
     {
+        if (! self::isEnabled()) {
+            return null;
+        }
+
         $user = null;
         try {
             $user = $request->user();
@@ -610,6 +619,10 @@ class QaFeedbackBotController extends Controller
 
     public function revokePass(Request $request): JsonResponse
     {
+        if (! self::isEnabled()) {
+            abort(404);
+        }
+
         Cookie::queue(Cookie::forget(self::PASS_COOKIE_NAME));
 
         return response()->json(['revoked' => true]);
@@ -624,6 +637,10 @@ class QaFeedbackBotController extends Controller
      */
     private function authorizeReviewer(Request $request): array
     {
+        if (! self::isEnabled()) {
+            abort(404);
+        }
+
         $context = self::resolveReviewerFromRequest($request);
         if ($context !== null) {
             return $context;

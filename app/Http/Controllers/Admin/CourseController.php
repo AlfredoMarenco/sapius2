@@ -84,7 +84,7 @@ class CourseController extends Controller
         $course->activo = 'si';
 
         if ($request->hasFile('image')) {
-            $course->image = $this->optimizeAndStoreImage($request->file('image'), 'courses');
+            $course->image = $this->storeCourseImageForBothSystems($request->file('image'));
         }
 
         $course->save();
@@ -152,7 +152,7 @@ class CourseController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            $course->image = $this->optimizeAndStoreImage($request->file('image'), 'courses');
+            $course->image = $this->storeCourseImageForBothSystems($request->file('image'));
         }
 
         $course->save();
@@ -343,6 +343,24 @@ class CourseController extends Controller
         });
 
         return redirect()->route('admin.cursos.index')->with('success', 'Los contenidos seleccionados fueron copiados con éxito');
+    }
+
+    private function storeCourseImageForBothSystems(\Illuminate\Http\UploadedFile $file): string
+    {
+        $path = $this->optimizeAndStoreImage($file, 'courses');
+        $filename = basename($path);
+        $sourcePath = Storage::disk('public')->path($path);
+        $legacyDir = storage_path('app/images/cursos');
+
+        if (! is_dir($legacyDir)) {
+            @mkdir($legacyDir, 0775, true);
+        }
+
+        if (is_file($sourcePath)) {
+            @copy($sourcePath, $legacyDir.DIRECTORY_SEPARATOR.$filename);
+        }
+
+        return $filename;
     }
 
     private function copyQuizzes($origLessonId, $newLessonId, $newCourseId)

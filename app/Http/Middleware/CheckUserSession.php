@@ -31,6 +31,7 @@ class CheckUserSession
 
             if (
                 ! app()->runningUnitTests()
+                && config('elearning.enforce_single_session', true)
                 && $request->hasSession()
                 && ! empty($user->session_id)
                 && $user->session_id !== $request->session()->getId()

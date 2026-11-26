@@ -100,14 +100,16 @@ class HandleInertiaRequests extends Middleware
 
         $qaContext = null;
 
-        if ($user && ($sharedUser['role'] ?? null) === 'admin') {
-            $passToken = QaFeedbackBotController::createReviewerPassToken($user);
-            Cookie::queue(QaFeedbackBotController::PASS_COOKIE_NAME, $passToken, 60 * 24 * 7);
-            $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
-        } else {
-            $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
-            if ($qaContext === null && $request->hasCookie(QaFeedbackBotController::PASS_COOKIE_NAME)) {
-                Cookie::queue(Cookie::forget(QaFeedbackBotController::PASS_COOKIE_NAME));
+        if (QaFeedbackBotController::isEnabled()) {
+            if ($user && ($sharedUser['role'] ?? null) === 'admin') {
+                $passToken = QaFeedbackBotController::createReviewerPassToken($user);
+                Cookie::queue(QaFeedbackBotController::PASS_COOKIE_NAME, $passToken, 60 * 24 * 7);
+                $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
+            } else {
+                $qaContext = QaFeedbackBotController::resolveReviewerFromRequest($request);
+                if ($qaContext === null && $request->hasCookie(QaFeedbackBotController::PASS_COOKIE_NAME)) {
+                    Cookie::queue(Cookie::forget(QaFeedbackBotController::PASS_COOKIE_NAME));
+                }
             }
         }
 
