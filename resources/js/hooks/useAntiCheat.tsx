@@ -683,11 +683,6 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                     'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
                     'Screen Capture',
                 );
-            } else {
-                registerStrike(
-                    'Apertura de herramienta externa o pérdida de foco de la ventana',
-                    'Window Blur',
-                );
             }
         };
 
@@ -768,19 +763,12 @@ export function useAntiCheat(options: AntiCheatOptions = {}) {
                 setIsWindowBlurred(true);
                 setUnlockCountdown(null);
 
-                if (wasFocused) {
-                    if (Date.now() - lastModifierDownAtRef.current < 2000) {
-                        lastModifierDownAtRef.current = 0;
-                        registerStrike(
-                            'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
-                            'Screen Capture',
-                        );
-                    } else {
-                        registerStrike(
-                            'Apertura de herramienta externa o pérdida de foco de la ventana',
-                            'Window Blur',
-                        );
-                    }
+                if (wasFocused && Date.now() - lastModifierDownAtRef.current < 2000) {
+                    lastModifierDownAtRef.current = 0;
+                    registerStrike(
+                        'Intento de captura o grabación de pantalla (Ctrl/Win+Shift+S)',
+                        'Screen Capture',
+                    );
                 }
             } else {
                 hasWindowFocusRef.current = true;
