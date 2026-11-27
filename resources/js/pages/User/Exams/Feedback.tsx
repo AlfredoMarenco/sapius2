@@ -270,7 +270,52 @@ export default function Feedback({
 
                     {/* Revisión Detallada con hover-to-reveal por tarjeta */}
                     {feedback && feedback.length > 0 && (() => {
-                        const indexedFeedback = feedback.map((item, idx) => ({ item, originalIndex: idx }));
+                        const slugCounts: Record<string, number> = {};
+                        const slugSubIndex: Record<string, number> = {};
+                        let currentGroupNum = 0;
+                        let lastSlug = '';
+
+                        const indexedFeedback = feedback.map((item, idx) => {
+                            const questionId =
+                                item.correct_answer?.question_id ||
+                                item.correct_answer?.pregunta_id ||
+                                item.user_answer?.name;
+                            const question =
+                                questions.find((q) => Number(q.id) === Number(questionId)) ||
+                                item.correct_answer?.question;
+                            const slug = String(question?.slug || '').trim();
+                            if (slug !== '') {
+                                slugCounts[slug] = (slugCounts[slug] || 0) + 1;
+                            }
+                            return { item, originalIndex: idx, question, slug };
+                        }).map((entry) => {
+                            const { slug } = entry;
+                            const isGrouped = slug !== '' && (slugCounts[slug] || 0) > 1;
+                            if (isGrouped) {
+                                if (slug !== lastSlug) {
+                                    currentGroupNum += 1;
+                                    lastSlug = slug;
+                                }
+                                slugSubIndex[slug] = (slugSubIndex[slug] || 0) + 1;
+                                return {
+                                    ...entry,
+                                    isGrouped: true,
+                                    groupCount: slugCounts[slug],
+                                    subIndex: slugSubIndex[slug],
+                                    displayNumber: `${currentGroupNum}.${slugSubIndex[slug]}`,
+                                };
+                            }
+                            currentGroupNum += 1;
+                            lastSlug = '';
+                            return {
+                                ...entry,
+                                isGrouped: false,
+                                groupCount: 1,
+                                subIndex: 1,
+                                displayNumber: `${currentGroupNum}`,
+                            };
+                        });
+
                         const errorItems = indexedFeedback.filter(({ item }) => item.status !== 'correct');
                         const displayedItems = filterMode === 'errors' ? errorItems : indexedFeedback;
 
@@ -312,16 +357,8 @@ export default function Feedback({
                                     <div className="text-center py-8 text-emerald-700 font-semibold">
                                         ¡Excelente! No tienes errores ni preguntas sin responder en este examen.
                                     </div>
-                                ) : displayedItems.map(({ item, originalIndex }) => {
+                                ) : displayedItems.map(({ item, originalIndex, question, isGrouped, groupCount, subIndex, displayNumber }) => {
                                     const index = originalIndex;
-                                    const questionId =
-                                        item.correct_answer?.question_id ||
-                                        item.correct_answer?.pregunta_id ||
-                                        item.user_answer?.name;
-                                    const question =
-                                        questions.find((q) => Number(q.id) === Number(questionId)) ||
-                                        item.correct_answer?.question;
-
                                     if (!question) return null;
 
                                     const userAnswerObj = question.answers?.find(
@@ -363,9 +400,16 @@ export default function Feedback({
                                             }
                                         >
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-white font-bold text-xs text-gray-700 border shadow-2xs">
-                                                    Reactivo #{index + 1}
-                                                </span>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-white font-bold text-xs text-gray-700 border shadow-2xs">
+                                                        Reactivo #{displayNumber}
+                                                    </span>
+                                                    {isGrouped && (
+                                                        <Badge variant="outline" className="text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                            Reactivo Agrupado (Parte {subIndex} de {groupCount})
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <span
                                                     className={`inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-white/80 px-2.5 py-0.5 rounded-full border transition-opacity ${
                                                         isRevealed ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'

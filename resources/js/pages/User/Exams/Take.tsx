@@ -71,20 +71,32 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
 
     // Agrupar preguntas consecutivas que compartan slug no vacío (casos clínicos seriados)
     const questionGroups = useMemo(() => {
-        const groups: { slug: string; questions: { question: any; globalIndex: number }[] }[] = [];
+        const groups: {
+            slug: string;
+            groupNumber: number;
+            questions: { question: any; globalIndex: number; displayNumber: string }[];
+        }[] = [];
 
         questions.forEach((q, idx) => {
             const slug = String(q.slug || '').trim();
             const lastGroup = groups[groups.length - 1];
 
             if (slug !== '' && lastGroup && lastGroup.slug === slug) {
-                lastGroup.questions.push({ question: q, globalIndex: idx });
+                lastGroup.questions.push({ question: q, globalIndex: idx, displayNumber: '' });
             } else {
                 groups.push({
                     slug: slug !== '' ? slug : `__single_${q.id}`,
-                    questions: [{ question: q, globalIndex: idx }],
+                    groupNumber: groups.length + 1,
+                    questions: [{ question: q, globalIndex: idx, displayNumber: '' }],
                 });
             }
+        });
+
+        groups.forEach((grp) => {
+            const isMulti = grp.questions.length > 1;
+            grp.questions.forEach((item, subIdx) => {
+                item.displayNumber = isMulti ? `${grp.groupNumber}.${subIdx + 1}` : `${grp.groupNumber}`;
+            });
         });
 
         return groups;
@@ -252,7 +264,7 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                 className={`py-6 bg-slate-50 min-h-screen select-none ${isBlurred ? 'blur-xl pointer-events-none' : ''}`}
                 onContextMenu={(e) => e.preventDefault()}
             >
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header Bar */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm mb-6 sticky top-4 z-20 border border-slate-200">
                         <div>
@@ -295,27 +307,58 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* Question / Clinical Case Group Area */}
-                        <div className="lg:col-span-3 space-y-5">
+                        <div className="lg:col-span-8 space-y-5">
                             {isSerialGroup && (
-                                <div className="bg-indigo-950 text-white px-5 py-3 rounded-xl flex items-center justify-between shadow-sm">
-                                    <div className="flex items-center gap-2 text-sm font-bold">
-                                        <Layers className="w-4 h-4 text-indigo-300" />
-                                        Caso Clínico / Serie de Reactivos ({firstGlobal} - {lastGlobal} de {questions.length})
+                                <div className="bg-[#002146] text-white p-4 rounded-2xl shadow-sm space-y-3 border border-indigo-900">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 text-sm font-bold">
+                                            <Layers className="w-4 h-4 text-amber-300 shrink-0" />
+                                            <span>
+                                                Reactivo Agrupado #{currentGroup.groupNumber} — Esta pantalla contiene {currentGroup.questions.length} preguntas ({currentGroup.questions[0].displayNumber} a {currentGroup.questions[currentGroup.questions.length - 1].displayNumber})
+                                            </span>
+                                        </div>
+                                        <span className="text-xs text-indigo-200">
+                                            Reactivos {firstGlobal}–{lastGlobal} de {questions.length}
+                                        </span>
                                     </div>
-                                    <span className="text-xs text-indigo-200">
-                                        {currentGroup.questions.length} reactivos vinculados
-                                    </span>
+                                    <div className="flex flex-wrap gap-2">
+                                        {currentGroup.questions.map(({ question, displayNumber }) => {
+                                            const isSubAnswered = Boolean(answers[question.id]);
+                                            return (
+                                                <button
+                                                    key={question.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        document.getElementById(`question-card-${question.id}`)?.scrollIntoView({
+                                                            behavior: 'smooth',
+                                                            block: 'center',
+                                                        });
+                                                    }}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                                                        isSubAnswered
+                                                            ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 hover:bg-emerald-500/30'
+                                                            : 'bg-amber-500/20 text-amber-200 border border-amber-400/40 hover:bg-amber-500/30'
+                                                    }`}
+                                                >
+                                                    <span>{displayNumber}</span>
+                                                    <span>{isSubAnswered ? '✓ Respondida' : '• Pendiente'}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
 
-                            {currentGroup.questions.map(({ question, globalIndex }) => {
+                            {currentGroup.questions.map(({ question, globalIndex, displayNumber }, subIdx) => {
                                 const qImageUrl = resolveQuestionImageUrl(question.image);
                                 const isExplicitRevealed = Boolean(revealedQuestionIds[question.id]);
+                                const isSubAnswered = Boolean(answers[question.id]);
 
                                 return (
                                     <Card
+                                        id={`question-card-${question.id}`}
                                         key={question.id}
                                         className="shadow-md border-slate-200/80 group relative overflow-hidden"
                                         onClick={() =>
@@ -327,9 +370,31 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                                     >
                                         <CardContent className="p-6 sm:p-8">
                                             <div className="mb-5 flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3">
-                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                    Pregunta {globalIndex + 1} de {questions.length}
-                                                </span>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                                        Reactivo {displayNumber}
+                                                    </span>
+                                                    {isSerialGroup && (
+                                                        <Badge variant="outline" className="text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                            Sub-pregunta {subIdx + 1} de {currentGroup.questions.length}
+                                                        </Badge>
+                                                    )}
+                                                    <span className="text-xs text-slate-400">
+                                                        ({globalIndex + 1} de {questions.length})
+                                                    </span>
+                                                    {isSerialGroup && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                isSubAnswered
+                                                                    ? 'text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : 'text-[11px] bg-amber-50 text-amber-700 border-amber-200'
+                                                            }
+                                                        >
+                                                            {isSubAnswered ? 'Respondida' : 'Sin responder'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <span
                                                     className={`inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full transition-opacity ${
                                                         isExplicitRevealed ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
@@ -445,24 +510,24 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                         </div>
 
                         {/* Navigation Sidebar */}
-                        <div className="lg:col-span-1">
+                        <div className="lg:col-span-4">
                             <Card className="shadow-md sticky top-24 border-slate-200/80">
-                                <CardContent className="p-4">
+                                <CardContent className="p-5">
                                     <div className="flex items-center justify-between gap-2 mb-3">
-                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                                             Navegación de Reactivos
                                         </h3>
-                                        <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                        <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full">
                                             {answeredCount}/{questions.length}
                                         </span>
                                     </div>
 
                                     {questions.length > 15 && (
-                                        <div className="grid grid-cols-3 gap-1 mb-3 p-1 bg-slate-100 rounded-lg text-[11px] font-semibold">
+                                        <div className="grid grid-cols-3 gap-1 mb-4 p-1 bg-slate-100 rounded-lg text-[11px] font-semibold">
                                             <button
                                                 type="button"
                                                 onClick={() => setNavFilter('all')}
-                                                className={`py-1 rounded-md transition-colors cursor-pointer ${
+                                                className={`py-1.5 rounded-md transition-colors cursor-pointer ${
                                                     navFilter === 'all'
                                                         ? 'bg-white text-slate-900 shadow-xs'
                                                         : 'text-slate-500 hover:text-slate-700'
@@ -473,7 +538,7 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                                             <button
                                                 type="button"
                                                 onClick={() => setNavFilter('unanswered')}
-                                                className={`py-1 rounded-md transition-colors cursor-pointer ${
+                                                className={`py-1.5 rounded-md transition-colors cursor-pointer ${
                                                     navFilter === 'unanswered'
                                                         ? 'bg-white text-amber-700 shadow-xs'
                                                         : 'text-slate-500 hover:text-slate-700'
@@ -484,7 +549,7 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                                             <button
                                                 type="button"
                                                 onClick={() => setNavFilter('answered')}
-                                                className={`py-1 rounded-md transition-colors cursor-pointer ${
+                                                className={`py-1.5 rounded-md transition-colors cursor-pointer ${
                                                     navFilter === 'answered'
                                                         ? 'bg-white text-indigo-700 shadow-xs'
                                                         : 'text-slate-500 hover:text-slate-700'
@@ -495,46 +560,98 @@ export default function Take({ quiz, exam, questions = [], savedAnswers = [], ti
                                         </div>
                                     )}
 
-                                    <div className="max-h-[42vh] overflow-y-auto pr-1">
-                                        <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-5 gap-1.5">
-                                            {questions.map((q, idx) => {
-                                                const isAnswered = Boolean(answers[q.id]);
-                                                if (navFilter === 'unanswered' && isAnswered) return null;
-                                                if (navFilter === 'answered' && !isAnswered) return null;
+                                    <div className="max-h-[54vh] overflow-y-auto pr-1.5 py-1">
+                                        <div className="flex flex-wrap gap-2 items-center">
+                                            {questionGroups.map((grp, gIdx) => {
+                                                const isGrouped = grp.questions.length > 1;
+                                                const isCurrent = gIdx === currentGroupIndex;
+                                                const answeredInGroup = grp.questions.filter((item) => Boolean(answers[item.question.id])).length;
+                                                const allAnswered = answeredInGroup === grp.questions.length;
+                                                const someAnswered = answeredInGroup > 0 && !allAnswered;
 
-                                                const targetGroupIdx = questionToGroupMap[q.id] ?? 0;
-                                                const isCurrent = targetGroupIdx === currentGroupIndex;
+                                                if (navFilter === 'unanswered' && allAnswered) return null;
+                                                if (navFilter === 'answered' && answeredInGroup === 0) return null;
+
+                                                if (!isGrouped) {
+                                                    const item = grp.questions[0];
+                                                    const isAnswered = Boolean(answers[item.question.id]);
+
+                                                    return (
+                                                        <button
+                                                            key={grp.slug}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setCurrentGroupIndex(gIdx);
+                                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                            }}
+                                                            className={`min-w-[40px] h-10 px-2.5 rounded-lg flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
+                                                                isCurrent ? 'ring-2 ring-[#ed6a5a] ring-offset-1' : ''
+                                                            } ${
+                                                                isAnswered
+                                                                    ? 'bg-[#002146] text-white hover:bg-[#002146]/90'
+                                                                    : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                                                            }`}
+                                                        >
+                                                            {item.displayNumber}
+                                                        </button>
+                                                    );
+                                                }
 
                                                 return (
-                                                    <button
-                                                        key={q.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setCurrentGroupIndex(targetGroupIdx);
-                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                        }}
-                                                        className={`h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-all cursor-pointer ${
-                                                            isCurrent ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                                                    <div
+                                                        key={grp.slug}
+                                                        title={`Reactivo agrupado #${grp.groupNumber} (${grp.questions.length} sub-preguntas)`}
+                                                        className={`inline-flex items-center gap-1.5 p-1.5 rounded-xl border-2 transition-all ${
+                                                            isCurrent ? 'ring-2 ring-[#ed6a5a] ring-offset-1' : ''
                                                         } ${
-                                                            isAnswered
-                                                                ? 'bg-indigo-600 text-white'
-                                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                            allAnswered
+                                                                ? 'bg-[#002146]/15 border-[#002146]'
+                                                                : someAnswered
+                                                                  ? 'bg-amber-50 border-amber-400'
+                                                                  : 'bg-slate-200/70 border-slate-300'
                                                         }`}
                                                     >
-                                                        {idx + 1}
-                                                    </button>
+                                                        {grp.questions.map((item) => {
+                                                            const isSubAnswered = Boolean(answers[item.question.id]);
+                                                            return (
+                                                                <button
+                                                                    key={item.question.id}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setCurrentGroupIndex(gIdx);
+                                                                        setTimeout(() => {
+                                                                            document
+                                                                                .getElementById(`question-card-${item.question.id}`)
+                                                                                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                                        }, 60);
+                                                                    }}
+                                                                    className={`min-w-[42px] h-8 px-2 rounded-md flex items-center justify-center text-xs font-bold transition-colors cursor-pointer ${
+                                                                        isSubAnswered
+                                                                            ? 'bg-[#002146] text-white hover:bg-[#002146]/90'
+                                                                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
+                                                                    }`}
+                                                                >
+                                                                    {item.displayNumber}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 );
                                             })}
                                         </div>
                                     </div>
-                                    <div className="mt-6 border-t border-slate-100 pt-4 space-y-2">
+                                    <div className="mt-5 border-t border-slate-100 pt-4 space-y-2">
                                         <div className="flex items-center text-xs font-medium text-slate-600">
-                                            <div className="w-3 h-3 rounded-full bg-indigo-600 mr-2" />
+                                            <div className="w-3.5 h-3.5 rounded bg-[#002146] mr-2 shrink-0" />
                                             Respondidas ({answeredCount})
                                         </div>
                                         <div className="flex items-center text-xs font-medium text-slate-600">
-                                            <div className="w-3 h-3 rounded-full bg-slate-200 mr-2 border border-slate-300" />
+                                            <div className="w-3.5 h-3.5 rounded bg-slate-100 mr-2 border border-slate-300 shrink-0" />
                                             Sin responder ({unansweredCount})
+                                        </div>
+                                        <div className="flex items-center text-xs font-medium text-slate-600">
+                                            <div className="w-5 h-3.5 rounded bg-slate-200/80 border-2 border-slate-400 mr-2 shrink-0" />
+                                            Reactivos agrupados (ej. 25.1, 25.2)
                                         </div>
                                     </div>
                                 </CardContent>
