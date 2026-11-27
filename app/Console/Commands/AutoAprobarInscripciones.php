@@ -32,17 +32,17 @@ class AutoAprobarInscripciones extends Command
         $this->info('Iniciando proceso de auto-aprobación de inscripciones...');
 
         $dosHorasAtras = now()->subHours(2);
-        $inicioDeAnio = now()->startOfYear();
+        $ventanaBusqueda = now()->startOfYear()->subDays(7);
 
         $inscripciones = Inscripcion::where('aceptado', 'no')
-            ->where('created_at', '>=', $inicioDeAnio)
+            ->where('created_at', '>=', $ventanaBusqueda)
             ->where('created_at', '<=', $dosHorasAtras)
             ->whereColumn('created_at', 'updated_at') // Solo inscripciones no modificadas por un admin
             ->whereHas('User', function ($query) {
                 $query->where('activo', 'si');
             })
             ->whereHas('CursoProgramado', function ($query) {
-                $query->where('fecha_fin', '>=', now());
+                $query->where('fecha_fin', '>=', now()->startOfDay());
             })
             ->with(['User', 'CursoProgramado.category', 'CursoProgramado.Curso'])
             ->get();

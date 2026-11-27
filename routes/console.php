@@ -22,17 +22,14 @@ Artisan::command('inspire', function () {
 
 Schedule::command('inscripciones:auto-aprobar')
     ->everyFifteenMinutes()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 Schedule::command('reminders:overdue-lessons')
     ->dailyAt('08:00')
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 Schedule::command('usuarios:verificar')
     ->mondays()
     ->at('08:00')
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 

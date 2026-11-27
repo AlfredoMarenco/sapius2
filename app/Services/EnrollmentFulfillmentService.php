@@ -98,6 +98,10 @@ class EnrollmentFulfillmentService
                 $enrollment->clave = $normalizedCoupon;
             }
 
+            $now = now();
+            $enrollment->created_at = $now;
+            $enrollment->updated_at = $now;
+
             $enrollment->save();
 
             if ($discount && (int) $discount->limite > 0) {
