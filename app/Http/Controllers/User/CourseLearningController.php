@@ -285,7 +285,48 @@ class CourseLearningController extends Controller
 
         $isCompleted = in_array($leccion->id, $completedLessonIds);
 
-        $safeQuizzes = $leccion->quizzes->map(function (Quiz $quiz) {
+        $quizIds = $leccion->quizzes->pluck('id')->all();
+        $studentExamsByQuiz = ! empty($quizIds)
+            ? Exam::where('inscripcion_id', $inscripcion->id)
+                ->whereIn('prueba_id', $quizIds)
+                ->orderByDesc('id')
+                ->get()
+                ->groupBy('prueba_id')
+            : collect();
+
+        $safeQuizzes = $leccion->quizzes->map(function (Quiz $quiz) use ($studentExamsByQuiz) {
+            $quizExams = $studentExamsByQuiz->get($quiz->id, collect());
+            $finishedExams = $quizExams->where('finalizado', 'si')->values();
+            $activeExam = $quizExams->firstWhere('finalizado', 'no');
+            $latestFinished = $finishedExams->first();
+
+            $feedbackAvailable = $latestFinished !== null && $latestFinished->retro_visualizado !== 'si';
+            if ($feedbackAvailable && $quiz->tiempo_caducidad !== null && trim((string) $quiz->tiempo_caducidad) !== '') {
+                $caducidadStr = trim((string) $quiz->tiempo_caducidad);
+                $finishedAt = Carbon::parse($latestFinished->updated_at ?? $latestFinished->created_at ?? now());
+                if (preg_match('/^\d{4}-\d{2}-\d{2}/', $caducidadStr)) {
+                    try {
+                        if (now()->gt(Carbon::parse($caducidadStr))) {
+                            $feedbackAvailable = false;
+                        }
+                    } catch (\Throwable $e) {
+                        //
+                    }
+                } elseif (is_numeric($caducidadStr) && (int) $caducidadStr > 0) {
+                    if ($finishedAt->copy()->addDays((int) $caducidadStr)->lt(now())) {
+                        $feedbackAvailable = false;
+                    }
+                } elseif (str_contains($caducidadStr, ':')) {
+                    $parts = explode(':', $caducidadStr);
+                    $secs = count($parts) === 3
+                        ? (((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2])
+                        : (((int) $parts[0] * 3600) + ((int) $parts[1] * 60));
+                    if ($secs > 0 && $finishedAt->copy()->addSeconds($secs)->lt(now())) {
+                        $feedbackAvailable = false;
+                    }
+                }
+            }
+
             return [
                 'id' => $quiz->id,
                 'title' => $quiz->titulo ?? $quiz->title,
@@ -294,6 +335,12 @@ class CourseLearningController extends Controller
                 'time_limit' => $quiz->tiempo ?? $quiz->time_limit,
                 'attempts_allowed' => (int) ($quiz->oportunidades ?? $quiz->attempts_allowed ?? 1),
                 'questions_count' => (int) ($quiz->questions_count ?? 0),
+                'attempts_count' => $finishedExams->count(),
+                'has_active_attempt' => $activeExam !== null,
+                'latest_score' => $latestFinished ? (float) ($latestFinished->score_total ?? 0) : null,
+                'latest_finished_exam_id' => $latestFinished?->id,
+                'feedback_available' => $feedbackAvailable,
+                'feedback_consumed' => $latestFinished ? ($latestFinished->retro_visualizado === 'si') : false,
             ];
         })->values();
 
@@ -745,8 +792,8 @@ class CourseLearningController extends Controller
 
             $feedbackAvailable = $ex->finalizado === 'si' && $ex->retro_visualizado !== 'si';
             if ($feedbackAvailable && $ex->quiz) {
-                $caducidadRaw = $ex->quiz->tiempo_caducidad ?? $ex->quiz->tiempo_vigencia;
-                if ($caducidadRaw) {
+                $caducidadRaw = $ex->quiz->tiempo_caducidad;
+                if ($caducidadRaw !== null && trim((string) $caducidadRaw) !== '') {
                     $caducidadStr = trim((string) $caducidadRaw);
                     if (preg_match('/^\d{4}-\d{2}-\d{2}/', $caducidadStr)) {
                         try {
@@ -756,17 +803,16 @@ class CourseLearningController extends Controller
                         } catch (\Throwable $e) {
                             //
                         }
+                    } elseif (is_numeric($caducidadStr) && (int) $caducidadStr > 0) {
+                        if (Carbon::parse($ex->updated_at ?? $ex->created_at)->addDays((int) $caducidadStr)->lt(now())) {
+                            $feedbackAvailable = false;
+                        }
                     } elseif (str_contains($caducidadStr, ':')) {
                         $parts = explode(':', $caducidadStr);
                         $secs = count($parts) === 3
                             ? (((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2])
                             : (((int) $parts[0] * 3600) + ((int) $parts[1] * 60));
                         if ($secs > 0 && Carbon::parse($ex->updated_at ?? $ex->created_at)->addSeconds($secs)->lt(now())) {
-                            $feedbackAvailable = false;
-                        }
-                    } elseif (is_numeric($caducidadStr) && (int) $caducidadStr > 0) {
-                        $secs = (int) $caducidadStr * 60;
-                        if (Carbon::parse($ex->updated_at ?? $ex->created_at)->addSeconds($secs)->lt(now())) {
                             $feedbackAvailable = false;
                         }
                     }

@@ -435,32 +435,78 @@ export default function Lesson({
                                             <CardDescription>Demuestra lo que has aprendido</CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
-                                            {lesson.quizzes.map((quiz) => (
-                                                <div
-                                                    key={quiz.id}
-                                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-gradient-to-r from-purple-50/50 to-white dark:from-purple-950/20 dark:to-neutral-900"
-                                                >
-                                                    <div>
-                                                        <h4 className="font-bold text-neutral-900 dark:text-neutral-100">
-                                                            {quiz.title}
-                                                        </h4>
-                                                        <p className="text-xs text-neutral-500 mt-1">
-                                                            {quiz.questions_count ?? quiz.questions?.length ?? 0} preguntas preparadas
-                                                        </p>
-                                                    </div>
-                                                    <Button asChild className="bg-purple-600 hover:bg-purple-700 text-white shrink-0">
-                                                        <Link
-                                                            href={
-                                                                enrollment_id
-                                                                    ? `/alumno/exams/${quiz.id}/preview?enrollment_id=${enrollment_id}`
-                                                                    : `/alumno/exams/${quiz.id}/preview`
+                                            {lesson.quizzes.map((quiz) => {
+                                                const attemptsCount = Number(quiz.attempts_count ?? 0);
+                                                const attemptsAllowed = Number(quiz.attempts_allowed ?? 1) || 1;
+                                                const hasActiveAttempt = Boolean(quiz.has_active_attempt);
+                                                const feedbackAvailable = Boolean(quiz.feedback_available);
+                                                const attemptsExhausted = attemptsCount >= attemptsAllowed;
+
+                                                let buttonLabel = 'Comenzar Examen';
+                                                if (hasActiveAttempt) {
+                                                    buttonLabel = 'Continuar Examen';
+                                                } else if (attemptsExhausted) {
+                                                    buttonLabel = feedbackAvailable
+                                                        ? 'Ver Resultados y Retroalimentación'
+                                                        : 'Ver Resultados';
+                                                } else if (attemptsCount > 0) {
+                                                    buttonLabel = 'Ver Resultados / Nuevo Intento';
+                                                }
+
+                                                return (
+                                                    <div
+                                                        key={quiz.id}
+                                                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-gradient-to-r from-purple-50/50 to-white dark:from-purple-950/20 dark:to-neutral-900"
+                                                    >
+                                                        <div>
+                                                            <h4 className="font-bold text-neutral-900 dark:text-neutral-100">
+                                                                {quiz.title}
+                                                            </h4>
+                                                            <p className="text-xs text-neutral-500 mt-1">
+                                                                {quiz.questions_count ?? quiz.questions?.length ?? 0} preguntas preparadas
+                                                                {attemptsCount > 0 && ` · ${attemptsCount}/${attemptsAllowed} intentos`}
+                                                            </p>
+                                                            {(hasActiveAttempt || attemptsCount > 0 || feedbackAvailable) && (
+                                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                                    {hasActiveAttempt && (
+                                                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                                                                            Intento en curso
+                                                                        </Badge>
+                                                                    )}
+                                                                    {attemptsCount > 0 && (
+                                                                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                                                                            Finalizado · {Number(quiz.latest_score ?? 0).toFixed(1)} pts
+                                                                        </Badge>
+                                                                    )}
+                                                                    {feedbackAvailable && (
+                                                                        <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+                                                                            Retroalimentación disponible
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            asChild
+                                                            className={
+                                                                attemptsExhausted && !hasActiveAttempt
+                                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shrink-0'
+                                                                    : 'bg-purple-600 hover:bg-purple-700 text-white shrink-0'
                                                             }
                                                         >
-                                                            Comenzar Examen
-                                                        </Link>
-                                                    </Button>
-                                                </div>
-                                            ))}
+                                                            <Link
+                                                                href={
+                                                                    enrollment_id
+                                                                        ? `/alumno/exams/${quiz.id}/preview?enrollment_id=${enrollment_id}`
+                                                                        : `/alumno/exams/${quiz.id}/preview`
+                                                                }
+                                                            >
+                                                                {buttonLabel}
+                                                            </Link>
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            })}
                                         </CardContent>
                                     </Card>
                                 </TabsContent>

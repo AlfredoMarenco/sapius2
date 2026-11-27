@@ -695,40 +695,52 @@ class ExamController extends Controller
         }
 
         $exam->loadMissing('quiz');
-        $caducidadRaw = $exam->quiz?->tiempo_caducidad ?? $exam->quiz?->tiempo_vigencia;
+        $caducidadRaw = $exam->quiz?->tiempo_caducidad;
+        $vigenciaRaw = $exam->quiz?->tiempo_vigencia;
+
+        $timerSeconds = null;
+        if ($vigenciaRaw !== null && trim((string) $vigenciaRaw) !== '') {
+            $parsedVigencia = $this->parseDurationSeconds((string) $vigenciaRaw);
+            if ($parsedVigencia > 0) {
+                $timerSeconds = $parsedVigencia;
+            }
+        }
 
         if ($caducidadRaw !== null && trim((string) $caducidadRaw) !== '') {
             $caducidadStr = trim((string) $caducidadRaw);
+            $finishedAt = Carbon::parse($exam->updated_at ?? $exam->created_at ?? now());
 
             if (preg_match('/^\d{4}-\d{2}-\d{2}/', $caducidadStr)) {
                 try {
                     $expiresAt = Carbon::parse($caducidadStr);
-                    $timeLeft = max(0, (int) now()->diffInSeconds($expiresAt, false));
-
-                    if ($timeLeft <= 0) {
+                    if (now()->gt($expiresAt)) {
                         return ['available' => false, 'status' => 'expired', 'time_left' => 0];
                     }
-
-                    return ['available' => true, 'status' => 'available', 'time_left' => $timeLeft];
                 } catch (\Throwable $e) {
-                    // Fallback to duration parsing below
+                    // Fallback below
                 }
-            }
-
-            $vigenciaSeconds = $this->parseDurationSeconds($caducidadStr);
-            if ($vigenciaSeconds > 0) {
-                $finishedAt = $exam->updated_at ?? $exam->created_at ?? now();
-                $elapsedSeconds = max(0, (int) Carbon::parse($finishedAt)->diffInSeconds(now(), false));
-                $timeLeft = max(0, $vigenciaSeconds - $elapsedSeconds);
-
-                if ($timeLeft <= 0) {
-                    return ['available' => false, 'status' => 'expired', 'time_left' => 0];
+            } elseif (is_numeric($caducidadStr)) {
+                $days = (int) $caducidadStr;
+                if ($days > 0) {
+                    $expiresAt = $finishedAt->copy()->addDays($days);
+                    if (now()->gt($expiresAt)) {
+                        return ['available' => false, 'status' => 'expired', 'time_left' => 0];
+                    }
                 }
-
-                return ['available' => true, 'status' => 'available', 'time_left' => $timeLeft];
+            } elseif (str_contains($caducidadStr, ':')) {
+                $caducidadSeconds = $this->parseDurationSeconds($caducidadStr);
+                if ($caducidadSeconds > 0) {
+                    $expiresAt = $finishedAt->copy()->addSeconds($caducidadSeconds);
+                    if (now()->gt($expiresAt)) {
+                        return ['available' => false, 'status' => 'expired', 'time_left' => 0];
+                    }
+                    if ($timerSeconds === null) {
+                        $timerSeconds = max(0, (int) now()->diffInSeconds($expiresAt, false));
+                    }
+                }
             }
         }
 
-        return ['available' => true, 'status' => 'available', 'time_left' => null];
+        return ['available' => true, 'status' => 'available', 'time_left' => $timerSeconds];
     }
 }

@@ -970,7 +970,10 @@ class ElectronPanelController extends Controller
         }
 
         $caducidadRaw = $examen->tiempo_caducidad ?? ($examen->Prueba?->tiempo_caducidad ?? null);
-        $caducidadSeconds = ! empty($caducidadRaw) ? $this->parseDurationToSeconds($caducidadRaw) : 0;
+        $caducidadStr = trim((string) ($caducidadRaw ?? ''));
+        $caducidadSeconds = $caducidadStr !== ''
+            ? (is_numeric($caducidadStr) ? ((int) $caducidadStr * 86400) : $this->parseDurationToSeconds($caducidadStr))
+            : 0;
         $vigenciaSeconds = $this->parseDurationToSeconds($examen->Prueba?->tiempo_vigencia ?? null);
 
         if ($examen->retro_visualizado === 'si' && $vigenciaSeconds <= 0) {
