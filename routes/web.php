@@ -125,6 +125,10 @@ Route::get('/sso/v2-login', function (\Illuminate\Http\Request $request) {
 
     \Illuminate\Support\Facades\Auth::login($user);
     $request->session()->regenerate();
+    if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_id')) {
+        $user->session_id = $request->session()->getId();
+        $user->save();
+    }
 
     return redirect($data['target'] ?: '/alumno');
 })->name('sso.v2-login');

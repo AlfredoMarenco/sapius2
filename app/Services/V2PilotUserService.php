@@ -87,7 +87,14 @@ class V2PilotUserService
         }
 
         $expectedSig = hash_hmac('sha256', $payloadB64, $appKey);
-        if (! hash_equals($expectedSig, $sig)) {
+        $valid = hash_equals($expectedSig, $sig);
+        if (! $valid && str_starts_with($appKey, 'base64:')) {
+            $decodedKey = base64_decode(substr($appKey, 7), true);
+            if (is_string($decodedKey) && $decodedKey !== '') {
+                $valid = hash_equals(hash_hmac('sha256', $payloadB64, $decodedKey), $sig);
+            }
+        }
+        if (! $valid) {
             return null;
         }
 
