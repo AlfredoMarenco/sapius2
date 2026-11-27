@@ -300,29 +300,51 @@ class CourseLearningController extends Controller
             $activeExam = $quizExams->firstWhere('finalizado', 'no');
             $latestFinished = $finishedExams->first();
 
-            $feedbackAvailable = $latestFinished !== null && $latestFinished->retro_visualizado !== 'si';
-            if ($feedbackAvailable && $quiz->tiempo_caducidad !== null && trim((string) $quiz->tiempo_caducidad) !== '') {
-                $caducidadStr = trim((string) $quiz->tiempo_caducidad);
-                $finishedAt = Carbon::parse($latestFinished->updated_at ?? $latestFinished->created_at ?? now());
-                if (preg_match('/^\d{4}-\d{2}-\d{2}/', $caducidadStr)) {
-                    try {
-                        if (now()->gt(Carbon::parse($caducidadStr))) {
-                            $feedbackAvailable = false;
+            $feedbackInProgress = false;
+            $feedbackAvailable = false;
+
+            if ($latestFinished !== null) {
+                if ($latestFinished->retro_visualizado === 'si') {
+                    $vigenciaRaw = $quiz->tiempo_vigencia;
+                    if ($vigenciaRaw !== null && trim((string) $vigenciaRaw) !== '' && $latestFinished->updated_at) {
+                        $vParts = explode(':', trim((string) $vigenciaRaw));
+                        $vSecs = count($vParts) === 3
+                            ? (((int) $vParts[0] * 3600) + ((int) $vParts[1] * 60) + (int) $vParts[2])
+                            : (count($vParts) === 2 ? (((int) $vParts[0] * 3600) + ((int) $vParts[1] * 60)) : ((int) $vParts[0] * 60));
+                        if ($vSecs > 0) {
+                            $elapsed = max(0, (int) Carbon::parse($latestFinished->updated_at)->diffInSeconds(now(), false));
+                            if (($vSecs - $elapsed) > 0) {
+                                $feedbackInProgress = true;
+                                $feedbackAvailable = true;
+                            }
                         }
-                    } catch (\Throwable $e) {
-                        //
                     }
-                } elseif (is_numeric($caducidadStr) && (int) $caducidadStr > 0) {
-                    if ($finishedAt->copy()->addDays((int) $caducidadStr)->lt(now())) {
-                        $feedbackAvailable = false;
-                    }
-                } elseif (str_contains($caducidadStr, ':')) {
-                    $parts = explode(':', $caducidadStr);
-                    $secs = count($parts) === 3
-                        ? (((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2])
-                        : (((int) $parts[0] * 3600) + ((int) $parts[1] * 60));
-                    if ($secs > 0 && $finishedAt->copy()->addSeconds($secs)->lt(now())) {
-                        $feedbackAvailable = false;
+                } else {
+                    $feedbackAvailable = true;
+                    if ($quiz->tiempo_caducidad !== null && trim((string) $quiz->tiempo_caducidad) !== '') {
+                        $caducidadStr = trim((string) $quiz->tiempo_caducidad);
+                        $finishedAt = Carbon::parse($latestFinished->updated_at ?? $latestFinished->created_at ?? now());
+                        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $caducidadStr)) {
+                            try {
+                                if (now()->gt(Carbon::parse($caducidadStr))) {
+                                    $feedbackAvailable = false;
+                                }
+                            } catch (\Throwable $e) {
+                                //
+                            }
+                        } elseif (is_numeric($caducidadStr) && (int) $caducidadStr > 0) {
+                            if ($finishedAt->copy()->addDays((int) $caducidadStr)->lt(now())) {
+                                $feedbackAvailable = false;
+                            }
+                        } elseif (str_contains($caducidadStr, ':')) {
+                            $parts = explode(':', $caducidadStr);
+                            $secs = count($parts) === 3
+                                ? (((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2])
+                                : (((int) $parts[0] * 3600) + ((int) $parts[1] * 60));
+                            if ($secs > 0 && $finishedAt->copy()->addSeconds($secs)->lt(now())) {
+                                $feedbackAvailable = false;
+                            }
+                        }
                     }
                 }
             }
@@ -340,6 +362,7 @@ class CourseLearningController extends Controller
                 'latest_score' => $latestFinished ? (float) ($latestFinished->score_total ?? 0) : null,
                 'latest_finished_exam_id' => $latestFinished?->id,
                 'feedback_available' => $feedbackAvailable,
+                'feedback_in_progress' => $feedbackInProgress,
                 'feedback_consumed' => $latestFinished ? ($latestFinished->retro_visualizado === 'si') : false,
             ];
         })->values();

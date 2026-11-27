@@ -65,6 +65,7 @@ export default function Feedback({
 
     const [timeLeft, setTimeLeft] = useState<number>(initialTimeLeft ? Math.max(0, Math.floor(initialTimeLeft)) : 0);
     const [revealedCards, setRevealedCards] = useState<Record<number, boolean>>({});
+    const [filterMode, setFilterMode] = useState<'all' | 'errors'>('all');
 
     const courseIdForReturn =
         scheduled_course_id ||
@@ -268,19 +269,51 @@ export default function Feedback({
                     </div>
 
                     {/* Revisión Detallada con hover-to-reveal por tarjeta */}
-                    {feedback && feedback.length > 0 && (
+                    {feedback && feedback.length > 0 && (() => {
+                        const indexedFeedback = feedback.map((item, idx) => ({ item, originalIndex: idx }));
+                        const errorItems = indexedFeedback.filter(({ item }) => item.status !== 'correct');
+                        const displayedItems = filterMode === 'errors' ? errorItems : indexedFeedback;
+
+                        return (
                         <Card className="shadow-md border-neutral-200/80">
-                            <CardHeader className="border-b border-neutral-100 flex flex-row items-center justify-between">
-                                <CardTitle className="text-xl font-bold flex items-center">
-                                    <AlertCircle className="w-5 h-5 mr-2 text-indigo-600" />
-                                    Revisión del Examen y Retroalimentación
-                                </CardTitle>
-                                <span className="text-xs text-slate-500 hidden sm:inline">
-                                    Pasa el cursor sobre cada tarjeta para visualizar el detalle
-                                </span>
+                            <CardHeader className="border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <CardTitle className="text-xl font-bold flex items-center">
+                                        <AlertCircle className="w-5 h-5 mr-2 text-indigo-600" />
+                                        Revisión del Examen y Retroalimentación
+                                    </CardTitle>
+                                    <span className="text-xs text-slate-500 hidden sm:inline">
+                                        Pasa el cursor sobre cada tarjeta para visualizar el detalle
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={filterMode === 'all' ? 'default' : 'outline'}
+                                        onClick={() => setFilterMode('all')}
+                                        className={filterMode === 'all' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}
+                                    >
+                                        Todos ({indexedFeedback.length})
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={filterMode === 'errors' ? 'default' : 'outline'}
+                                        onClick={() => setFilterMode('errors')}
+                                        className={filterMode === 'errors' ? 'bg-rose-600 hover:bg-rose-700 text-white' : ''}
+                                    >
+                                        Solo errores ({errorItems.length})
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-5 pt-6">
-                                {feedback.map((item, index) => {
+                                {displayedItems.length === 0 ? (
+                                    <div className="text-center py-8 text-emerald-700 font-semibold">
+                                        ¡Excelente! No tienes errores ni preguntas sin responder en este examen.
+                                    </div>
+                                ) : displayedItems.map(({ item, originalIndex }) => {
+                                    const index = originalIndex;
                                     const questionId =
                                         item.correct_answer?.question_id ||
                                         item.correct_answer?.pregunta_id ||
@@ -430,7 +463,8 @@ export default function Feedback({
                                 })}
                             </CardContent>
                         </Card>
-                    )}
+                        );
+                    })()}
                 </div>
             </div>
         </>

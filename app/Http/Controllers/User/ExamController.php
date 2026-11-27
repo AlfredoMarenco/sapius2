@@ -112,6 +112,8 @@ class ExamController extends Controller
             'hasActiveAttempt' => $hasActiveAttempt,
             'isScheduleAvailable' => $isScheduleAvailable,
             'exams' => $mappedExams,
+            'examCriteria' => ExamCriteriaService::getAll(),
+            'vigencia_formatted' => $quiz->tiempo_vigencia,
         ]);
     }
 
@@ -330,7 +332,10 @@ class ExamController extends Controller
         }
 
         return redirect()
-            ->route('alumno.exam.feedback', ['exam_id' => $exam->id])
+            ->route('alumno.exam.preview', [
+                'quiz_id' => $exam->prueba_id,
+                'enrollment_id' => $exam->inscripcion_id,
+            ])
             ->with('success', 'Examen enviado exitosamente.');
     }
 
@@ -369,11 +374,12 @@ class ExamController extends Controller
                 ->with('error', $message);
         }
 
-        // Consumir bloqueo de retroalimentación preservando updated_at original del cierre del examen
-        $exam->timestamps = false;
-        $exam->retro_visualizado = 'si';
-        $exam->save();
-        $exam->timestamps = true;
+        // Consumir bloqueo de retroalimentación la primera vez, actualizando updated_at al inicio de la revisión
+        if ($exam->retro_visualizado !== 'si') {
+            $exam->retro_visualizado = 'si';
+            $exam->updated_at = now();
+            $exam->save();
+        }
 
         $answers = collect($this->decodeAnswersSnapshot($exam));
 
@@ -690,21 +696,26 @@ class ExamController extends Controller
             return ['available' => false, 'status' => 'unfinished', 'time_left' => null];
         }
 
+        $exam->loadMissing('quiz');
+        $vigenciaRaw = $exam->quiz?->tiempo_vigencia;
+        $vigenciaSeconds = ($vigenciaRaw !== null && trim((string) $vigenciaRaw) !== '')
+            ? $this->parseDurationSeconds((string) $vigenciaRaw)
+            : 0;
+
         if ($exam->retro_visualizado === 'si') {
+            if ($vigenciaSeconds > 0 && $exam->updated_at) {
+                $elapsed = max(0, (int) Carbon::parse($exam->updated_at)->diffInSeconds(now(), false));
+                $remaining = $vigenciaSeconds - $elapsed;
+                if ($remaining > 0) {
+                    return ['available' => true, 'status' => 'in_progress', 'time_left' => $remaining];
+                }
+            }
+
             return ['available' => false, 'status' => 'consumed', 'time_left' => 0];
         }
 
-        $exam->loadMissing('quiz');
+        $timerSeconds = $vigenciaSeconds > 0 ? $vigenciaSeconds : null;
         $caducidadRaw = $exam->quiz?->tiempo_caducidad;
-        $vigenciaRaw = $exam->quiz?->tiempo_vigencia;
-
-        $timerSeconds = null;
-        if ($vigenciaRaw !== null && trim((string) $vigenciaRaw) !== '') {
-            $parsedVigencia = $this->parseDurationSeconds((string) $vigenciaRaw);
-            if ($parsedVigencia > 0) {
-                $timerSeconds = $parsedVigencia;
-            }
-        }
 
         if ($caducidadRaw !== null && trim((string) $caducidadRaw) !== '') {
             $caducidadStr = trim((string) $caducidadRaw);

@@ -440,15 +440,21 @@ export default function Lesson({
                                                 const attemptsAllowed = Number(quiz.attempts_allowed ?? 1) || 1;
                                                 const hasActiveAttempt = Boolean(quiz.has_active_attempt);
                                                 const feedbackAvailable = Boolean(quiz.feedback_available);
+                                                const feedbackInProgress = Boolean(quiz.feedback_in_progress);
+                                                const feedbackConsumed = Boolean(quiz.feedback_consumed);
                                                 const attemptsExhausted = attemptsCount >= attemptsAllowed;
 
                                                 let buttonLabel = 'Comenzar Examen';
                                                 if (hasActiveAttempt) {
                                                     buttonLabel = 'Continuar Examen';
                                                 } else if (attemptsExhausted) {
-                                                    buttonLabel = feedbackAvailable
-                                                        ? 'Ver Resultados y Retroalimentación'
-                                                        : 'Ver Resultados';
+                                                    if (feedbackInProgress) {
+                                                        buttonLabel = 'Continuar Retroalimentación';
+                                                    } else if (feedbackAvailable) {
+                                                        buttonLabel = 'Ver Resultados y Retroalimentación';
+                                                    } else {
+                                                        buttonLabel = 'Ver Resultados';
+                                                    }
                                                 } else if (attemptsCount > 0) {
                                                     buttonLabel = 'Ver Resultados / Nuevo Intento';
                                                 }
@@ -466,7 +472,7 @@ export default function Lesson({
                                                                 {quiz.questions_count ?? quiz.questions?.length ?? 0} preguntas preparadas
                                                                 {attemptsCount > 0 && ` · ${attemptsCount}/${attemptsAllowed} intentos`}
                                                             </p>
-                                                            {(hasActiveAttempt || attemptsCount > 0 || feedbackAvailable) && (
+                                                            {(hasActiveAttempt || attemptsCount > 0 || feedbackAvailable || feedbackConsumed) && (
                                                                 <div className="flex flex-wrap gap-2 mt-2">
                                                                     {hasActiveAttempt && (
                                                                         <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
@@ -478,11 +484,19 @@ export default function Lesson({
                                                                             Finalizado · {Number(quiz.latest_score ?? 0).toFixed(1)} pts
                                                                         </Badge>
                                                                     )}
-                                                                    {feedbackAvailable && (
+                                                                    {feedbackInProgress ? (
+                                                                        <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800">
+                                                                            Retroalimentación en curso
+                                                                        </Badge>
+                                                                    ) : feedbackAvailable ? (
                                                                         <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
                                                                             Retroalimentación disponible
                                                                         </Badge>
-                                                                    )}
+                                                                    ) : feedbackConsumed ? (
+                                                                        <Badge variant="outline" className="text-neutral-600 border-neutral-300 dark:text-neutral-400 dark:border-neutral-700">
+                                                                            Retroalimentación vista
+                                                                        </Badge>
+                                                                    ) : null}
                                                                 </div>
                                                             )}
                                                         </div>
