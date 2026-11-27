@@ -279,8 +279,28 @@ class LandingController extends Controller
         });
     }
 
-    public function index(): Response
+    protected function redirectIfPublicDisabled(): ?RedirectResponse
     {
+        if (! config('elearning.redirect_public_landings', false)) {
+            return null;
+        }
+
+        $path = '/'.ltrim(request()->path(), '/');
+        if ($path === '/' && auth()->check()) {
+            return redirect('/dashboard');
+        }
+
+        $baseUrl = rtrim((string) config('elearning.production_site_url', 'https://sapius.com.mx'), '/');
+
+        return redirect()->away($baseUrl.($path === '/' ? '' : $path));
+    }
+
+    public function index(): Response|RedirectResponse
+    {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Welcome', [
             'slides' => $this->formatPublicSlides(),
             'prides' => $this->formatPublicPrides(),
@@ -290,8 +310,12 @@ class LandingController extends Controller
         ]);
     }
 
-    public function coursesHub(): Response
+    public function coursesHub(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/CoursesHub', [
             'scheduledCourses' => $this->activeScheduledCourses(),
             'guiasMedicine' => $this->formatManageableCards(ManageableGuiaMedicine::class),
@@ -301,29 +325,45 @@ class LandingController extends Controller
         ]);
     }
 
-    public function productsHub(): Response
+    public function productsHub(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/ProductsHub', [
             'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
         ]);
     }
 
-    public function faq(): Response
+    public function faq(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/Faq', [
             'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
         ]);
     }
 
-    public function groupsPackages(): Response
+    public function groupsPackages(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/GroupsPackages', [
             'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
         ]);
     }
 
-    public function coursePage($slug): Response
+    public function coursePage($slug): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/CourseLanding', [
             'slug' => $slug,
             'reviews' => $this->formatPublicReviews(6),
@@ -331,8 +371,12 @@ class LandingController extends Controller
         ]);
     }
 
-    public function guias($area = 'medicina'): Response
+    public function guias($area = 'medicina'): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         $normalizedArea = strtolower(trim((string) $area)) === 'nutricion' ? 'nutricion' : 'medicina';
         $guias = $this->activeScheduledCourses($normalizedArea, 'guias');
         $scheduledCourses = $this->activeScheduledCourses(lightweight: true);
@@ -348,8 +392,12 @@ class LandingController extends Controller
         ]);
     }
 
-    public function simuladores($area = 'medicina'): Response
+    public function simuladores($area = 'medicina'): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         $normalizedArea = strtolower(trim((string) $area)) === 'nutricion' ? 'nutricion' : 'medicina';
         $simuladores = $this->activeScheduledCourses($normalizedArea, 'simuladores');
         $scheduledCourses = $this->activeScheduledCourses(lightweight: true);
@@ -365,16 +413,24 @@ class LandingController extends Controller
         ]);
     }
 
-    public function about(): Response
+    public function about(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/About', [
             'teachers' => $this->formatPublicTeachers(),
             'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
         ]);
     }
 
-    public function pride(): Response
+    public function pride(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/Pride', [
             'prides' => $this->formatPublicPrides(),
             'reviews' => $this->formatPublicReviews(12),
@@ -382,8 +438,12 @@ class LandingController extends Controller
         ]);
     }
 
-    public function contact(): Response
+    public function contact(): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/Contact', [
             'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),
         ]);
@@ -440,8 +500,12 @@ class LandingController extends Controller
         }
     }
 
-    public function legal($type): Response
+    public function legal($type): Response|RedirectResponse
     {
+        if ($redirect = $this->redirectIfPublicDisabled()) {
+            return $redirect;
+        }
+
         return Inertia::render('Public/Legal', [
             'type' => $type,
             'scheduledCourses' => $this->activeScheduledCourses(lightweight: true),

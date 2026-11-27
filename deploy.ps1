@@ -76,8 +76,8 @@ Write-Host "[3/3] Verificando salud de los servidores..." -ForegroundColor Yello
 foreach ($url in @("https://test.sapius.com.mx", "https://v2.sapius.com.mx")) {
     $response = curl.exe -sI $url | Select-String "HTTP/"
     Write-Host "$url -> $response" -ForegroundColor Green
-    if (-not ($response -match "\b200\b")) {
-        Write-Error "La comprobación de salud HTTP falló en $url. Se esperaba HTTP 200 y se recibió: $response"
+    if (-not ($response -match "\b(200|302)\b")) {
+        Write-Error "La comprobación de salud HTTP falló en $url. Se esperaba HTTP 200 o 302 y se recibió: $response"
     }
 }
 
