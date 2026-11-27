@@ -240,7 +240,7 @@
     "src": "node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CGdkcxnp.css",
+    "file": "assets/app-Da1zQaxD.css",
     "name": "app",
     "names": [
       "app.css"
@@ -249,7 +249,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-w_Oqu5I2.js",
+    "file": "assets/app-DCbbDDJC.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,

@@ -333,6 +333,27 @@ export const DEFAULT_MINI_TEST_CONFIG: MiniTestConfig = {
                 },
             ],
         },
+        {
+            id: 'group_interest',
+            title: '¿Tienes compañeros de generación que también presentarán el EGEL Plus y estarían interesados en formar un grupo para obtener un precio preferencial?',
+            active: true,
+            options: [
+                {
+                    id: 'si',
+                    label: 'Sí, nos interesa formar un grupo',
+                    helper: 'Habla directo por WhatsApp con un asesor para conocer el descuento según cuántas personas son.',
+                    areaFilter: null,
+                    weights: {},
+                },
+                {
+                    id: 'no',
+                    label: 'No, es solo para mí',
+                    helper: 'Ver la recomendación individual según mis respuestas anteriores.',
+                    areaFilter: null,
+                    weights: {},
+                },
+            ],
+        },
     ],
     recommendations: [
         {
@@ -681,7 +702,35 @@ export function computeDynamicRecommendation(
         return (a.priority ?? 999) - (b.priority ?? 999);
     });
 
-    return sorted[0] ?? DEFAULT_MINI_TEST_CONFIG.recommendations[0];
+    const baseRecommendation = sorted[0] ?? DEFAULT_MINI_TEST_CONFIG.recommendations[0];
+
+    if (answers.group_interest === 'si') {
+        return {
+            id: 'grupo_preferencial_whatsapp',
+            area: baseRecommendation.area,
+            priority: 0,
+            active: true,
+            badge: 'Precio Preferencial para Grupos',
+            title: 'Descuento Grupal EGEL Plus — Atención Personalizada',
+            price: 'Precio preferencial',
+            paymentNote: 'Según el número de integrantes',
+            summary:
+                '¡Excelente! Al formar un grupo con tus compañeros de generación pueden obtener un precio preferencial. Escríbenos por WhatsApp para decirnos cuántas personas son y qué descuento les corresponde.',
+            includes: [
+                'Descuento especial según el número de compañeros en el grupo',
+                'Atención directa y personalizada con un asesor de Sapius',
+                `Opción individual de referencia: ${baseRecommendation.title}`,
+            ],
+            coursePageHref: baseRecommendation.coursePageHref,
+            keywords: [],
+            purchaseMode: 'whatsapp',
+            scheduledCourseId: null,
+            whatsappMessage:
+                'Hola Sapius, hice el test de opción ideal y tengo compañeros de generación interesados en formar un grupo para el EGEL Plus. ¿Me pueden decir qué descuento corresponde según cuántas personas seamos?',
+        };
+    }
+
+    return baseRecommendation;
 }
 
 export function MiniTestModal({
