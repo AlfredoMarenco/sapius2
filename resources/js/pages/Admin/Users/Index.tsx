@@ -10,6 +10,7 @@ import {
     AlertTriangle,
     Edit3,
     UserPlus,
+    Rocket,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -53,6 +54,7 @@ interface UserRecord {
     is_active: boolean;
     is_validated: boolean;
     is_blocked: boolean;
+    is_v2_pilot?: boolean;
     strikes: number;
     mac_address: string | null;
     pending_mac_address: string | null;
@@ -80,6 +82,7 @@ interface UsersProps {
     activeFilter: string;
     searchTerm: string;
     roles?: RoleOption[];
+    v2PilotCount?: number;
 }
 
 export default function UsersIndex({
@@ -87,6 +90,7 @@ export default function UsersIndex({
     activeFilter = 'enable',
     searchTerm = '',
     roles = [],
+    v2PilotCount = 0,
 }: UsersProps) {
     const [search, setSearch] = useState(searchTerm);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -133,6 +137,10 @@ export default function UsersIndex({
         if (confirm('¿Desvincular la dirección MAC registrada para este alumno?')) {
             router.post(`/admin/users/${id}/clear-mac`);
         }
+    };
+
+    const handleToggleV2Pilot = (id: number) => {
+        router.post(`/admin/users/${id}/toggle-v2-pilot`, {}, { preserveScroll: true });
     };
 
     const handleCreateUserSubmit = (e: React.FormEvent) => {
@@ -204,6 +212,21 @@ export default function UsersIndex({
                                 }`}
                             >
                                 <Link href="/admin/users/blocked">Bloqueados</Link>
+                            </Button>
+                            <Button
+                                asChild
+                                variant={activeFilter === 'v2_pilot' ? 'default' : 'ghost'}
+                                size="sm"
+                                className={`h-8 rounded-md text-xs gap-1 ${
+                                    activeFilter === 'v2_pilot'
+                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                        : 'text-indigo-600 hover:text-indigo-700'
+                                }`}
+                            >
+                                <Link href="/admin/users/v2_pilot">
+                                    <Rocket className="h-3.5 w-3.5" />
+                                    Piloto V2 ({v2PilotCount})
+                                </Link>
                             </Button>
                         </div>
 
@@ -365,6 +388,21 @@ export default function UsersIndex({
                                         {user.is_active ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
                                         {user.is_active ? 'Desactivar' : 'Activar'}
                                     </Button>
+                                    {user.role === 'alumno' && (
+                                        <Button
+                                            size="sm"
+                                            variant={user.is_v2_pilot ? 'default' : 'outline'}
+                                            className={`h-8 gap-1 rounded-lg px-2.5 text-xs ${
+                                                user.is_v2_pilot
+                                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                    : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                                            }`}
+                                            onClick={() => handleToggleV2Pilot(user.id)}
+                                        >
+                                            <Rocket className="h-3.5 w-3.5" />
+                                            {user.is_v2_pilot ? 'Piloto V2' : 'Clásico v1'}
+                                        </Button>
+                                    )}
                                     <Button asChild size="sm" variant="outline" className="h-8 gap-1 rounded-lg px-2.5 text-xs">
                                         <Link href={`/admin/users/${user.id}/view`}>
                                             <Eye className="h-3.5 w-3.5" /> Detalles
@@ -569,6 +607,26 @@ export default function UsersIndex({
                                                         <CheckCircle className="h-3.5 w-3.5" />
                                                     )}
                                                 </Button>
+
+                                                {user.role === 'alumno' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant={user.is_v2_pilot ? 'default' : 'outline'}
+                                                        className={`h-8 w-8 p-0 rounded-lg ${
+                                                            user.is_v2_pilot
+                                                                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                                : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                                                        }`}
+                                                        onClick={() => handleToggleV2Pilot(user.id)}
+                                                        title={
+                                                            user.is_v2_pilot
+                                                                ? 'Piloto V2 activo (clic para regresar a v1)'
+                                                                : 'Asignar a Piloto V2 (v2.sapius.com.mx)'
+                                                        }
+                                                    >
+                                                        <Rocket className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
 
                                                 <Button
                                                     asChild

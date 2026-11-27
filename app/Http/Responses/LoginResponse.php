@@ -47,6 +47,21 @@ class LoginResponse implements LoginResponseContract
         }
 
         if ($user && $user->hasRole('alumno')) {
+            if (
+                config('elearning.v2_pilot_restriction_enabled', false)
+                && ! $user->hasRole('admin')
+                && ! $user->hasRole('instructor')
+                && ! \App\Services\V2PilotUserService::isPilotUser((int) $user->id)
+            ) {
+                \Illuminate\Support\Facades\Auth::logout();
+                if ($request->hasSession()) {
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+                }
+
+                return redirect()->away(rtrim((string) config('elearning.production_site_url', 'https://sapius.com.mx'), '/').'/login');
+            }
+
             $intended = (string) session('url.intended', '');
             if ($intended !== '' && str_contains($intended, 'checkout')) {
                 return redirect()->intended(route('alumno.home'));

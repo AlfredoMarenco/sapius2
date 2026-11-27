@@ -199,6 +199,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/users/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::post('/users/unapprove', [UserController::class, 'unapprove'])->name('users.unapprove');
     Route::post('/users/{id}/unlock', [UserController::class, 'unlock'])->name('users.unlock');
+    Route::post('/users/{id}/toggle-v2-pilot', [UserController::class, 'toggleV2Pilot'])->name('users.toggleV2Pilot');
     Route::post('/users/{id}/clear-mac', [UserController::class, 'clearMac'])->name('users.clearMac');
     Route::post('/users/{id}/approve-mac', [UserController::class, 'approveMac'])->name('users.approveMac');
     Route::post('/users/{id}/reject-mac', [UserController::class, 'rejectMac'])->name('users.rejectMac');

@@ -41,6 +41,7 @@ deploy_app() {
         ln -sfn /home/wwsapi/SapiusProduction/storage/app/documentos "$APP_DIR/storage/app/documentos"
         ln -sfn /home/wwsapi/SapiusProduction/storage/app/uploads "$APP_DIR/storage/app/uploads"
         ln -sfn /home/wwsapi/SapiusProduction/storage/app/tareas "$APP_DIR/storage/app/tareas"
+        ln -sfn /home/wwsapi/SapiusProduction/storage/app/config "$APP_DIR/storage/app/config"
         ln -sfn /home/wwsapi/SapiusProduction/storage/app/public "$APP_DIR/public/storage"
         mkdir -p "$APP_DIR/public/updates"
         ln -sfn /home/wwsapi/public_html/updates/detector "$APP_DIR/public/updates/detector"

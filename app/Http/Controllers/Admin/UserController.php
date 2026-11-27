@@ -29,6 +29,9 @@ class UserController extends Controller
             $query->where('activo', 'no');
         } elseif ($activo == 'blocked') {
             $query->where('is_blocked', 1);
+        } elseif ($activo == 'v2_pilot') {
+            $pilotIds = \App\Services\V2PilotUserService::getPilotUserIds();
+            $query->whereIn('id', $pilotIds !== [] ? $pilotIds : [0]);
         }
 
         if ($request->filled('search')) {
@@ -42,7 +45,9 @@ class UserController extends Controller
             });
         }
 
-        $users = $query->orderBy('id', 'desc')->paginate(20)->withQueryString()->through(function ($u) {
+        $pilotLookup = array_flip(\App\Services\V2PilotUserService::getPilotUserIds());
+
+        $users = $query->orderBy('id', 'desc')->paginate(20)->withQueryString()->through(function ($u) use ($pilotLookup) {
             $role = $u->roles->first();
 
             return [
@@ -54,6 +59,7 @@ class UserController extends Controller
                 'is_active' => $u->activo === 'si',
                 'is_validated' => $u->validado === 'si',
                 'is_blocked' => (bool) $u->is_blocked,
+                'is_v2_pilot' => isset($pilotLookup[$u->id]),
                 'strikes' => $u->strikes ?? 0,
                 'mac_address' => $u->mac_address,
                 'pending_mac_address' => $u->pending_mac_address,
@@ -65,6 +71,7 @@ class UserController extends Controller
             'users' => $users,
             'activeFilter' => $activo,
             'searchTerm' => $request->input('search', ''),
+            'v2PilotCount' => count($pilotLookup),
         ]);
     }
 
@@ -100,6 +107,7 @@ class UserController extends Controller
                 'is_active' => $user->activo === 'si',
                 'is_validated' => $user->validado === 'si',
                 'is_blocked' => (bool) $user->is_blocked,
+                'is_v2_pilot' => \App\Services\V2PilotUserService::isPilotUser((int) $user->id),
                 'strikes' => $user->strikes ?? 0,
                 'mac_address' => $user->mac_address,
                 'pending_mac_address' => $user->pending_mac_address,
@@ -202,6 +210,17 @@ class UserController extends Controller
             ],
             'roles' => $roles,
         ]);
+    }
+
+    public function toggleV2Pilot($id)
+    {
+        $user = User::findOrFail($id);
+        $enabled = \App\Services\V2PilotUserService::togglePilotUser((int) $user->id);
+        $msg = $enabled
+            ? "Alumno {$user->name} asignado a la Nueva Versión (v2.sapius.com.mx)."
+            : "Alumno {$user->name} regresado a la versión clásica (sapius.com.mx).";
+
+        return redirect()->back()->with('success', $msg);
     }
 
     public function approve(Request $request)

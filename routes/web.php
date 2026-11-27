@@ -110,4 +110,23 @@ Route::middleware(['auth', 'verified'])
         })->name('dashboard');
     });
 
+Route::get('/sso/v2-login', function (\Illuminate\Http\Request $request) {
+    $data = \App\Services\V2PilotUserService::verifySsoToken($request->query('token'));
+    if (! $data) {
+        return redirect('/login')->withErrors([
+            'username' => 'El enlace de redirección automática expiró. Inicia sesión nuevamente.',
+        ]);
+    }
+
+    $user = \App\Models\User::where('id', $data['uid'])->where('activo', 'si')->first();
+    if (! $user) {
+        return redirect('/login');
+    }
+
+    \Illuminate\Support\Facades\Auth::login($user);
+    $request->session()->regenerate();
+
+    return redirect($data['target'] ?: '/alumno');
+})->name('sso.v2-login');
+
 require __DIR__.'/settings.php';

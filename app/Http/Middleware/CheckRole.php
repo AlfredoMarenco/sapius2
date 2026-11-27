@@ -37,6 +37,22 @@ class CheckRole
             return $next($request);
         }
 
+        if (
+            config('elearning.v2_pilot_restriction_enabled', false)
+            && method_exists($user, 'hasRole')
+            && $user->hasRole('alumno')
+            && ! $user->hasRole('instructor')
+            && ! \App\Services\V2PilotUserService::isPilotUser((int) $user->id)
+        ) {
+            Auth::logout();
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            return redirect()->away(rtrim((string) config('elearning.production_site_url', 'https://sapius.com.mx'), '/').'/login');
+        }
+
         $allowedRoles = [];
         foreach ($roles as $roleGroup) {
             foreach (explode('|', $roleGroup) as $r) {

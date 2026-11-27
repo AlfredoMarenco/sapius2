@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Shield, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Shield, AlertTriangle, Rocket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ interface UserDetailProps {
         is_active: boolean;
         is_validated: boolean;
         is_blocked: boolean;
+        is_v2_pilot?: boolean;
         strikes: number;
         created_at: string;
     };
@@ -48,6 +49,21 @@ export default function UserShow({ user, enrollments = [] }: UserDetailProps) {
                         <Badge className={`capitalize ${user.role === 'admin' ? 'bg-[#101E33] text-white' : 'bg-blue-600 text-white'}`}>
                             {user.role}
                         </Badge>
+                        {user.role === 'alumno' && (
+                            <Button
+                                size="sm"
+                                variant={user.is_v2_pilot ? 'default' : 'outline'}
+                                className={`h-7 gap-1.5 rounded-full px-3 text-xs font-semibold ${
+                                    user.is_v2_pilot
+                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                        : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                                }`}
+                                onClick={() => router.post(`/admin/users/${user.id}/toggle-v2-pilot`, {}, { preserveScroll: true })}
+                            >
+                                <Rocket className="h-3.5 w-3.5" />
+                                {user.is_v2_pilot ? 'Piloto V2 Activo' : 'Activar Piloto V2'}
+                            </Button>
+                        )}
                     </div>
                 </div>
 
