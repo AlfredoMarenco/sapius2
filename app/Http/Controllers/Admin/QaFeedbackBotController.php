@@ -362,6 +362,7 @@ class QaFeedbackBotController extends Controller
             'console_errors.*' => ['nullable'],
             'server_exception' => ['nullable', 'array'],
             'screenshot' => ['nullable', 'string', 'max:8000000'],
+            'grill_me' => ['nullable', 'boolean'],
         ]);
 
         $decodedScreenshot = null;
@@ -423,6 +424,10 @@ class QaFeedbackBotController extends Controller
                 'agent_reply' => null,
                 'follow_up_message' => null,
                 'follow_ups' => [],
+                'grill_me' => (bool) ($validated['grill_me'] ?? false),
+                'grill_question' => null,
+                'grill_history' => [],
+                'grill_ready_to_execute' => false,
                 'created_at' => $now,
                 'updated_at' => $now,
                 'resolved_at' => null,
@@ -446,11 +451,17 @@ class QaFeedbackBotController extends Controller
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'in:'.implode(',', self::VALID_ADMIN_STATUSES)],
             'follow_up_message' => ['nullable', 'string', 'max:5000'],
+            'grill_answer' => ['nullable', 'string', 'max:5000'],
+            'grill_finish' => ['nullable', 'boolean'],
         ]);
 
-        if (empty($validated['status']) && empty(trim((string) ($validated['follow_up_message'] ?? '')))) {
+        if (
+            empty($validated['status']) &&
+            empty(trim((string) ($validated['follow_up_message'] ?? ''))) &&
+            empty(trim((string) ($validated['grill_answer'] ?? '')))
+        ) {
             throw ValidationException::withMessages([
-                'status' => 'Debes indicar un nuevo estado o un mensaje de seguimiento.',
+                'status' => 'Debes indicar un nuevo estado, un mensaje de seguimiento o una respuesta.',
             ]);
         }
 
@@ -502,7 +513,32 @@ class QaFeedbackBotController extends Controller
                 }
             }
 
-            if (! empty($validated['status'])) {
+            $grillAnswer = isset($validated['grill_answer'])
+                ? trim((string) $validated['grill_answer'])
+                : '';
+
+            if ($grillAnswer !== '') {
+                $currentQuestion = $report['grill_question'] ?? null;
+                $history = is_array($report['grill_history'] ?? null) ? $report['grill_history'] : [];
+                $history[] = [
+                    'question' => is_array($currentQuestion)
+                        ? ($currentQuestion['question'] ?? 'Pregunta de perfilado')
+                        : 'Pregunta de perfilado',
+                    'options' => is_array($currentQuestion) ? ($currentQuestion['options'] ?? []) : [],
+                    'answer' => $grillAnswer,
+                    'author' => $authorName,
+                    'answered_at' => $now,
+                ];
+                $report['grill_history'] = $history;
+                $report['grill_question'] = null;
+                if (! empty($validated['grill_finish'])) {
+                    $report['grill_ready_to_execute'] = true;
+                }
+                $report['status'] = 'pending';
+                $report['resolved_at'] = null;
+            }
+
+            if (! empty($validated['status']) && $grillAnswer === '') {
                 $report['status'] = $validated['status'];
                 if ($validated['status'] === 'resolved' || $validated['status'] === 'verified') {
                     $report['resolved_at'] = $report['resolved_at'] ?? $now;

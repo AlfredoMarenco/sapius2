@@ -13,7 +13,9 @@ class QaReportsCommand extends Command
                             {--status= : Filtro de estado en list o nuevo estado en update}
                             {--perspective= : Filtro opcional por perspectiva (designer|student|admin|engineering|desktop)}
                             {--platform= : Filtro opcional por plataforma (desktop|web)}
-                            {--reply= : Respuesta de Antigravity para el revisor}';
+                            {--reply= : Respuesta de Antigravity para el revisor}
+                            {--question= : Pregunta interactiva para perfilar la idea en el Bot QA}
+                            {--options= : Opciones en JSON array para la pregunta interactiva}';
 
     protected $description = 'Gestiona los reportes QA enviados desde el bot flotante en storage/app/qa-bot/reports.json';
 
@@ -105,9 +107,15 @@ class QaReportsCommand extends Command
 
         $newStatus = $this->option('status');
         $reply = $this->option('reply');
+        $question = $this->option('question');
+        $optionsRaw = $this->option('options');
 
-        if (($newStatus === null || $newStatus === '') && $reply === null) {
-            return $this->failWithMessage('Debes proporcionar al menos --status o --reply para actualizar el reporte.');
+        if (
+            ($newStatus === null || $newStatus === '') &&
+            $reply === null &&
+            ($question === null || trim((string) $question) === '')
+        ) {
+            return $this->failWithMessage('Debes proporcionar al menos --status, --reply o --question para actualizar el reporte.');
         }
 
         if (is_string($newStatus) && $newStatus !== '' && ! in_array($newStatus, QaFeedbackBotController::VALID_AGENT_STATUSES, true)) {
@@ -117,7 +125,7 @@ class QaReportsCommand extends Command
         }
 
         $now = now()->toIso8601String();
-        $updated = QaFeedbackBotController::mutateReports(function (array $reports) use ($id, $newStatus, $reply, $now): array {
+        $updated = QaFeedbackBotController::mutateReports(function (array $reports) use ($id, $newStatus, $reply, $question, $optionsRaw, $now): array {
             $foundIndex = null;
             foreach ($reports as $index => $report) {
                 if (($report['id'] ?? null) === $id) {
@@ -147,6 +155,28 @@ class QaReportsCommand extends Command
 
             if ($reply !== null) {
                 $report['agent_reply'] = (string) $reply;
+            }
+
+            if (is_string($question) && trim($question) !== '') {
+                $options = [];
+                if (is_string($optionsRaw) && trim($optionsRaw) !== '') {
+                    $decoded = json_decode($optionsRaw, true);
+                    if (is_array($decoded)) {
+                        $options = array_values(array_map('strval', $decoded));
+                    } else {
+                        $options = array_values(array_filter(array_map('trim', explode('|', $optionsRaw))));
+                    }
+                }
+                $report['grill_me'] = true;
+                $report['grill_question'] = [
+                    'question' => trim($question),
+                    'options' => $options,
+                    'asked_at' => $now,
+                ];
+                if ($newStatus === null || $newStatus === '') {
+                    $report['status'] = 'needs_review';
+                    $report['resolved_at'] = null;
+                }
             }
 
             $report['updated_at'] = $now;

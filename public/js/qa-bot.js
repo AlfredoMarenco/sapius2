@@ -6,6 +6,7 @@
 
     const MAX_ERRORS = 10;
     const POLL_INTERVAL_MS = 15000;
+    const FAST_POLL_INTERVAL_MS = 4000;
     const ENDPOINT_BASE = '/admin/qa-bot/reports';
 
     // 1. Bridge for Inertia error modal iframe -> top window
@@ -47,6 +48,9 @@
         screenshotDataUrl: null,
         defectType: window.__SAPIUS_QA_EXCEPTION__ ? 'server_error' : 'broken_action',
         perspective: 'designer',
+        grillMe: false,
+        grillSelectedOption: {},
+        grillCustomAnswer: {},
         message: '',
         submitting: false,
         submitFeedback: null,
@@ -73,6 +77,7 @@
     let hostEl = null;
     let shadowRoot = null;
     let pollTimer = null;
+    let currentPollMs = POLL_INTERVAL_MS;
     let dialogObserver = null;
 
     function parseInitialInertiaPage() {
@@ -356,6 +361,18 @@
         }
     }
 
+    function syncPollingSpeed() {
+        const needsFastPoll = state.reports.some(
+            (r) => r.grill_me && (r.status === 'pending' || r.status === 'in_progress')
+        );
+        const desiredMs = needsFastPoll ? FAST_POLL_INTERVAL_MS : POLL_INTERVAL_MS;
+        if (desiredMs !== currentPollMs && pollTimer !== null) {
+            currentPollMs = desiredMs;
+            stopPolling();
+            startPolling();
+        }
+    }
+
     function startPolling() {
         if (pollTimer !== null) {
             return;
@@ -365,7 +382,7 @@
             if (!document.hidden && state.isAdmin) {
                 fetchReports(true);
             }
-        }, POLL_INTERVAL_MS);
+        }, currentPollMs);
     }
 
     function stopPolling() {
@@ -420,6 +437,7 @@
             if (data.counts && typeof data.counts === 'object') {
                 state.counts = { ...state.counts, ...data.counts };
             }
+            syncPollingSpeed();
         } catch {
             // Silently ignore transient network glitches during background polling
         } finally {
@@ -494,6 +512,7 @@
                 message: trimmed,
                 defect_type: state.defectType,
                 perspective: state.perspective,
+                grill_me: state.grillMe,
                 url: state.currentUrl || window.location.href,
                 component: state.currentComponent,
                 viewport: `${window.innerWidth}x${window.innerHeight}`,
@@ -527,6 +546,7 @@
             const created = data.report || data;
             state.message = '';
             state.screenshotDataUrl = null;
+            state.grillMe = false;
             state.hasUnreadError = false;
             state.submitFeedback = {
                 type: 'success',
@@ -719,6 +739,44 @@
                 case 'revoke-pass':
                     revokePass();
                     break;
+                case 'set-mode-direct':
+                    state.grillMe = false;
+                    render();
+                    break;
+                case 'set-mode-grill':
+                    state.grillMe = true;
+                    render();
+                    break;
+                case 'select-grill-opt':
+                    if (id) {
+                        state.grillSelectedOption[id] = target.getAttribute('data-qa-opt');
+                        render();
+                    }
+                    break;
+                case 'submit-grill-answer':
+                    if (id) {
+                        const report = state.reports.find((r) => r.id === id);
+                        const opts = Array.isArray(report?.grill_question?.options)
+                            ? report.grill_question.options
+                            : [];
+                        const sel = state.grillSelectedOption[id];
+                        let answerText = '';
+                        if (sel === 'custom' || opts.length === 0) {
+                            answerText = (state.grillCustomAnswer[id] || '').trim();
+                        } else if (sel !== undefined && sel !== null && opts[Number(sel)] !== undefined) {
+                            answerText = String(opts[Number(sel)]);
+                        }
+                        if (answerText) {
+                            const finishNow = target.getAttribute('data-qa-finish') === '1';
+                            delete state.grillSelectedOption[id];
+                            delete state.grillCustomAnswer[id];
+                            updateReport(id, {
+                                grill_answer: answerText,
+                                grill_finish: finishNow,
+                            });
+                        }
+                    }
+                    break;
                 default:
                     break;
             }
@@ -738,6 +796,15 @@
                 }
             } else if (target.id === 'qa-reopen-input') {
                 state.reopenNote = target.value;
+            } else if (target.id && target.id.startsWith('qa-grill-custom-')) {
+                const reportId = target.id.replace('qa-grill-custom-', '');
+                state.grillCustomAnswer[reportId] = target.value;
+                const submitBtns = shadowRoot.querySelectorAll(`[data-qa-action="submit-grill-answer"][data-qa-id="${reportId}"]`);
+                submitBtns.forEach((btn) => {
+                    if (btn instanceof HTMLButtonElement) {
+                        btn.disabled = !target.value.trim() || state.busyReportId === reportId;
+                    }
+                });
             }
         });
 
@@ -875,15 +942,34 @@
                 </div>
                 ${renderErrorPreview()}
                 ${feedbackHtml}
+                <label class="field-label">Modo de atención del Bot</label>
+                <div class="mode-grid">
+                    <button
+                        type="button"
+                        class="mode-card ${!state.grillMe ? 'active' : ''}"
+                        data-qa-action="set-mode-direct"
+                    >
+                        <div class="mode-title">⚡ Ejecución directa</div>
+                        <div class="mode-sub">Aplicar el cambio o corrección directo</div>
+                    </button>
+                    <button
+                        type="button"
+                        class="mode-card ${state.grillMe ? 'active-grill' : ''}"
+                        data-qa-action="set-mode-grill"
+                    >
+                        <div class="mode-title">🧠 Perfilar idea con preguntas</div>
+                        <div class="mode-sub">El bot te hará preguntas aquí antes de programar</div>
+                    </button>
+                </div>
                 <label class="field-label" for="qa-perspective">Enfoque / Perspectiva del reporte</label>
                 <select id="qa-perspective">${perspectiveOptionsHtml}</select>
                 <label class="field-label" for="qa-defect-type">Tipo de fallo</label>
                 <select id="qa-defect-type">${defectOptionsHtml}</select>
-                <label class="field-label" for="qa-message-input">Describe el fallo a corregir</label>
+                <label class="field-label" for="qa-message-input">${state.grillMe ? 'Describe tu idea o prompt a perfilar' : 'Describe el fallo a corregir'}</label>
                 <textarea
                     id="qa-message-input"
                     rows="4"
-                    placeholder="Describe qué falló, qué acción hiciste y qué debería ocurrir... (Ctrl+V para pegar captura, Ctrl+Enter para enviar)"
+                    placeholder="${state.grillMe ? 'Escribe tu idea completa. El bot analizará el código y te hará preguntas de opción múltiple para afinar cada detalle... (Ctrl+Enter para enviar)' : 'Describe qué falló, qué acción hiciste y qué debería ocurrir... (Ctrl+V para pegar captura, Ctrl+Enter para enviar)'}"
                 >${escapeHtml(state.message)}</textarea>
                 ${previewHtml}
                 <input id="qa-file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
@@ -898,7 +984,7 @@
                         data-qa-action="submit"
                         ${!state.message.trim() || state.submitting ? 'disabled' : ''}
                     >
-                        ${state.submitting ? 'Enviando...' : 'Enviar reporte'}
+                        ${state.submitting ? 'Enviando...' : state.grillMe ? '🧠 Enviar y perfilar' : 'Enviar reporte'}
                     </button>
                 </div>
             </div>
@@ -921,6 +1007,114 @@
 
         const pMeta = perspectiveMeta(report.perspective || 'designer');
         const perspectiveBadgeHtml = `<span class="perspective-chip ${pMeta.cls}">${pMeta.icon} ${escapeHtml(pMeta.label)}</span>`;
+        const grillBadgeHtml = report.grill_me
+            ? '<span class="grill-chip">🧠 Modo Entrevista</span>'
+            : '';
+
+        const grillHistoryList = Array.isArray(report.grill_history) ? report.grill_history : [];
+        const grillHistoryHtml =
+            grillHistoryList.length > 0
+                ? `
+                    <div class="grill-history">
+                        <div class="grill-history-title">💬 Preguntas respondidas (${grillHistoryList.length})</div>
+                        ${grillHistoryList
+                            .map(
+                                (item, idx) => `
+                                    <div class="grill-history-item">
+                                        <div class="grill-hq"><strong>P${idx + 1}:</strong> ${escapeHtml(item.question)}</div>
+                                        <div class="grill-ha">↳ ${escapeHtml(item.answer)}</div>
+                                    </div>
+                                `
+                            )
+                            .join('')}
+                    </div>
+                `
+                : '';
+
+        let grillBoxHtml = '';
+        if (report.status === 'needs_review' && report.grill_question && report.grill_question.question) {
+            const qObj = report.grill_question;
+            const opts = Array.isArray(qObj.options) ? qObj.options : [];
+            const selectedOpt = state.grillSelectedOption[report.id];
+            const customVal = state.grillCustomAnswer[report.id] || '';
+            const hasSelection =
+                (selectedOpt !== undefined && selectedOpt !== null && selectedOpt !== 'custom') ||
+                ((selectedOpt === 'custom' || opts.length === 0) && customVal.trim() !== '');
+
+            const optsHtml = opts
+                .map((opt, idx) => {
+                    const isSelected = String(selectedOpt) === String(idx);
+                    const isRec = String(opt).toLowerCase().includes('(recomendado)');
+                    return `
+                        <button
+                            type="button"
+                            class="grill-opt ${isSelected ? 'selected' : ''} ${isRec ? 'recommended' : ''}"
+                            data-qa-action="select-grill-opt"
+                            data-qa-id="${escapeHtml(report.id)}"
+                            data-qa-opt="${idx}"
+                        >
+                            <span class="grill-radio">${isSelected ? '●' : '○'}</span>
+                            <span>${escapeHtml(opt)}</span>
+                        </button>
+                    `;
+                })
+                .join('');
+
+            const showCustomInput = selectedOpt === 'custom' || opts.length === 0;
+            const customOptionBtn =
+                opts.length > 0
+                    ? `
+                        <button
+                            type="button"
+                            class="grill-opt ${selectedOpt === 'custom' ? 'selected' : ''}"
+                            data-qa-action="select-grill-opt"
+                            data-qa-id="${escapeHtml(report.id)}"
+                            data-qa-opt="custom"
+                        >
+                            <span class="grill-radio">${selectedOpt === 'custom' ? '●' : '○'}</span>
+                            <span>✍️ Otra respuesta (especificar)...</span>
+                        </button>
+                    `
+                    : '';
+
+            const customInputHtml = showCustomInput
+                ? `<textarea id="qa-grill-custom-${escapeHtml(report.id)}" rows="2" placeholder="Escribe tu respuesta personalizada...">${escapeHtml(customVal)}</textarea>`
+                : '';
+
+            grillBoxHtml = `
+                <div class="grill-box">
+                    <div class="grill-box-title">🧠 Pregunta del Bot para perfilar tu idea:</div>
+                    <div class="grill-question-text">${escapeHtml(qObj.question)}</div>
+                    <div class="grill-options-list">
+                        ${optsHtml}
+                        ${customOptionBtn}
+                    </div>
+                    ${customInputHtml}
+                    <div class="grill-actions">
+                        <button
+                            type="button"
+                            class="btn-xs btn-primary-sm"
+                            data-qa-action="submit-grill-answer"
+                            data-qa-id="${escapeHtml(report.id)}"
+                            data-qa-finish="0"
+                            ${!hasSelection || isBusy ? 'disabled' : ''}
+                        >
+                            Enviar respuesta
+                        </button>
+                        <button
+                            type="button"
+                            class="btn-xs btn-ok-grill"
+                            data-qa-action="submit-grill-answer"
+                            data-qa-id="${escapeHtml(report.id)}"
+                            data-qa-finish="1"
+                            ${!hasSelection || isBusy ? 'disabled' : ''}
+                        >
+                            🚀 Responder e implementar ya
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
         const replyHtml = report.agent_reply
             ? `
@@ -993,9 +1187,12 @@
                 ${testedAsHtml}
                 <div class="badges-row">
                     ${perspectiveBadgeHtml}
+                    ${grillBadgeHtml}
                     ${defectBadgeHtml}
                 </div>
                 <div class="report-msg">${escapeHtml(report.message)}</div>
+                ${grillHistoryHtml}
+                ${grillBoxHtml}
                 <div class="report-meta">
                     <span title="${escapeHtml(report.url || '')}">${escapeHtml(shortUrl)}</span>
                     ${report.component ? `<span>· ${escapeHtml(report.component)}</span>` : ''}
@@ -1050,11 +1247,16 @@
 
         const resolvedCount = Number(state.counts.resolved || 0);
         const activeCount = Number(state.counts.pending || 0) + Number(state.counts.in_progress || 0);
+        const grillPendingCount = state.reports.filter(
+            (r) => r.status === 'needs_review' && r.grill_question && r.grill_question.question
+        ).length;
         const totalBadgeCount = Number(state.counts.total || state.reports.length || 0);
 
         let badgeHtml = '';
         if (state.hasUnreadError) {
             badgeHtml = '<span class="fab-badge fab-badge-err">⚠️ Error detectado</span>';
+        } else if (grillPendingCount > 0) {
+            badgeHtml = `<span class="fab-badge fab-badge-grill">🧠 ${grillPendingCount} pregunta${grillPendingCount === 1 ? '' : 's'}</span>`;
         } else if (state.newResolvedAlert || resolvedCount > 0) {
             badgeHtml = `<span class="fab-badge fab-badge-ok">✅ ${resolvedCount} listo${resolvedCount === 1 ? '' : 's'}</span>`;
         } else if (activeCount > 0) {
@@ -1117,6 +1319,47 @@
                 }
                 .fab-badge-ok { background: #10b981; color: #fff; }
                 .fab-badge-pending { background: #6366f1; color: #fff; }
+                .fab-badge-grill { background: #ec4899; color: #fff; animation: qa-pulse 1.6s infinite; }
+                .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                .mode-card {
+                    text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid #cbd5e1;
+                    background: #f8fafc; cursor: pointer; transition: all 0.15s ease;
+                }
+                .mode-card:hover { border-color: #94a3b8; }
+                .mode-card.active { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 1px #4f46e5; }
+                .mode-card.active-grill { border-color: #db2777; background: #fdf2f8; box-shadow: 0 0 0 1px #db2777; }
+                .mode-title { font-size: 11px; font-weight: 700; color: #0f172a; }
+                .mode-sub { font-size: 10px; color: #64748b; margin-top: 2px; line-height: 1.25; }
+                .grill-chip {
+                    display: inline-block; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 7px;
+                    background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8;
+                }
+                .grill-history {
+                    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;
+                    display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto;
+                }
+                .grill-history-title { font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; }
+                .grill-history-item { font-size: 11px; border-left: 2px solid #cbd5e1; padding-left: 6px; }
+                .grill-hq { color: #334155; }
+                .grill-ha { color: #4f46e5; font-weight: 600; margin-top: 2px; }
+                .grill-box {
+                    background: #fdf2f8; border: 1px solid #f9a8d4; border-radius: 10px; padding: 10px;
+                    display: flex; flex-direction: column; gap: 8px;
+                }
+                .grill-box-title { font-size: 11px; font-weight: 800; color: #be185d; }
+                .grill-question-text { font-size: 12px; font-weight: 700; color: #0f172a; line-height: 1.35; }
+                .grill-options-list { display: flex; flex-direction: column; gap: 5px; }
+                .grill-opt {
+                    display: flex; align-items: flex-start; gap: 6px; text-align: left; width: 100%;
+                    padding: 7px 9px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;
+                    font-size: 11px; color: #1e293b; cursor: pointer; line-height: 1.3;
+                }
+                .grill-opt:hover { border-color: #db2777; }
+                .grill-opt.recommended { border-color: #a5b4fc; background: #eef2ff; }
+                .grill-opt.selected { border-color: #db2777; background: #fce7f3; font-weight: 700; color: #831843; }
+                .grill-radio { font-size: 12px; color: #db2777; flex-shrink: 0; }
+                .grill-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+                .btn-ok-grill { background: #059669; color: #fff; }
                 @keyframes qa-pulse {
                     0%, 100% { opacity: 1; transform: scale(1); }
                     50% { opacity: 0.85; transform: scale(1.04); }
