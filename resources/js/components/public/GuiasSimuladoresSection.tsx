@@ -133,9 +133,9 @@ export function GuiasSimuladoresSection({
                         <div className="mt-5 flex justify-center">
                             <Link
                                 href="/guias-nutricion"
-                                className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#FF6B52] px-10 py-3 text-center text-[15px] font-bold text-[#101E33] shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] hover:text-white"
+                                className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#FF6B52] px-10 py-3 text-center text-[15px] font-bold text-white shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
                             >
-                                Nutrición digital 2026
+                                Nutrición digital 2027
                             </Link>
                         </div>
                     </motion.div>
@@ -173,7 +173,7 @@ export function GuiasSimuladoresSection({
                                 <Link
                                     key={item.label}
                                     href={item.href}
-                                    className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#FF6B52] px-5 py-2.5 text-center text-[14px] leading-tight font-bold text-[#101E33] shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] hover:text-white"
+                                    className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#FF6B52] px-5 py-2.5 text-center text-[14px] leading-tight font-bold text-white shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
                                 >
                                     {item.label}
                                 </Link>

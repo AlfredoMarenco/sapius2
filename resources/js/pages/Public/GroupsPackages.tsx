@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import React from 'react';
+import { WHATSAPP_PHONE } from '@/components/public/PricingCard';
 import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
 import ProductBookHero from '@/components/public/ProductBookHero';
 import LandingLayout from '@/layouts/LandingLayout';
@@ -21,10 +22,14 @@ export default function GroupsPackages({
                 titleLine2="paquetes"
                 actions={
                     <a
-                        href="#grupos-descuentos"
+                        href={`https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(
+                            'Hola Sapius, me gustaría hablar con un asesor sobre grupos y paquetes para el EGEL Plus.',
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-7 py-3.5 text-base font-medium text-white shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] sm:w-[290px]"
                     >
-                        Ver más
+                        Hablar con un asesor
                     </a>
                 }
             />
