@@ -10,6 +10,7 @@ import {
 } from '@/components/public/PricingCard';
 import type {ScheduledCourseCandidate} from '@/components/public/PricingCard';
 import { SapiusWordmark } from '@/components/public/SapiusLogo';
+import SapiusPageLoader from '@/components/public/SapiusPageLoader';
 
 export interface LandingLayoutProps {
     children: React.ReactNode;
@@ -102,6 +103,7 @@ export default function LandingLayout({
             style={{ colorScheme: 'light' }}
             className="min-h-screen bg-white font-display text-[#101E33] antialiased selection:bg-[#FF6B52]/20 selection:text-[#101E33]"
         >
+            <SapiusPageLoader />
             {/* Navbar Superior Transparente sobre Hero y Translúcido al Hacer Scroll */}
             <header
                 className={`fixed inset-x-0 top-0 z-50 transition-all duration-200 ${
