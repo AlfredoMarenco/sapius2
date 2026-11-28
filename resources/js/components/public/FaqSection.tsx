@@ -12,6 +12,7 @@ import FaqAccordion from '@/components/public/FaqAccordion';
 import type { FaqItem } from '@/components/public/FaqAccordion';
 import PlusGridPattern from '@/components/public/PlusGridPattern';
 import { SapiusIsotype } from '@/components/public/SapiusLogo';
+import { PROGRESSIVE_FAQ_GROUPS } from '@/data/faqBank';
 
 export interface PublicFaqItem extends FaqItem {
     category: 'antes-de-comprar' | 'cursos' | 'acceso';
@@ -173,23 +174,18 @@ export function FaqSection({
     progressiveMode = false,
 }: FaqSectionProps) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [openGroupIds, setOpenGroupIds] = useState<string[]>([]);
-    const [openCategoryIds, setOpenCategoryIds] = useState<string[]>([]);
+    const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+    const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
+        null,
+    );
 
     const toggleGroup = (groupId: string) => {
-        setOpenGroupIds((prev) =>
-            prev.includes(groupId)
-                ? prev.filter((id) => id !== groupId)
-                : [...prev, groupId],
-        );
+        setActiveGroupId((prev) => (prev === groupId ? null : groupId));
+        setActiveCategoryId(null);
     };
 
     const toggleCategory = (catId: string) => {
-        setOpenCategoryIds((prev) =>
-            prev.includes(catId)
-                ? prev.filter((id) => id !== catId)
-                : [...prev, catId],
-        );
+        setActiveCategoryId((prev) => (prev === catId ? null : catId));
     };
 
     const filteredFaqs = useMemo(() => {
@@ -315,9 +311,15 @@ export function FaqSection({
                         <div className="mt-10 grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
                             {/* Mitad izquierda: 3 tarjetas principales apiladas verticalmente */}
                             <div className="space-y-4 lg:col-span-6">
-                                {PROGRESSIVE_GROUPS.map((group) => {
-                                    const Icon = group.icon;
-                                    const isOpen = openGroupIds.includes(group.id);
+                                {PROGRESSIVE_FAQ_GROUPS.map((group) => {
+                                    const Icon =
+                                        group.id === 'antes-de-comprar'
+                                            ? ShoppingBag
+                                            : group.id ===
+                                                'conoce-tu-preparacion'
+                                              ? BookOpenCheck
+                                              : PackageCheck;
+                                    const isOpen = activeGroupId === group.id;
 
                                     return (
                                         <div key={group.id}>
@@ -381,10 +383,7 @@ export function FaqSection({
                                                 <div className="overflow-hidden">
                                                     <div className="space-y-2.5 pl-2">
                                                         {group.categories.map((cat) => {
-                                                            const catOpen = openCategoryIds.includes(cat.id);
-                                                            const catFaqs = PUBLIC_FAQS.filter((f) =>
-                                                                cat.faqIds.includes(f.id),
-                                                            );
+                                                            const catOpen = activeCategoryId === cat.id;
                                                             return (
                                                                 <div
                                                                     key={cat.id}
@@ -394,7 +393,7 @@ export function FaqSection({
                                                                         type="button"
                                                                         onClick={() => toggleCategory(cat.id)}
                                                                         aria-expanded={catOpen}
-                                                                        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-bold text-[#101E33]"
+                                                                        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-xs font-bold text-[#101E33] sm:text-sm"
                                                                     >
                                                                         <span>{cat.title}</span>
                                                                         <ChevronDown
@@ -413,13 +412,11 @@ export function FaqSection({
                                                                     >
                                                                         <div className="overflow-hidden">
                                                                             <div className="border-t border-[#101E33]/10 px-4 py-3">
-                                                                                {catFaqs.length > 0 ? (
-                                                                                    <FaqAccordion items={catFaqs} />
-                                                                                ) : (
-                                                                                    <p className="text-xs text-[#101E33]/70">
-                                                                                        Consulta esta categoría en la sección completa de Preguntas Frecuentes.
-                                                                                    </p>
-                                                                                )}
+                                                                                <FaqAccordion
+                                                                                    items={cat.items}
+                                                                                    defaultOpenId=""
+                                                                                    compactTypography={true}
+                                                                                />
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -434,9 +431,9 @@ export function FaqSection({
                                 })}
                             </div>
 
-                            {/* Mitad derecha (escritorio): Categorías y preguntas de las tarjetas abiertas */}
+                            {/* Mitad derecha (escritorio): Categorías y preguntas de la tarjeta abierta */}
                             <div className="hidden lg:col-span-6 lg:block">
-                                {openGroupIds.length === 0 ? (
+                                {!activeGroupId ? (
                                     <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[#FF6B52]/40 bg-[#F6F0EA]/45 p-8 text-center">
                                         <SapiusIsotype
                                             variant="dark"
@@ -451,8 +448,8 @@ export function FaqSection({
                                     </div>
                                 ) : (
                                     <div className="space-y-6">
-                                        {PROGRESSIVE_GROUPS.filter((g) =>
-                                            openGroupIds.includes(g.id),
+                                        {PROGRESSIVE_FAQ_GROUPS.filter(
+                                            (g) => g.id === activeGroupId,
                                         ).map((group) => (
                                             <div
                                                 key={group.id}
@@ -469,10 +466,7 @@ export function FaqSection({
 
                                                 <div className="space-y-2.5">
                                                     {group.categories.map((cat) => {
-                                                        const catOpen = openCategoryIds.includes(cat.id);
-                                                        const catFaqs = PUBLIC_FAQS.filter((f) =>
-                                                            cat.faqIds.includes(f.id),
-                                                        );
+                                                        const catOpen = activeCategoryId === cat.id;
 
                                                         return (
                                                             <div
@@ -483,7 +477,7 @@ export function FaqSection({
                                                                     type="button"
                                                                     onClick={() => toggleCategory(cat.id)}
                                                                     aria-expanded={catOpen}
-                                                                    className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-bold text-[#101E33] transition-colors hover:text-[#FF6B52]"
+                                                                    className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-xs font-bold text-[#101E33] transition-colors hover:text-[#FF6B52] sm:text-sm"
                                                                 >
                                                                     <span>{cat.title}</span>
                                                                     <ChevronDown
@@ -502,13 +496,11 @@ export function FaqSection({
                                                                 >
                                                                     <div className="overflow-hidden">
                                                                         <div className="border-t border-[#101E33]/10 bg-white px-4 py-3">
-                                                                            {catFaqs.length > 0 ? (
-                                                                                <FaqAccordion items={catFaqs} />
-                                                                            ) : (
-                                                                                <p className="text-xs text-[#101E33]/70">
-                                                                                    Consulta esta categoría en la sección completa de Preguntas Frecuentes.
-                                                                                </p>
-                                                                            )}
+                                                                            <FaqAccordion
+                                                                                items={cat.items}
+                                                                                defaultOpenId=""
+                                                                                compactTypography={true}
+                                                                            />
                                                                         </div>
                                                                     </div>
                                                                 </div>

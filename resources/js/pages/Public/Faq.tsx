@@ -48,6 +48,7 @@ export default function Faq({ scheduledCourses = [] }: FaqPageProps) {
 
             {/* Sección 1: Buscador, Acordeón, Isotipo s. y CTA (Canva Page 6 v297) */}
             <FaqSection
+                progressiveMode={true}
                 headingAs="h1"
                 topPaddingClass="pt-28 pb-16 sm:pt-34 lg:pb-20"
                 ctaHref="#temas-informacion"

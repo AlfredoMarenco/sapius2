@@ -14,6 +14,7 @@ export interface FaqAccordionProps {
     moreHref?: string;
     onMoreClick?: () => void;
     showMoreButton?: boolean;
+    compactTypography?: boolean;
     className?: string;
 }
 
@@ -31,6 +32,7 @@ export function FaqAccordion({
     moreHref,
     onMoreClick,
     showMoreButton = false,
+    compactTypography = false,
     className = '',
 }: FaqAccordionProps) {
     const [openId, setOpenId] = useState<string | null>(
@@ -80,7 +82,13 @@ export function FaqAccordion({
                                     </svg>
                                 </span>
 
-                                <span className="font-display text-base leading-snug font-normal text-[#101E33] transition-colors group-hover:text-[#FF6B52] sm:text-[20px]">
+                                <span
+                                    className={`font-display leading-snug font-normal text-[#101E33] transition-colors group-hover:text-[#FF6B52] ${
+                                        compactTypography
+                                            ? 'text-xs sm:text-sm'
+                                            : 'text-base sm:text-[20px]'
+                                    }`}
+                                >
                                     {item.question}
                                 </span>
                             </button>
