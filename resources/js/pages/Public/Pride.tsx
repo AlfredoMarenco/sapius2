@@ -203,15 +203,9 @@ return img;
                             Resultados que hablan por sí mismos
                         </span>
 
-                        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                            <h1 className="font-display text-4xl font-extrabold tracking-tight text-[#101E33] sm:text-5xl lg:text-6xl">
-                                Orgullo
-                            </h1>
-                            <SapiusWordmark
-                                variant="dark"
-                                className="h-9 sm:h-12 lg:h-14"
-                            />
-                        </div>
+                        <h1 className="mt-5 font-display text-4xl font-extrabold tracking-tight text-[#101E33] sm:text-5xl lg:text-6xl">
+                            Orgullo <span className="text-[#FF6B52]">Sapius</span>
+                        </h1>
 
                         <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#101E33]/75 sm:text-lg">
                             Conoce los logros, premios nacionales y testimonios
@@ -231,7 +225,7 @@ return img;
                                     label: 'aprobación y éxito',
                                 },
                                 {
-                                    kpi: '+123',
+                                    kpi: '+2000',
                                     label: 'alumnos inscritos',
                                 },
                             ].map((stat) => (
