@@ -926,6 +926,7 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                 SECCIÓN 7: PREGUNTAS FRECUENTES (Canva Page 1 v297)
                ========================================================= */}
             <FaqSection
+                progressiveMode={true}
                 headingAs="h2"
                 subtitle="Encuentra información sobre nuestros cursos, metodología y proceso de preparación para el EGEL Plus."
                 ctaHref="/preguntas-frecuentes"
