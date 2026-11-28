@@ -1,7 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import { Award, Quote, Star } from 'lucide-react';
-import React from 'react';
+import {
+    Award,
+    ChevronLeft,
+    ChevronRight,
+    Quote,
+    Star,
+} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { openMiniTest } from '@/components/public/MiniTestModal';
 import PlusGridPattern from '@/components/public/PlusGridPattern';
 import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
@@ -101,6 +107,69 @@ return img;
 }
 
         return `/media/stream/${img}`;
+    };
+
+    const pridesCarouselRef = useRef<HTMLDivElement | null>(null);
+    const reviewsCarouselRef = useRef<HTMLDivElement | null>(null);
+    const [pridesPaused, setPridesPaused] = useState(false);
+    const [reviewsPaused, setReviewsPaused] = useState(false);
+    const [expandedReviews, setExpandedReviews] = useState<
+        Record<string, boolean>
+    >({});
+    const [prideFormNotice, setPrideFormNotice] = useState(false);
+
+    useEffect(() => {
+        if (pridesPaused) {
+            return;
+        }
+        const timer = window.setInterval(() => {
+            const el = pridesCarouselRef.current;
+            if (!el || el.scrollWidth <= el.clientWidth) {
+                return;
+            }
+            if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 2) {
+                el.scrollLeft = 0;
+            } else {
+                el.scrollLeft += 1;
+            }
+        }, 30);
+
+        return () => window.clearInterval(timer);
+    }, [pridesPaused]);
+
+    useEffect(() => {
+        if (reviewsPaused) {
+            return;
+        }
+        const timer = window.setInterval(() => {
+            const el = reviewsCarouselRef.current;
+            if (!el || el.scrollWidth <= el.clientWidth) {
+                return;
+            }
+            if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 2) {
+                el.scrollLeft = 0;
+            } else {
+                el.scrollLeft += 1;
+            }
+        }, 30);
+
+        return () => window.clearInterval(timer);
+    }, [reviewsPaused]);
+
+    const scrollCarousel = (
+        ref: React.RefObject<HTMLDivElement | null>,
+        direction: 'prev' | 'next',
+    ) => {
+        const el = ref.current;
+        if (!el) {
+            return;
+        }
+        const amount = direction === 'next' ? 360 : -360;
+        el.scrollBy({ left: amount, behavior: 'smooth' });
+    };
+
+    const toggleReviewExpand = (id: string) => {
+        setExpandedReviews((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
     return (
@@ -210,19 +279,48 @@ return img;
                         </Link>
                     </div>
 
-                    <div className="mt-12 grid grid-cols-1 gap-7 md:grid-cols-3">
-                        {displayedPrides.map((item, idx) => (
-                            <motion.article
-                                key={item.id}
-                                initial={{ opacity: 0, y: 18 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true, margin: '-50px' }}
-                                transition={{
-                                    duration: 0.35,
-                                    delay: idx * 0.06,
-                                }}
-                                className="flex h-full flex-col justify-between rounded-3xl border border-white/10 bg-[#192B47] p-7 shadow-lg"
+                    <div className="relative mt-10">
+                        <div className="mb-4 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    scrollCarousel(pridesCarouselRef, 'prev')
+                                }
+                                aria-label="Anterior caso de éxito"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-[#192B47] text-white transition-colors hover:border-[#FF6B52] hover:bg-[#FF6B52]"
                             >
+                                <ChevronLeft className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    scrollCarousel(pridesCarouselRef, 'next')
+                                }
+                                aria-label="Siguiente caso de éxito"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-[#192B47] text-white transition-colors hover:border-[#FF6B52] hover:bg-[#FF6B52]"
+                            >
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div
+                            ref={pridesCarouselRef}
+                            onMouseEnter={() => setPridesPaused(true)}
+                            onMouseLeave={() => setPridesPaused(false)}
+                            className="flex gap-6 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        >
+                            {displayedPrides.map((item, idx) => (
+                                <motion.article
+                                    key={item.id}
+                                    initial={{ opacity: 0, y: 18 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true, margin: '-50px' }}
+                                    transition={{
+                                        duration: 0.35,
+                                        delay: Math.min(idx * 0.04, 0.2),
+                                    }}
+                                    className="flex w-[310px] shrink-0 flex-col justify-between rounded-3xl border border-white/10 bg-[#192B47] p-7 shadow-lg sm:w-[340px]"
+                                >
                                 <div>
                                     <div className="flex items-center gap-4">
                                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-[#FF6B52] bg-white">
@@ -267,6 +365,7 @@ return img;
                                 </div>
                             </motion.article>
                         ))}
+                        </div>
                     </div>
                 </div>
             </section>
@@ -276,25 +375,66 @@ return img;
                ========================================================= */}
             <section className="relative overflow-hidden bg-white py-20 lg:py-24">
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="text-center">
-                        <h2 className="font-display text-3xl font-extrabold tracking-tight text-[#101E33] sm:text-4xl">
-                            Lo que opinan{' '}
-                            <span className="text-[#FF6B52]">
-                                nuestros alumnos
-                            </span>
-                        </h2>
-                        <p className="mx-auto mt-3 max-w-xl text-sm text-[#101E33]/75 sm:text-base">
-                            Reseñas reales de quienes se prepararon con nuestras
-                            guías, simuladores y cursos completos.
-                        </p>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="font-display text-3xl font-extrabold tracking-tight text-[#101E33] sm:text-4xl">
+                                Lo que opinan{' '}
+                                <span className="text-[#FF6B52]">
+                                    nuestros alumnos
+                                </span>
+                            </h2>
+                            <p className="mt-2 max-w-xl text-sm text-[#101E33]/75 sm:text-base">
+                                Reseñas reales de quienes se prepararon con
+                                nuestras guías, simuladores y cursos completos.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    scrollCarousel(reviewsCarouselRef, 'prev')
+                                }
+                                aria-label="Anterior opinión"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#101E33]/20 bg-white text-[#101E33] transition-colors hover:border-[#FF6B52] hover:bg-[#FF6B52] hover:text-white"
+                            >
+                                <ChevronLeft className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    scrollCarousel(reviewsCarouselRef, 'next')
+                                }
+                                aria-label="Siguiente opinión"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#101E33]/20 bg-white text-[#101E33] transition-colors hover:border-[#FF6B52] hover:bg-[#FF6B52] hover:text-white"
+                            >
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <div
+                        ref={reviewsCarouselRef}
+                        onMouseEnter={() => setReviewsPaused(true)}
+                        onMouseLeave={() => setReviewsPaused(false)}
+                        className="mt-10 flex items-stretch gap-6 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    >
                         {displayedReviews.map((review, idx) => {
                             const stars = Math.max(
                                 1,
                                 Math.min(5, Number(review.rating) || 5),
                             );
+                            const fullText =
+                                review.content ||
+                                review.comment ||
+                                'Excelente preparación académica.';
+                            const revKey = String(review.id);
+                            const isLong = fullText.length > 150;
+                            const isExpanded = Boolean(expandedReviews[revKey]);
+                            const shownText =
+                                isLong && !isExpanded
+                                    ? `${fullText.slice(0, 150).trim()}...`
+                                    : fullText;
 
                             return (
                                 <motion.div
@@ -304,9 +444,9 @@ return img;
                                     viewport={{ once: true, margin: '-50px' }}
                                     transition={{
                                         duration: 0.35,
-                                        delay: idx * 0.05,
+                                        delay: Math.min(idx * 0.04, 0.2),
                                     }}
-                                    className="flex h-full flex-col justify-between rounded-2xl border border-[#FF6B52]/45 bg-white p-6 shadow-[0_10px_30px_-15px_rgba(16,30,51,0.12)]"
+                                    className="flex min-h-[260px] w-[310px] shrink-0 flex-col justify-between rounded-2xl border border-[#FF6B52]/45 bg-white p-6 shadow-[0_10px_30px_-15px_rgba(16,30,51,0.12)] sm:w-[340px]"
                                 >
                                     <div>
                                         <div className="flex items-center justify-between">
@@ -324,12 +464,21 @@ return img;
                                         </div>
 
                                         <p className="mt-4 text-sm leading-relaxed text-[#101E33]/85">
-                                            “
-                                            {review.content ||
-                                                review.comment ||
-                                                'Excelente preparación académica.'}
-                                            ”
+                                            “{shownText}”
                                         </p>
+                                        {isLong && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    toggleReviewExpand(revKey)
+                                                }
+                                                className="mt-2 text-xs font-bold text-[#FF6B52] hover:underline"
+                                            >
+                                                {isExpanded
+                                                    ? 'Leer menos'
+                                                    : 'Leer más'}
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="mt-6 flex items-center gap-3 border-t border-[#101E33]/10 pt-4">
@@ -356,30 +505,31 @@ return img;
                         })}
                     </div>
 
-                    {/* Tira CTA Mini-Test */}
+                    {/* Tira CTA Orgullo Sapius */}
                     <div className="mt-16 rounded-3xl bg-gradient-to-r from-[#CFE4FF]/55 via-white to-[#FFD9CE]/65 p-8 text-center shadow-xs sm:p-12">
                         <h3 className="font-display text-2xl font-extrabold text-[#101E33] sm:text-3xl">
                             El siguiente caso de éxito{' '}
                             <span className="text-[#FF6B52]">puedes ser tú</span>
                         </h3>
                         <p className="mx-auto mt-2 max-w-lg text-sm text-[#101E33]/75 sm:text-base">
-                            Realiza nuestro test gratuito de 6 preguntas para
-                            encontrar el paquete exacto según tu fecha de examen.
+                            Compártenos tus resultados de tu EGEL, envíanos tus
+                            datos o completa el formulario para ser parte de
+                            Orgullo Sapius.
                         </p>
-                        <div className="mt-6 flex flex-wrap justify-center gap-3.5">
+                        <div className="mt-6 flex flex-col items-center justify-center gap-3">
                             <button
                                 type="button"
-                                onClick={openMiniTest}
-                                className="inline-flex min-w-[210px] items-center justify-center rounded-full bg-[#FF6B52] px-8 py-3 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
+                                onClick={() => setPrideFormNotice(true)}
+                                className="inline-flex min-w-[240px] items-center justify-center rounded-full bg-[#FF6B52] px-8 py-3 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C]"
                             >
-                                Realiza el test
+                                Quiero ser parte de Orgullo Sapius
                             </button>
-                            <Link
-                                href="/cursos"
-                                className="inline-flex min-w-[210px] items-center justify-center rounded-full bg-[#101E33] px-8 py-3 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#192B47]"
-                            >
-                                Ver cursos y paquetes
-                            </Link>
+                            {prideFormNotice && (
+                                <p className="text-xs font-medium text-[#101E33]/70">
+                                    El enlace del formulario se habilitará
+                                    próximamente.
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
