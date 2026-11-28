@@ -114,9 +114,14 @@ class V2PilotUserService
             return null;
         }
 
+        $rawTarget = (string) ($data['target'] ?? '/alumno');
+        if ($rawTarget === '' || ! str_starts_with($rawTarget, '/') || str_starts_with($rawTarget, '//') || str_starts_with($rawTarget, '/\\')) {
+            $rawTarget = '/alumno';
+        }
+
         return [
             'uid' => (int) $data['uid'],
-            'target' => (string) ($data['target'] ?? '/alumno'),
+            'target' => $rawTarget,
         ];
     }
 }

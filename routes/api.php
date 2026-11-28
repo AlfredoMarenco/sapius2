@@ -76,6 +76,10 @@ Route::namespace('App\Http\Controllers\Api')->group(function () {
 
     // Endpoint directo para reportes QA desde Electron Desktop (sin requerir cookie de admin)
     Route::post('/electron/qa-report', function (\Illuminate\Http\Request $request) {
+        if (! \App\Http\Controllers\Admin\QaFeedbackBotController::isEnabled()) {
+            abort(404);
+        }
+
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'description' => 'required|string|max:5000',
@@ -140,5 +144,5 @@ Route::namespace('App\Http\Controllers\Api')->group(function () {
             'message' => 'Reporte QA registrado con ID '.$id,
             'id' => $id,
         ]);
-    });
+    })->middleware('throttle:5,1');
 });

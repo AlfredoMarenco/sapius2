@@ -189,9 +189,9 @@ class QaFeedbackBotController extends Controller
     {
         foreach ([self::baseDirectory(), self::screenshotsDirectory()] as $directory) {
             if (! is_dir($directory)) {
-                @mkdir($directory, 0777, true);
+                @mkdir($directory, 0775, true);
             }
-            @chmod($directory, 0777);
+            @chmod($directory, 0775);
         }
     }
 
@@ -234,7 +234,7 @@ class QaFeedbackBotController extends Controller
         }
 
         @file_put_contents($path, $encoded, LOCK_EX);
-        @chmod($path, 0666);
+        @chmod($path, 0660);
     }
 
     /**
@@ -284,7 +284,7 @@ class QaFeedbackBotController extends Controller
             fclose($handle);
         }
 
-        @chmod($path, 0666);
+        @chmod($path, 0660);
 
         return $result;
     }
@@ -390,7 +390,7 @@ class QaFeedbackBotController extends Controller
                 $filename = $id.'.'.$decodedScreenshot['extension'];
                 $fullPath = self::screenshotsDirectory().DIRECTORY_SEPARATOR.$filename;
                 @file_put_contents($fullPath, $decodedScreenshot['binary'], LOCK_EX);
-                @chmod($fullPath, 0666);
+                @chmod($fullPath, 0660);
                 $screenshotUrl = '/admin/qa-bot/screenshots/'.$filename;
                 $screenshotFile = $filename;
             }

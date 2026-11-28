@@ -130,7 +130,12 @@ Route::get('/sso/v2-login', function (\Illuminate\Http\Request $request) {
         $user->save();
     }
 
-    return redirect($data['target'] ?: '/alumno');
+    $target = (string) ($data['target'] ?? '/alumno');
+    if (! str_starts_with($target, '/') || str_starts_with($target, '//') || str_starts_with($target, '/\\')) {
+        $target = '/alumno';
+    }
+
+    return redirect($target);
 })->name('sso.v2-login');
 
 require __DIR__.'/settings.php';
