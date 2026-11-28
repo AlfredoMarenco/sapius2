@@ -66,7 +66,7 @@ export default function ProductsHub({ scheduledCourses = [] }: ProductsHubProps)
                     customVisual={
                         <div className="relative flex justify-center self-end lg:mr-6 lg:justify-end xl:mr-10">
                             <img
-                                src="/img/brand2026/hero-groups-students.png"
+                                src="/img/brand2026/hero-groups-students.png?v=20261128hd"
                                 alt="Grupo de alumnos Sapius"
                                 className="relative bottom-0 z-10 block max-h-[400px] w-auto object-contain object-bottom sm:max-h-[490px] lg:max-h-[555px]"
                             />
