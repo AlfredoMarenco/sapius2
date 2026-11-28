@@ -33,7 +33,7 @@ export function ProductBookHero({
         <section
             className={`relative overflow-hidden bg-white ${
                 flushBottom
-                    ? 'pt-20 pb-0 sm:pt-24 lg:pt-24 lg:pb-0'
+                    ? 'pt-24 pb-0 sm:pt-28 lg:pt-30'
                     : 'pt-24 pb-12 sm:pt-28 lg:pt-30 lg:pb-16'
             }`}
         >
@@ -43,7 +43,7 @@ export function ProductBookHero({
             />
 
             {/* Grilla 4x6 navy central superior */}
-            <div className="pointer-events-none absolute top-24 left-[41%] hidden opacity-85 lg:top-26 lg:block">
+            <div className="pointer-events-none absolute top-24 left-[43%] hidden opacity-85 lg:top-28 lg:block">
                 <PlusGridPattern
                     rows={4}
                     cols={6}
@@ -54,7 +54,7 @@ export function ProductBookHero({
             </div>
 
             {/* Grilla sutil inferior izquierda */}
-            <div className="pointer-events-none absolute bottom-4 left-4 hidden opacity-20 sm:block lg:left-6">
+            <div className="pointer-events-none absolute bottom-5 left-3 hidden opacity-20 sm:left-6 sm:block">
                 <PlusGridPattern
                     rows={6}
                     cols={4}
@@ -65,7 +65,7 @@ export function ProductBookHero({
             </div>
 
             {/* Grilla inferior derecha coral */}
-            <div className="pointer-events-none absolute right-4 bottom-4 hidden opacity-85 md:block lg:right-7">
+            <div className="pointer-events-none absolute right-5 bottom-5 hidden opacity-85 md:block lg:right-8">
                 <PlusGridPattern
                     rows={6}
                     cols={4}
@@ -77,14 +77,14 @@ export function ProductBookHero({
 
             <div className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-10">
                 <div
-                    className={`grid grid-cols-1 gap-10 lg:grid-cols-12 ${
-                        flushBottom ? 'items-end lg:gap-2' : 'items-center lg:gap-8'
+                    className={`grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8 ${
+                        flushBottom ? 'items-end' : 'items-center'
                     }`}
                 >
                     <div
                         className={`lg:col-span-5 ${
                             flushBottom
-                                ? 'pt-4 pb-8 lg:self-center lg:py-12 lg:pl-8 xl:pl-12'
+                                ? 'pt-4 pb-10 lg:self-center lg:py-14'
                                 : ''
                         }`}
                     >

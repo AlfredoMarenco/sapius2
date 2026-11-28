@@ -22,11 +22,11 @@ export default function GroupsPackages({
                 titleLine2="paquetes"
                 flushBottom
                 customVisual={
-                    <div className="relative flex justify-center self-end lg:-ml-8 lg:justify-start xl:-ml-10">
+                    <div className="relative flex justify-center self-end lg:mr-6 lg:justify-end xl:mr-10">
                         <img
                             src="/img/brand2026/hero-groups-students.png"
                             alt="Grupo de alumnos Sapius"
-                            className="relative bottom-0 z-10 block max-h-[440px] w-auto object-contain object-bottom sm:max-h-[510px] lg:max-h-[565px] xl:max-h-[590px]"
+                            className="relative bottom-0 z-10 block max-h-[400px] w-auto object-contain object-bottom sm:max-h-[490px] lg:max-h-[555px]"
                         />
                     </div>
                 }
@@ -37,7 +37,7 @@ export default function GroupsPackages({
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-base font-medium text-white shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] sm:w-[240px]"
+                        className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-8 py-3.5 text-[16px] font-medium text-white shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0563C] sm:w-[285px]"
                     >
                         Hablar con un asesor
                     </a>
