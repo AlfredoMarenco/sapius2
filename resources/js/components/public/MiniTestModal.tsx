@@ -905,9 +905,9 @@ export function MiniTestModal({
         }
 
         return {
-            href: whatsappHref,
-            isExternal: true,
-            label: 'Solicitar inscripción por WhatsApp',
+            href: '/login',
+            isExternal: false,
+            label: 'Comprar',
         };
     }, [scheduledCourses, recommendation, whatsappHref]);
 
@@ -1117,7 +1117,8 @@ export function MiniTestModal({
                                                 </Link>
                                             )}
 
-                                            {recommendation.coursePageHref && (
+                                            {recommendation.coursePageHref &&
+                                                purchaseTarget.href !== '/login' && (
                                                 <Link
                                                     href="/login"
                                                     onClick={() => setOpen(false)}
@@ -1127,19 +1128,6 @@ export function MiniTestModal({
                                                 </Link>
                                             )}
                                         </div>
-
-                                        {recommendation.purchaseMode !== 'whatsapp' && (
-                                            <div className="mt-3">
-                                                <a
-                                                    href={whatsappHref}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex w-full items-center justify-center rounded-full bg-[#06C156] px-6 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#05A84B] sm:text-sm"
-                                                >
-                                                    Hablar con un asesor por WhatsApp
-                                                </a>
-                                            </div>
-                                        )}
                                     </div>
 
                                     <div className="mt-4 flex justify-center">
