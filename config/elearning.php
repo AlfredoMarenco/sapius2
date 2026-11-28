@@ -11,4 +11,5 @@ return [
     'redirect_public_landings' => (bool) env('REDIRECT_PUBLIC_LANDINGS_TO_PRODUCTION', false),
     'production_site_url' => env('APP_REAL_SITE_URL', 'https://sapius.com.mx'),
     'v2_site_url' => env('APP_V2_SITE_URL', 'https://v2.sapius.com.mx'),
+    'google_analytics_id' => env('GOOGLE_ANALYTICS_ID', 'G-G0P10R831N'),
 ];

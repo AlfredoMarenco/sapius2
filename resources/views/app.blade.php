@@ -40,6 +40,28 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600|plus-jakarta-sans:400,500,600,700,800|dm-sans:400,500,700" rel="stylesheet" />
 
+        @php
+            $gaId = config('elearning.google_analytics_id');
+        @endphp
+        @if (! app()->environment('testing') && filled($gaId))
+            <!-- Google tag (gtag.js) -->
+            <script async src="https://www.googletagmanager.com/gtag/js?id={{ $gaId }}"></script>
+            <script>
+                window.dataLayer = window.dataLayer || [];
+                function gtag() { dataLayer.push(arguments); }
+                gtag('js', new Date());
+                gtag('config', '{{ $gaId }}');
+                document.addEventListener('inertia:navigate', function(event) {
+                    if (typeof gtag === 'function') {
+                        gtag('config', '{{ $gaId }}', {
+                            page_path: window.location.pathname + window.location.search,
+                            page_location: window.location.href
+                        });
+                    }
+                });
+            </script>
+        @endif
+
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx'])
         <x-inertia::head>
