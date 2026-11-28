@@ -55,6 +55,7 @@
         submitting: false,
         submitFeedback: null,
         loadingReports: false,
+        lastReportsSig: '',
         reports: [],
         counts: {
             pending: 0,
@@ -402,6 +403,7 @@
             render();
         }
 
+        let shouldRender = !silent;
         try {
             const response = await fetch(ENDPOINT_BASE, {
                 method: 'GET',
@@ -419,6 +421,13 @@
 
             const data = await response.json();
             const incoming = Array.isArray(data.reports) ? data.reports : [];
+            const nextSig = JSON.stringify({ r: incoming, c: data.counts });
+            if (silent && nextSig === state.lastReportsSig) {
+                return;
+            }
+            state.lastReportsSig = nextSig;
+            shouldRender = true;
+
             const nextResolved = new Set();
 
             for (const item of incoming) {
@@ -442,7 +451,9 @@
             // Silently ignore transient network glitches during background polling
         } finally {
             state.loadingReports = false;
-            render();
+            if (shouldRender) {
+                render();
+            }
         }
     }
 
@@ -749,8 +760,15 @@
                     break;
                 case 'select-grill-opt':
                     if (id) {
-                        state.grillSelectedOption[id] = target.getAttribute('data-qa-opt');
+                        const chosen = target.getAttribute('data-qa-opt');
+                        state.grillSelectedOption[id] = chosen;
                         render();
+                        if (chosen === 'custom') {
+                            const customEl = shadowRoot.getElementById(`qa-grill-custom-${id}`);
+                            if (customEl instanceof HTMLTextAreaElement) {
+                                customEl.focus({ preventScroll: true });
+                            }
+                        }
                     }
                     break;
                 case 'submit-grill-answer':
@@ -1190,9 +1208,9 @@
                     ${grillBadgeHtml}
                     ${defectBadgeHtml}
                 </div>
-                <div class="report-msg">${escapeHtml(report.message)}</div>
-                ${grillHistoryHtml}
                 ${grillBoxHtml}
+                ${grillHistoryHtml}
+                <div class="report-msg">${escapeHtml(report.message)}</div>
                 <div class="report-meta">
                     <span title="${escapeHtml(report.url || '')}">${escapeHtml(shortUrl)}</span>
                     ${report.component ? `<span>· ${escapeHtml(report.component)}</span>` : ''}
@@ -1239,7 +1257,9 @@
             return;
         }
 
-        // Preserve textarea focus & cursor if user is typing during a background poll
+        // Preserve scroll positions, textarea focus & cursor during re-renders
+        const prevReportsScroll = shadowRoot.querySelector('.reports-scroll')?.scrollTop ?? 0;
+        const prevTabScroll = shadowRoot.querySelector('.tab-body')?.scrollTop ?? 0;
         const activeEl = shadowRoot.activeElement;
         const activeId = activeEl instanceof HTMLElement ? activeEl.id : null;
         const selStart = activeEl instanceof HTMLTextAreaElement ? activeEl.selectionStart : null;
@@ -1533,10 +1553,19 @@
             </div>
         `;
 
+        const nextReportsScroll = shadowRoot.querySelector('.reports-scroll');
+        if (nextReportsScroll && prevReportsScroll > 0) {
+            nextReportsScroll.scrollTop = prevReportsScroll;
+        }
+        const nextTabScroll = shadowRoot.querySelector('.tab-body');
+        if (nextTabScroll && prevTabScroll > 0) {
+            nextTabScroll.scrollTop = prevTabScroll;
+        }
+
         if (activeId) {
             const restored = shadowRoot.getElementById(activeId);
             if (restored instanceof HTMLElement) {
-                restored.focus();
+                restored.focus({ preventScroll: true });
                 if (restored instanceof HTMLTextAreaElement && selStart !== null && selEnd !== null) {
                     restored.setSelectionRange(selStart, selEnd);
                 }
