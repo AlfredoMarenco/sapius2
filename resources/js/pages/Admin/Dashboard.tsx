@@ -178,10 +178,59 @@ export default function Dashboard({ cohorts, stats }: Props) {
                                             </div>
                                         )}
                                         
-                                        <div className="absolute top-3 left-3 z-20">
+                                        <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
                                             <span className="rounded-lg bg-[#101E33]/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm border border-white/10">
                                                 Cohorte #{cohort.id}
                                             </span>
+                                            {(() => {
+                                                const haystack = `${cohort.course?.title || ''} ${cohort.internal_id || ''}`
+                                                    .toLowerCase()
+                                                    .normalize('NFD')
+                                                    .replace(/[\u0300-\u036f]/g, '');
+                                                const hasSim = haystack.includes('simulador');
+                                                const hasGuia = haystack.includes('guia');
+                                                const typeLabel =
+                                                    hasSim && hasGuia
+                                                        ? 'Simulador + Guía'
+                                                        : hasSim
+                                                          ? 'Simulador'
+                                                          : hasGuia
+                                                            ? 'Guía'
+                                                            : 'Curso';
+
+                                                const months = [
+                                                    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                                                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+                                                ];
+                                                let periodLabel = '';
+                                                if (cohort.start_date) {
+                                                    const parts = cohort.start_date.split('/');
+                                                    if (parts.length === 3) {
+                                                        const mIdx = Number(parts[1]) - 1;
+                                                        const yr = parts[2];
+                                                        periodLabel = months[mIdx] ? `${months[mIdx]} ${yr}` : yr;
+                                                    }
+                                                }
+                                                if (!periodLabel) {
+                                                    const yrMatch = haystack.match(/\b(202[5-9]|203[0-9])\b/);
+                                                    if (yrMatch) {
+                                                        periodLabel = yrMatch[1];
+                                                    }
+                                                }
+
+                                                return (
+                                                    <>
+                                                        <span className="rounded-lg bg-indigo-600/95 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                                                            {typeLabel}
+                                                        </span>
+                                                        {periodLabel && (
+                                                            <span className="rounded-lg bg-emerald-600/95 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                                                                {periodLabel}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="absolute top-3 right-3 z-20">
                                             <span className="rounded-lg bg-[#FF6B52] px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
