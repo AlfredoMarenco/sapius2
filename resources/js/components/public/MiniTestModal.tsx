@@ -1119,11 +1119,11 @@ export function MiniTestModal({
 
                                             {recommendation.coursePageHref && (
                                                 <Link
-                                                    href={recommendation.coursePageHref}
+                                                    href="/login"
                                                     onClick={() => setOpen(false)}
                                                     className="inline-flex flex-1 items-center justify-center rounded-full bg-[#101E33] px-6 py-3 text-center text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#192B47] sm:text-sm"
                                                 >
-                                                    Ver detalles del programa
+                                                    Comprar
                                                 </Link>
                                             )}
                                         </div>
