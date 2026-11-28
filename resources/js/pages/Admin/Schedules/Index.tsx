@@ -33,18 +33,33 @@ interface Schedule {
     end_date: string | null;
     price: number;
     students_count: number;
+    zoom_classes_count?: number;
     is_active: boolean;
+}
+
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
 }
 
 interface SchedulesIndexProps {
     schedules: {
         data: Schedule[];
-        links: any[];
+        links: PaginationLink[];
         total: number;
+        current_page?: number;
+        last_page?: number;
     };
     courses: Array<{ id: number; title: string }>;
     instructors: Array<{ id: number; name: string }>;
     selectedCourseId: number | null;
+    filters?: {
+        search?: string;
+        curso_id?: number | null;
+        status?: 'all' | 'active' | 'inactive';
+        instructor_id?: number | null;
+    };
 }
 
 export default function SchedulesIndex({
@@ -52,7 +67,17 @@ export default function SchedulesIndex({
     courses = [],
     instructors = [],
     selectedCourseId = null,
+    filters = {},
 }: SchedulesIndexProps) {
+    const [searchText, setSearchText] = useState(filters.search ?? '');
+    const [courseFilter, setCourseFilter] = useState<string>(
+        filters.curso_id ? String(filters.curso_id) : selectedCourseId ? String(selectedCourseId) : '',
+    );
+    const [statusFilter, setStatusFilter] = useState<string>(filters.status ?? 'all');
+    const [instructorFilter, setInstructorFilter] = useState<string>(
+        filters.instructor_id ? String(filters.instructor_id) : '',
+    );
+
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [createForm, setCreateForm] = useState({
         course_id: selectedCourseId || (courses[0]?.id ?? ''),
@@ -64,13 +89,43 @@ export default function SchedulesIndex({
         is_active: true,
     });
 
-    const handleCourseFilter = (courseId: string) => {
-        if (courseId) {
-            router.get('/admin/registro/programacion', { curso_id: courseId });
-        } else {
-            router.get('/admin/registro/programacion');
-        }
+    const applyFilters = (overrides?: {
+        search?: string;
+        curso_id?: string;
+        status?: string;
+        instructor_id?: string;
+    }) => {
+        const nextSearch = overrides?.search !== undefined ? overrides.search : searchText;
+        const nextCourse = overrides?.curso_id !== undefined ? overrides.curso_id : courseFilter;
+        const nextStatus = overrides?.status !== undefined ? overrides.status : statusFilter;
+        const nextInstructor =
+            overrides?.instructor_id !== undefined ? overrides.instructor_id : instructorFilter;
+
+        const params: Record<string, string> = {};
+        if (nextSearch.trim() !== '') params.search = nextSearch.trim();
+        if (nextCourse !== '') params.curso_id = nextCourse;
+        if (nextStatus !== '' && nextStatus !== 'all') params.status = nextStatus;
+        if (nextInstructor !== '') params.instructor_id = nextInstructor;
+
+        router.get('/admin/registro/programacion', params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
+
+    const handleResetFilters = () => {
+        setSearchText('');
+        setCourseFilter('');
+        setStatusFilter('all');
+        setInstructorFilter('');
+        router.get('/admin/registro/programacion', {}, { preserveState: true });
+    };
+
+    const hasActiveFilters =
+        searchText.trim() !== '' ||
+        courseFilter !== '' ||
+        (statusFilter !== '' && statusFilter !== 'all') ||
+        instructorFilter !== '';
 
     const handleToggleActive = (id: number) => {
         router.patch(`/admin/schedules/${id}/toggle`);
@@ -110,23 +165,108 @@ export default function SchedulesIndex({
                     </Button>
                 </div>
 
-                {/* Filter by course */}
-                <div className="flex items-center gap-2.5 p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 shadow-xs w-full max-w-md">
-                    <BookOpen className="w-4 h-4 text-neutral-400 shrink-0" />
-                    <Label className="text-xs font-semibold shrink-0">Curso:</Label>
-                    <select
-                        className="w-full text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-transparent px-2.5 py-1.5"
-                        value={selectedCourseId || ''}
-                        onChange={(e) => handleCourseFilter(e.target.value)}
-                    >
-                        <option value="">Todos los cursos</option>
-                        {courses.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.title}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                {/* Barra de Filtros Completa */}
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        applyFilters();
+                    }}
+                    className="grid grid-cols-1 gap-2.5 rounded-xl border border-neutral-200/80 bg-white p-3 shadow-xs sm:grid-cols-2 lg:grid-cols-12 dark:border-neutral-800 dark:bg-neutral-900"
+                >
+                    <div className="relative flex items-center lg:col-span-4">
+                        <Search className="pointer-events-none absolute left-3 h-4 w-4 text-neutral-400" />
+                        <Input
+                            type="text"
+                            placeholder="Buscar por curso, generación (ej. diciembre), instructor o #ID..."
+                            value={searchText}
+                            onChange={(e) => setSearchText(e.target.value)}
+                            className="h-9 pl-9 pr-8 text-xs"
+                        />
+                        {searchText !== '' && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchText('');
+                                    applyFilters({ search: '' });
+                                }}
+                                className="absolute right-2.5 text-neutral-400 hover:text-neutral-600"
+                                title="Limpiar búsqueda"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 lg:col-span-3">
+                        <BookOpen className="h-4 w-4 shrink-0 text-neutral-400" />
+                        <select
+                            className="h-9 w-full rounded-lg border border-neutral-200 bg-transparent px-2.5 text-xs dark:border-neutral-700"
+                            value={courseFilter}
+                            onChange={(e) => {
+                                setCourseFilter(e.target.value);
+                                applyFilters({ curso_id: e.target.value });
+                            }}
+                        >
+                            <option value="">Todos los cursos</option>
+                            {courses.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.title}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                        <select
+                            className="h-9 w-full rounded-lg border border-neutral-200 bg-transparent px-2.5 text-xs dark:border-neutral-700"
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                applyFilters({ status: e.target.value });
+                            }}
+                        >
+                            <option value="all">Todos los estatus</option>
+                            <option value="active">Solo activos</option>
+                            <option value="inactive">Solo inactivos</option>
+                        </select>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                        <select
+                            className="h-9 w-full rounded-lg border border-neutral-200 bg-transparent px-2.5 text-xs dark:border-neutral-700"
+                            value={instructorFilter}
+                            onChange={(e) => {
+                                setInstructorFilter(e.target.value);
+                                applyFilters({ instructor_id: e.target.value });
+                            }}
+                        >
+                            <option value="">Todos los instructores</option>
+                            {instructors.map((i) => (
+                                <option key={i.id} value={i.id}>
+                                    {i.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 lg:col-span-1 lg:justify-end">
+                        <Button type="submit" size="sm" variant="secondary" className="h-9 flex-1 text-xs lg:flex-initial">
+                            Filtrar
+                        </Button>
+                        {hasActiveFilters && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleResetFilters}
+                                className="h-9 px-2 text-xs text-neutral-500 hover:text-neutral-800"
+                                title="Limpiar todos los filtros"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </form>
 
                 {/* Mobile Cards */}
                 <div className="space-y-3 md:hidden">
@@ -179,6 +319,7 @@ export default function SchedulesIndex({
                                     <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs text-indigo-600 border-indigo-200">
                                         <Link href={`/admin/schedules/${item.id}/zoom-classes`}>
                                             <Video className="w-3.5 h-3.5 mr-1" /> Zoom
+                                            {item.zoom_classes_count && item.zoom_classes_count > 0 ? ` (${item.zoom_classes_count})` : ''}
                                         </Link>
                                     </Button>
                                     <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs text-blue-600 border-blue-200">
@@ -286,7 +427,9 @@ export default function SchedulesIndex({
                                                 >
                                                     <Link href={`/admin/schedules/${item.id}/zoom-classes`}>
                                                         <Video className="w-3.5 h-3.5 xl:mr-1" />
-                                                        <span className="hidden xl:inline">Zoom</span>
+                                                        <span className="hidden xl:inline">
+                                                            Zoom{item.zoom_classes_count && item.zoom_classes_count > 0 ? ` (${item.zoom_classes_count})` : ''}
+                                                        </span>
                                                     </Link>
                                                 </Button>
                                                 <Button
@@ -318,6 +461,51 @@ export default function SchedulesIndex({
                         </TableBody>
                     </Table>
                 </Card>
+
+                {/* Paginación */}
+                {schedules.links && schedules.links.length > 3 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <p className="text-xs text-neutral-500">
+                            Total: <strong>{schedules.total}</strong> cohortes
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1">
+                            {schedules.links.map((link, idx) => {
+                                const cleanLabel = link.label
+                                    .replace(/&laquo;/g, '«')
+                                    .replace(/&raquo;/g, '»')
+                                    .replace(/Previous/i, 'Anterior')
+                                    .replace(/Next/i, 'Siguiente');
+
+                                if (!link.url) {
+                                    return (
+                                        <span
+                                            key={idx}
+                                            className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs text-neutral-400 dark:border-neutral-800"
+                                        >
+                                            {cleanLabel}
+                                        </span>
+                                    );
+                                }
+
+                                return (
+                                    <Link
+                                        key={idx}
+                                        href={link.url}
+                                        preserveState
+                                        preserveScroll
+                                        className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                                            link.active
+                                                ? 'border-blue-600 bg-blue-600 font-semibold text-white'
+                                                : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300'
+                                        }`}
+                                    >
+                                        {cleanLabel}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Create Modal */}
                 {isCreateOpen && (

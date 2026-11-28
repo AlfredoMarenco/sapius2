@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\CourseCategoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -22,10 +23,60 @@ class ScheduledCourseController extends Controller
     public function index(Request $request)
     {
         $cursoId = $request->input('curso_id');
+        $search = trim((string) $request->input('search', ''));
+        $status = (string) $request->input('status', 'all');
+        $instructorId = $request->input('instructor_id');
+
         $query = ScheduledCourse::with(['course', 'instructor'])->withCount('enrollments');
+
+        if (Schema::hasTable('zoom_classes')) {
+            $query->withCount('zoomClasses');
+        }
 
         if ($cursoId) {
             $query->where('curso_id', $cursoId);
+        }
+
+        if ($instructorId) {
+            $query->where('user_id', $instructorId);
+        }
+
+        if ($status === 'active') {
+            $query->where('activo', 'si');
+        } elseif ($status === 'inactive') {
+            $query->where('activo', 'no');
+        }
+
+        if ($search !== '') {
+            $hasNombre = Schema::hasColumn('users', 'nombre');
+            $hasApellido = Schema::hasColumn('users', 'apellido');
+            $hasName = Schema::hasColumn('users', 'name');
+            $like = '%'.$search.'%';
+
+            $query->where(function ($q) use ($search, $like, $hasNombre, $hasApellido, $hasName) {
+                $q->where('identificador', 'like', $like)
+                    ->orWhereHas('course', function ($cq) use ($like) {
+                        $cq->where('titulo', 'like', $like);
+                    })
+                    ->orWhereHas('instructor', function ($uq) use ($like, $hasNombre, $hasApellido, $hasName) {
+                        $uq->where(function ($sub) use ($like, $hasNombre, $hasApellido, $hasName) {
+                            $sub->where('email', 'like', $like);
+                            if ($hasNombre) {
+                                $sub->orWhere('nombre', 'like', $like);
+                            }
+                            if ($hasApellido) {
+                                $sub->orWhere('apellido', 'like', $like);
+                            }
+                            if ($hasName) {
+                                $sub->orWhere('name', 'like', $like);
+                            }
+                        });
+                    });
+
+                if (ctype_digit($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
+            });
         }
 
         $schedules = $query->orderBy('id', 'desc')->paginate(15)->withQueryString()->through(function ($s) {
@@ -42,27 +93,40 @@ class ScheduledCourseController extends Controller
                 'fecha_fin_venta' => $s->fecha_fin_venta ? $s->fecha_fin_venta->format('Y-m-d') : null,
                 'price' => $s->precio,
                 'students_count' => $s->enrollments_count,
+                'zoom_classes_count' => (int) ($s->zoom_classes_count ?? 0),
                 'is_active' => $s->activo === 'si',
             ];
         });
 
-        $courses = Course::where('activo', 'si')->select('id', 'titulo')->get()->map(fn ($c) => [
-            'id' => $c->id,
-            'title' => $c->titulo,
-        ]);
+        $courses = Course::where(function ($q) {
+            $q->where('activo', 'si')->orWhereHas('scheduledCourses');
+        })
+            ->orderBy('titulo', 'asc')
+            ->select('id', 'titulo')
+            ->get()
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'title' => $c->titulo,
+            ]);
 
         $instructors = User::whereHas('roles', function ($q) {
             $q->whereIn('slug', ['admin', 'instructor']);
         })->get()->map(fn ($u) => [
             'id' => $u->id,
-            'name' => $u->name,
-        ]);
+            'name' => $u->name ?: ($u->nombre_completo ?: $u->email),
+        ])->sortBy('name')->values();
 
         return Inertia::render('Admin/Schedules/Index', [
             'schedules' => $schedules,
             'courses' => $courses,
             'instructors' => $instructors,
             'selectedCourseId' => $cursoId ? (int) $cursoId : null,
+            'filters' => [
+                'search' => $search,
+                'curso_id' => $cursoId ? (int) $cursoId : null,
+                'status' => in_array($status, ['all', 'active', 'inactive'], true) ? $status : 'all',
+                'instructor_id' => $instructorId ? (int) $instructorId : null,
+            ],
         ]);
     }
 

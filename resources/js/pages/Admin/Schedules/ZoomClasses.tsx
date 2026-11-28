@@ -1,14 +1,16 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     ArrowLeft,
     Calendar,
     CheckCircle2,
     Clock,
     ExternalLink,
+    Filter,
     Plus,
     Radio,
+    Search,
     Trash2,
     Video,
     X,
@@ -52,6 +54,14 @@ interface ZoomClassItem {
     has_start_url: boolean;
 }
 
+interface CohortOption {
+    id: number;
+    course_id: number;
+    course_title: string;
+    internal_id: string;
+    is_active: boolean;
+}
+
 interface ZoomClassesProps {
     cohort: {
         id: number;
@@ -60,6 +70,7 @@ interface ZoomClassesProps {
         internal_id: string;
         instructor_name: string;
     };
+    availableCohorts?: CohortOption[];
     modules: ModuleOption[];
     zoomClasses: ZoomClassItem[];
     routePrefix: 'admin' | 'instructor';
@@ -69,12 +80,18 @@ interface ZoomClassesProps {
 
 export default function ZoomClasses({
     cohort,
+    availableCohorts = [],
     modules = [],
     zoomClasses = [],
     routePrefix,
     apiConfigured,
     sdkConfigured,
 }: ZoomClassesProps) {
+    const [cohortQuery, setCohortQuery] = useState('');
+    const [classSearch, setClassSearch] = useState('');
+    const [moduleFilter, setModuleFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [form, setForm] = useState({
         title: '',
@@ -89,6 +106,40 @@ export default function ZoomClasses({
     });
 
     const selectedModule = modules.find((m) => String(m.id) === String(form.module_id));
+
+    const filteredCohorts = useMemo(() => {
+        const q = cohortQuery.trim().toLowerCase();
+        if (!q) return availableCohorts;
+        return availableCohorts.filter(
+            (c) =>
+                c.course_title.toLowerCase().includes(q) ||
+                c.internal_id.toLowerCase().includes(q) ||
+                String(c.id) === q,
+        );
+    }, [availableCohorts, cohortQuery]);
+
+    const filteredZoomClasses = useMemo(() => {
+        const q = classSearch.trim().toLowerCase();
+        return zoomClasses.filter((zc) => {
+            if (q) {
+                const matchesText =
+                    zc.title.toLowerCase().includes(q) ||
+                    zc.meeting_number.toLowerCase().includes(q) ||
+                    (zc.module_title || '').toLowerCase().includes(q) ||
+                    (zc.lesson_title || '').toLowerCase().includes(q);
+                if (!matchesText) return false;
+            }
+            if (moduleFilter === 'general') {
+                if (zc.module_id !== null) return false;
+            } else if (moduleFilter !== 'all') {
+                if (String(zc.module_id ?? '') !== moduleFilter) return false;
+            }
+            if (statusFilter !== 'all' && zc.computed_status !== statusFilter) {
+                return false;
+            }
+            return true;
+        });
+    }, [zoomClasses, classSearch, moduleFilter, statusFilter]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -165,6 +216,50 @@ export default function ZoomClasses({
                     </Button>
                 </div>
 
+                {/* Selector Rápido de Curso / Cohorte */}
+                {availableCohorts.length > 1 && (
+                    <div className="rounded-xl border border-neutral-200/80 bg-white p-3.5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
+                        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+                            <Filter className="h-3.5 w-3.5 text-blue-600" />
+                            Cambiar rápidamente de Curso o Cohorte
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-12">
+                            <div className="relative sm:col-span-5">
+                                <Search className="pointer-events-none absolute top-2.5 left-3 h-4 w-4 text-neutral-400" />
+                                <Input
+                                    type="text"
+                                    placeholder="Filtrar curso o grupo (ej. Manejo de servicios...)"
+                                    value={cohortQuery}
+                                    onChange={(e) => setCohortQuery(e.target.value)}
+                                    className="h-9 pl-9 text-xs"
+                                />
+                            </div>
+                            <div className="sm:col-span-7">
+                                <select
+                                    className="h-9 w-full rounded-lg border border-neutral-200 bg-transparent px-3 text-xs font-medium dark:border-neutral-700"
+                                    value={cohort.id}
+                                    onChange={(e) => {
+                                        const nextId = e.target.value;
+                                        if (nextId && Number(nextId) !== cohort.id) {
+                                            router.get(`/${routePrefix}/schedules/${nextId}/zoom-classes`);
+                                        }
+                                    }}
+                                >
+                                    {filteredCohorts.length === 0 ? (
+                                        <option value={cohort.id}>Sin coincidencias para "{cohortQuery}"</option>
+                                    ) : (
+                                        filteredCohorts.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                                #{c.id} — {c.course_title} ({c.internal_id}){c.is_active ? '' : ' [Inactivo]'}
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Estado de configuración */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex items-center justify-between rounded-xl border border-neutral-200/80 bg-white p-3.5 text-xs dark:border-neutral-800 dark:bg-neutral-900">
@@ -185,20 +280,67 @@ export default function ZoomClasses({
                     </div>
                 </div>
 
+                {/* Filtros de Clases Zoom */}
+                {zoomClasses.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2.5 rounded-xl border border-neutral-200/80 bg-white p-3 shadow-xs sm:grid-cols-12 dark:border-neutral-800 dark:bg-neutral-900">
+                        <div className="relative sm:col-span-5">
+                            <Search className="pointer-events-none absolute top-2.5 left-3 h-4 w-4 text-neutral-400" />
+                            <Input
+                                type="text"
+                                placeholder="Buscar clase por título, Meeting ID o lección..."
+                                value={classSearch}
+                                onChange={(e) => setClassSearch(e.target.value)}
+                                className="h-9 pl-9 text-xs"
+                            />
+                        </div>
+                        <div className="sm:col-span-4">
+                            <select
+                                className="h-9 w-full rounded-lg border border-neutral-200 bg-transparent px-2.5 text-xs dark:border-neutral-700"
+                                value={moduleFilter}
+                                onChange={(e) => setModuleFilter(e.target.value)}
+                            >
+                                <option value="all">Todos los módulos</option>
+                                <option value="general">General del curso</option>
+                                {modules.map((m) => (
+                                    <option key={m.id} value={String(m.id)}>
+                                        {m.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="sm:col-span-3">
+                            <select
+                                className="h-9 w-full rounded-lg border border-neutral-200 bg-transparent px-2.5 text-xs dark:border-neutral-700"
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                            >
+                                <option value="all">Todos los estatus</option>
+                                <option value="live">En vivo</option>
+                                <option value="scheduled">Programadas</option>
+                                <option value="ended">Finalizadas</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+
                 {/* Lista de Clases */}
-                {zoomClasses.length === 0 ? (
+                {filteredZoomClasses.length === 0 ? (
                     <Card className="p-12 text-center text-neutral-400">
                         <Video className="mx-auto mb-3 h-12 w-12 opacity-30" />
                         <h3 className="font-semibold text-neutral-700 dark:text-neutral-300">
-                            No hay clases en vivo programadas para este grupo
+                            {zoomClasses.length === 0
+                                ? 'No hay clases en vivo programadas para este grupo'
+                                : 'No se encontraron clases con los filtros aplicados'}
                         </h3>
                         <p className="mt-1 text-xs">
-                            Programa una nueva sesión de Zoom para que aparezca en el calendario y temario de tus alumnos.
+                            {zoomClasses.length === 0
+                                ? 'Programa una nueva sesión de Zoom para que aparezca en el calendario y temario de tus alumnos.'
+                                : 'Prueba limpiando el texto de búsqueda o cambiando el filtro de módulo/estatus.'}
                         </p>
                     </Card>
                 ) : (
                     <div className="space-y-4">
-                        {zoomClasses.map((zc) => (
+                        {filteredZoomClasses.map((zc) => (
                             <Card key={zc.id} className="border-neutral-200/80 shadow-xs dark:border-neutral-800">
                                 <CardHeader className="pb-3">
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

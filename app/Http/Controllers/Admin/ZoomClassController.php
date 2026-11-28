@@ -39,9 +39,27 @@ class ZoomClassController extends Controller
 
     public function index(Request $request, ScheduledCourse $schedule)
     {
-        $this->authorizeCohortAccess($schedule);
+        $user = $this->authorizeCohortAccess($schedule);
 
         $schedule->load(['course', 'instructor']);
+
+        $availableCohortsQuery = ScheduledCourse::with('course:id,titulo')
+            ->orderByDesc('id');
+
+        if (! $user->hasRole('admin')) {
+            $availableCohortsQuery->where('user_id', $user->id);
+        }
+
+        $availableCohorts = $availableCohortsQuery
+            ->get(['id', 'curso_id', 'identificador', 'activo', 'user_id'])
+            ->map(fn (ScheduledCourse $c) => [
+                'id' => $c->id,
+                'course_id' => $c->curso_id,
+                'course_title' => $c->course?->titulo ?? 'Curso',
+                'internal_id' => $c->identificador ?? "Cohorte #{$c->id}",
+                'is_active' => $c->activo === 'si',
+            ])
+            ->values();
 
         $modules = Module::where('curso_id', $schedule->curso_id)
             ->with(['lessons' => fn ($q) => $q->where('activo', 'si')->orderBy('posicion', 'asc')])
@@ -93,6 +111,7 @@ class ZoomClassController extends Controller
                 'internal_id' => $schedule->identificador ?? "Cohorte #{$schedule->id}",
                 'instructor_name' => $schedule->instructor?->name ?? 'Sin asignar',
             ],
+            'availableCohorts' => $availableCohorts,
             'modules' => $modules,
             'zoomClasses' => $zoomClasses,
             'routePrefix' => $routePrefix,

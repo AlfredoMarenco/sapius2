@@ -290,3 +290,68 @@ test('enrolled student can open embedded zoom room and obtain sdk signature whil
         ->postJson("/alumno/clases-en-vivo/{$zoomClass->id}/signature")
         ->assertForbidden();
 });
+
+test('admin schedules index supports search, status and course filters and zoom page provides available cohorts', function () {
+    $adminRole = Role::create(['name' => 'Admin', 'slug' => 'admin']);
+    $admin = User::factory()->create(['activo' => 'si']);
+    $admin->roles()->attach($adminRole->id);
+
+    $courseA = Course::create([
+        'user_id' => $admin->id,
+        'title' => 'Manejo de Servicios Alimenticios',
+        'slug' => 'manejo-servicios-alimenticios',
+        'is_active' => true,
+    ]);
+    $courseB = Course::create([
+        'user_id' => $admin->id,
+        'title' => 'EXANI II Medicina',
+        'slug' => 'exani-ii-medicina',
+        'is_active' => true,
+    ]);
+
+    $schedA = ScheduledCourse::create([
+        'course_id' => $courseA->id,
+        'instructor_id' => $admin->id,
+        'start_date' => now()->subDay(),
+        'end_date' => now()->addMonth(),
+        'price' => 1500,
+        'internal_id' => 'DIC-2026-ALIM',
+        'is_active' => true,
+    ]);
+    ScheduledCourse::create([
+        'course_id' => $courseB->id,
+        'instructor_id' => $admin->id,
+        'start_date' => now()->subMonth(),
+        'end_date' => now()->subDay(),
+        'price' => 2000,
+        'internal_id' => 'ENE-2026-EXANI',
+        'is_active' => false,
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/admin/registro/programacion?search=alimenticios&status=active')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Admin/Schedules/Index')
+            ->has('schedules.data', 1)
+            ->where('schedules.data.0.internal_id', 'DIC-2026-ALIM')
+        );
+
+    $this->actingAs($admin)
+        ->get('/admin/registro/programacion?status=inactive')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Admin/Schedules/Index')
+            ->has('schedules.data', 1)
+            ->where('schedules.data.0.internal_id', 'ENE-2026-EXANI')
+        );
+
+    $this->actingAs($admin)
+        ->get("/admin/schedules/{$schedA->id}/zoom-classes")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Admin/Schedules/ZoomClasses')
+            ->has('availableCohorts', 2)
+        );
+});
+
