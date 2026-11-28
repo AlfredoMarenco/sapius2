@@ -754,12 +754,22 @@ export function MiniTestModal({
             Array.isArray(raw.recommendations) &&
             raw.recommendations.length > 0
         ) {
+            const hasGroupQuestion = raw.questions.some(
+                (q) => q.id === 'group_interest',
+            );
+            const groupFallback = DEFAULT_MINI_TEST_CONFIG.questions.find(
+                (q) => q.id === 'group_interest',
+            );
+
             return {
                 header: {
                     ...DEFAULT_MINI_TEST_CONFIG.header,
                     ...(raw.header ?? {}),
                 },
-                questions: raw.questions,
+                questions:
+                    !hasGroupQuestion && groupFallback
+                        ? [...raw.questions, groupFallback]
+                        : raw.questions,
                 recommendations: raw.recommendations,
             };
         }

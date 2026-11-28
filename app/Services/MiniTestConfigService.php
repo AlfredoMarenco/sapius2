@@ -280,6 +280,27 @@ class MiniTestConfigService
                         ],
                     ],
                 ],
+                [
+                    'id' => 'group_interest',
+                    'title' => '¿Tienes compañeros de generación que también presentarán el EGEL Plus y estarían interesados en formar un grupo para obtener un precio preferencial?',
+                    'active' => true,
+                    'options' => [
+                        [
+                            'id' => 'si',
+                            'label' => 'Sí, nos interesa formar un grupo',
+                            'helper' => 'Habla directo por WhatsApp con un asesor para conocer el descuento según cuántas personas son.',
+                            'areaFilter' => null,
+                            'weights' => [],
+                        ],
+                        [
+                            'id' => 'no',
+                            'label' => 'No, es solo para mí',
+                            'helper' => 'Ver la recomendación individual según mis respuestas anteriores.',
+                            'areaFilter' => null,
+                            'weights' => [],
+                        ],
+                    ],
+                ],
             ],
             'recommendations' => [
                 [
@@ -706,6 +727,11 @@ class MiniTestConfigService
 
         if ($questions === []) {
             $questions = $defaults['questions'];
+        } elseif (! collect($questions)->contains(fn (array $q): bool => ($q['id'] ?? '') === 'group_interest')) {
+            $groupQuestion = collect($defaults['questions'])->firstWhere('id', 'group_interest');
+            if ($groupQuestion) {
+                $questions[] = $groupQuestion;
+            }
         }
 
         return [
