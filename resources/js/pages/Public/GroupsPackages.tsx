@@ -20,12 +20,13 @@ export default function GroupsPackages({
             <ProductBookHero
                 titleLine1="Grupos y"
                 titleLine2="paquetes"
+                flushBottom
                 customVisual={
-                    <div className="flex justify-center lg:justify-end">
+                    <div className="relative flex justify-center self-end lg:justify-end">
                         <img
                             src="/img/brand2026/hero-groups-students.png"
                             alt="Grupo de alumnos Sapius"
-                            className="max-h-[460px] w-auto rounded-2xl object-contain mix-blend-multiply"
+                            className="relative z-10 block max-h-[420px] w-auto object-contain object-bottom sm:max-h-[480px] lg:max-h-[520px]"
                         />
                     </div>
                 }

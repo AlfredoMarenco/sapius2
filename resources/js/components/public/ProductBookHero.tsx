@@ -11,6 +11,7 @@ export interface ProductBookHeroProps {
     bookSubtitle?: string;
     bookEdition?: string;
     customVisual?: React.ReactNode;
+    flushBottom?: boolean;
 }
 
 /**
@@ -26,9 +27,14 @@ export function ProductBookHero({
     bookSubtitle = 'MATERIAL VIRTUAL\nY FÍSICO',
     bookEdition = '2027',
     customVisual,
+    flushBottom = false,
 }: ProductBookHeroProps) {
     return (
-        <section className="relative overflow-hidden bg-white pt-24 pb-12 sm:pt-28 lg:pt-30 lg:pb-16">
+        <section
+            className={`relative overflow-hidden bg-white pt-24 sm:pt-28 lg:pt-30 ${
+                flushBottom ? 'pb-0' : 'pb-12 lg:pb-16'
+            }`}
+        >
             <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,_#FBE3D8_0%,_#FFE9DF_26%,_transparent_56%),radial-gradient(circle_at_84%_58%,_#F7EFEA_0%,_transparent_56%)]"
@@ -68,8 +74,16 @@ export function ProductBookHero({
             </div>
 
             <div className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-10">
-                <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
-                    <div className="lg:col-span-5">
+                <div
+                    className={`grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8 ${
+                        flushBottom ? 'items-end' : 'items-center'
+                    }`}
+                >
+                    <div
+                        className={`lg:col-span-5 ${
+                            flushBottom ? 'pb-12 lg:pb-16' : ''
+                        }`}
+                    >
                         <p className="text-lg font-normal text-[#101E33] sm:text-[22px]">
                             {eyebrow}
                         </p>
@@ -89,7 +103,11 @@ export function ProductBookHero({
                         </div>
                     </div>
 
-                    <div className="lg:col-span-7">
+                    <div
+                        className={`lg:col-span-7 ${
+                            flushBottom ? 'self-end' : ''
+                        }`}
+                    >
                         {customVisual ?? (
                             <BookMockup3D
                                 area="guias_simuladores"
