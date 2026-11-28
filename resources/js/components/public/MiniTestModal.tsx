@@ -842,34 +842,11 @@ export function MiniTestModal({
     );
 
     const purchaseTarget = useMemo(() => {
-        if (recommendation.purchaseMode === 'whatsapp') {
+        if (recommendation.id === 'grupo_preferencial_whatsapp') {
             return {
                 href: whatsappHref,
                 isExternal: true,
-                label:
-                    recommendation.id === 'grupo_preferencial_whatsapp'
-                        ? 'Solicitar descuento de grupo por WhatsApp'
-                        : 'Hablar con un asesor',
-            };
-        }
-
-        if (
-            recommendation.purchaseMode === 'waitlist' ||
-            recommendation.purchaseMode === 'presale'
-        ) {
-            const target = resolvePurchaseTarget(
-                scheduledCourses,
-                recommendation.keywords ?? [],
-                recommendation.purchaseMode,
-                recommendation.title,
-            );
-
-            return {
-                ...target,
-                label:
-                    recommendation.purchaseMode === 'waitlist'
-                        ? 'Anotarme en lista de espera'
-                        : 'Solicitar preventa',
+                label: 'Solicitar descuento por WhatsApp',
             };
         }
 
@@ -885,7 +862,7 @@ export function MiniTestModal({
                 return {
                     href: `/checkout/${explicitCourse.id}`,
                     isExternal: false,
-                    label: 'Inscribirme ahora',
+                    label: 'Comprar',
                 };
             }
         }
@@ -900,7 +877,7 @@ export function MiniTestModal({
         if (matchedTarget.href.startsWith('/checkout/')) {
             return {
                 ...matchedTarget,
-                label: 'Inscribirme ahora',
+                label: 'Comprar',
             };
         }
 
@@ -1103,7 +1080,7 @@ export function MiniTestModal({
                                                     href={purchaseTarget.href}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex flex-1 items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-center text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#F0563C] sm:text-sm"
+                                                    className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-center text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#F0563C] sm:text-sm"
                                                 >
                                                     {purchaseTarget.label}
                                                 </a>
@@ -1111,20 +1088,9 @@ export function MiniTestModal({
                                                 <Link
                                                     href={purchaseTarget.href}
                                                     onClick={() => setOpen(false)}
-                                                    className="inline-flex flex-1 items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-center text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#F0563C] sm:text-sm"
+                                                    className="inline-flex w-full items-center justify-center rounded-full bg-[#FF6B52] px-6 py-3 text-center text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#F0563C] sm:text-sm"
                                                 >
                                                     {purchaseTarget.label}
-                                                </Link>
-                                            )}
-
-                                            {recommendation.coursePageHref &&
-                                                purchaseTarget.href !== '/login' && (
-                                                <Link
-                                                    href="/login"
-                                                    onClick={() => setOpen(false)}
-                                                    className="inline-flex flex-1 items-center justify-center rounded-full bg-[#101E33] px-6 py-3 text-center text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#192B47] sm:text-sm"
-                                                >
-                                                    Comprar
                                                 </Link>
                                             )}
                                         </div>
