@@ -14,6 +14,8 @@ import {
     FileSpreadsheet,
     FileText,
     Clock,
+    Video,
+    Radio,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,6 +73,16 @@ interface CourseDetailProps {
     modules: ModuleItem[];
     completedLessonIds: number[];
     globalProgress: number;
+    zoomClasses?: Array<{
+        id: number;
+        title: string;
+        scheduled_date_formatted: string;
+        scheduled_time_formatted: string;
+        ends_time_formatted: string;
+        status: string;
+        is_joinable: boolean;
+        room_url: string;
+    }>;
 }
 
 export default function Detail({
@@ -81,6 +93,7 @@ export default function Detail({
     modules = [],
     completedLessonIds = [],
     globalProgress = 0,
+    zoomClasses = [],
 }: CourseDetailProps) {
     const { auth } = usePage<any>().props;
     const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
@@ -198,6 +211,45 @@ export default function Detail({
                         )}
                     </div>
                 </div>
+
+                {/* Clases en Vivo Zoom de la Cohorte */}
+                {!is_guia && zoomClasses.length > 0 && (
+                    <Card className="border-blue-200/80 bg-blue-50/40 p-5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                        <div className="mb-3 flex items-center justify-between">
+                            <h2 className="flex items-center gap-2 text-base font-bold text-neutral-900 dark:text-neutral-100">
+                                <Video className="h-5 w-5 text-blue-600" />
+                                Clases en Vivo de tu Grupo (Zoom)
+                            </h2>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {zoomClasses.map((zc) => (
+                                <div
+                                    key={zc.id}
+                                    className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white p-3.5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                                                {zc.title}
+                                            </span>
+                                            {zc.status === 'live' && (
+                                                <Badge className="animate-pulse bg-red-600 text-[10px] text-white">
+                                                    <Radio className="mr-1 h-2.5 w-2.5" /> EN VIVO
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <p className="mt-0.5 text-xs text-neutral-500">
+                                            {zc.scheduled_date_formatted} • {zc.scheduled_time_formatted} - {zc.ends_time_formatted}
+                                        </p>
+                                    </div>
+                                    <Button asChild size="sm" className="shrink-0 bg-blue-600 text-xs text-white hover:bg-blue-700">
+                                        <Link href={zc.room_url}>Entrar</Link>
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                )}
 
                 {/* Guía viewer callout when Guias category */}
                 {is_guia ? (

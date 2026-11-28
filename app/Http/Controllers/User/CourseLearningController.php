@@ -15,6 +15,7 @@ use App\Models\Media;
 use App\Models\Module;
 use App\Models\Quiz;
 use App\Models\ScheduledCourse;
+use App\Models\ZoomClass;
 use App\Services\CourseCategoryService;
 use App\Services\EnrollmentAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -23,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class CourseLearningController extends Controller
@@ -180,6 +182,22 @@ class CourseLearningController extends Controller
 
         $globalProgress = $totalClases > 0 ? min(100, (int) round((count($completedLessonIds) / $totalClases) * 100)) : 0;
 
+        $cohortZoomClasses = [];
+        try {
+            if (Schema::hasTable('zoom_classes')) {
+                $cohortZoomClasses = ZoomClass::where('curso_programado_id', $scheduled->id)
+                    ->where('is_active', true)
+                    ->where('status', '!=', 'cancelled')
+                    ->orderBy('scheduled_at', 'asc')
+                    ->get()
+                    ->map(fn (ZoomClass $zc) => $zc->toStudentArray())
+                    ->values()
+                    ->toArray();
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
         return Inertia::render('User/Courses/Detail', [
             'scheduled' => [
                 'id' => $scheduled->id,
@@ -205,6 +223,7 @@ class CourseLearningController extends Controller
             'modules' => $modulesData,
             'completedLessonIds' => $completedLessonIds,
             'globalProgress' => $globalProgress,
+            'zoomClasses' => $cohortZoomClasses,
         ]);
     }
 
@@ -433,6 +452,29 @@ class CourseLearningController extends Controller
             return $item;
         }, $modulesUnsorted);
 
+        $lessonZoomClasses = [];
+        try {
+            if (Schema::hasTable('zoom_classes')) {
+                $lessonZoomClasses = ZoomClass::where('curso_programado_id', $scheduled->id)
+                    ->where('is_active', true)
+                    ->where('status', '!=', 'cancelled')
+                    ->where(function ($q) use ($leccion, $isModule) {
+                        if ($isModule) {
+                            $q->where('module_id', $leccion->id);
+                        } else {
+                            $q->where('leccion_id', $leccion->id);
+                        }
+                    })
+                    ->orderBy('scheduled_at', 'asc')
+                    ->get()
+                    ->map(fn (ZoomClass $zc) => $zc->toStudentArray())
+                    ->values()
+                    ->toArray();
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
         return Inertia::render('User/Courses/Lesson', [
             'lesson' => [
                 'id' => $leccion->id,
@@ -449,6 +491,7 @@ class CourseLearningController extends Controller
                 'homework' => $leccion->homeworks ? $leccion->homeworks->first() : null,
                 'interactive_pdfs' => $leccion->interactivePdfs,
                 'has_homework_feature' => ! $isGuia,
+                'zoom_classes' => $lessonZoomClasses,
             ],
             'scheduled' => [
                 'id' => $scheduled->id,

@@ -13,6 +13,7 @@ use App\Http\Controllers\User\NotificationController;
 use App\Http\Controllers\User\OpinionController;
 use App\Http\Controllers\User\ProfileCompletionController;
 use App\Http\Controllers\User\SupportController;
+use App\Http\Controllers\User\ZoomRoomController;
 use App\Http\Middleware\CheckStrikes;
 use Illuminate\Support\Facades\Route;
 
@@ -119,6 +120,10 @@ Route::middleware(['auth', 'verified', 'role:alumno'])->prefix('alumno')->group(
 
             // Tareas
             Route::post('/homework/{assignment_id}/submit', [HomeworkController::class, 'submit'])->name('alumno.homework.submit');
+
+            // Clases en Vivo Zoom Embebidas
+            Route::get('/clases-en-vivo/{zoomClass}/sala', [ZoomRoomController::class, 'show'])->name('alumno.zoom.room');
+            Route::post('/clases-en-vivo/{zoomClass}/signature', [ZoomRoomController::class, 'signature'])->name('alumno.zoom.signature');
         });
     });
 });

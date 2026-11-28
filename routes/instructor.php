@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\Admin\InteractivePdfController;
 use App\Http\Controllers\Admin\QuizImportController;
+use App\Http\Controllers\Admin\ZoomClassController;
 use App\Http\Controllers\Instructor\CourseBuilderController;
 use App\Http\Controllers\Instructor\CourseController;
 use App\Http\Controllers\Instructor\DashboardController;
 use App\Http\Controllers\Instructor\SupportController;
 use App\Http\Controllers\User\CourseLearningController;
+use App\Http\Controllers\User\ZoomRoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'role:instructor', 'restrict.mobile'])->prefix('instructor')->name('instructor.')->group(function () {
@@ -55,4 +57,13 @@ Route::middleware(['auth', 'verified', 'role:instructor', 'restrict.mobile'])->p
     // Soporte
     Route::get('/soporte', [SupportController::class, 'index'])->name('soporte');
     Route::post('/soporte', [SupportController::class, 'send'])->name('soporte.send');
+
+    // Clases en Vivo Zoom (solo cohortes asignadas al instructor)
+    Route::get('/schedules/{schedule}/zoom-classes', [ZoomClassController::class, 'index'])->name('schedules.zoom.index');
+    Route::post('/schedules/{schedule}/zoom-classes', [ZoomClassController::class, 'store'])->name('schedules.zoom.store');
+    Route::put('/zoom-classes/{zoomClass}', [ZoomClassController::class, 'update'])->name('zoom.update');
+    Route::delete('/zoom-classes/{zoomClass}', [ZoomClassController::class, 'destroy'])->name('zoom.destroy');
+    Route::get('/zoom-classes/{zoomClass}/host-launch', [ZoomClassController::class, 'hostLaunch'])->name('zoom.host-launch');
+    Route::get('/zoom-classes/{zoomClass}/room', [ZoomRoomController::class, 'show'])->name('zoom.room');
+    Route::post('/zoom-classes/{zoomClass}/signature', [ZoomRoomController::class, 'signature'])->name('zoom.signature');
 });

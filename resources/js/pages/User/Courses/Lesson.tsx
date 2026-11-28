@@ -22,6 +22,8 @@ import {
     ZoomOut,
     BarChart3,
     ClipboardCheck,
+    Video,
+    Radio,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,6 +59,16 @@ interface LessonProps {
         homework: any | null;
         interactive_pdfs?: any[];
         has_homework_feature: boolean;
+        zoom_classes?: Array<{
+            id: number;
+            title: string;
+            scheduled_date_formatted: string;
+            scheduled_time_formatted: string;
+            ends_time_formatted: string;
+            status: string;
+            is_joinable: boolean;
+            room_url: string;
+        }>;
     };
     scheduled: {
         id: number;
@@ -192,6 +204,42 @@ export default function Lesson({
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Panel Izquierdo: Contenido de la Lección (70%) */}
                     <div className="flex-1 min-w-0 space-y-6">
+                        {lesson.zoom_classes && lesson.zoom_classes.length > 0 && (
+                            <Card className="border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900/50 dark:bg-blue-950/20">
+                                <div className="space-y-2.5">
+                                    {lesson.zoom_classes.map((zc) => (
+                                        <div key={zc.id} className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                                                    <Video className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                                                            {zc.title}
+                                                        </span>
+                                                        {zc.status === 'live' && (
+                                                            <Badge className="animate-pulse bg-red-600 text-[10px] text-white">
+                                                                <Radio className="mr-1 h-2.5 w-2.5" /> EN VIVO
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                                                        Clase en vivo Zoom: {zc.scheduled_date_formatted} • {zc.scheduled_time_formatted} - {zc.ends_time_formatted}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Button asChild size="sm" className="shrink-0 bg-blue-600 text-white hover:bg-blue-700">
+                                                <Link href={zc.room_url}>
+                                                    <Video className="mr-1.5 h-4 w-4" /> Entrar a Sala en Vivo
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+
                         {/* Video Player Section */}
                         {videoMedia ? (
                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-black shadow-md border border-neutral-800/50">

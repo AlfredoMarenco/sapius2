@@ -23,7 +23,9 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ScheduledCourseController;
 use App\Http\Controllers\Admin\TrackingExamController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\ZoomClassController;
 use App\Http\Controllers\User\CourseLearningController;
+use App\Http\Controllers\User\ZoomRoomController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -164,6 +166,15 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::resource('courses.schedules', ScheduledCourseController::class)->shallow();
     Route::patch('/schedules/{schedule}/toggle', [ScheduledCourseController::class, 'toggle'])->name('schedules.toggle');
     Route::resource('categories', CategoryController::class);
+
+    // Clases en Vivo Zoom por Cohorte
+    Route::get('/schedules/{schedule}/zoom-classes', [ZoomClassController::class, 'index'])->name('schedules.zoom.index');
+    Route::post('/schedules/{schedule}/zoom-classes', [ZoomClassController::class, 'store'])->name('schedules.zoom.store');
+    Route::put('/zoom-classes/{zoomClass}', [ZoomClassController::class, 'update'])->name('zoom.update');
+    Route::delete('/zoom-classes/{zoomClass}', [ZoomClassController::class, 'destroy'])->name('zoom.destroy');
+    Route::get('/zoom-classes/{zoomClass}/host-launch', [ZoomClassController::class, 'hostLaunch'])->name('zoom.host-launch');
+    Route::get('/zoom-classes/{zoomClass}/room', [ZoomRoomController::class, 'show'])->name('zoom.room');
+    Route::post('/zoom-classes/{zoomClass}/signature', [ZoomRoomController::class, 'signature'])->name('zoom.signature');
 
     // Programación de Contenido por Cohorte (Legacy: /admin/registro/contenido)
     Route::match(['get', 'post'], '/registro/contenido', [ContenidoProgramadoController::class, 'index'])->name('contenido.index');

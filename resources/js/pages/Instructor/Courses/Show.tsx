@@ -14,7 +14,8 @@ import {
     Clock, 
     AlertTriangle, 
     Layers,
-    BookOpen
+    BookOpen,
+    Video
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -146,13 +147,24 @@ export default function Show({
                     <p className="text-muted-foreground">Panel de detalles del curso y alumnos inscritos por cohorte</p>
                 </div>
                 
-                <Link
-                    href={`/instructor/cursos/${course.id}/builder`}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"
-                >
-                    <Settings className="h-4 w-4" />
-                    Abrir Course Builder
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                    {currentCohort && (
+                        <Link
+                            href={`/instructor/schedules/${currentCohort.id}/zoom-classes`}
+                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2 gap-2"
+                        >
+                            <Video className="h-4 w-4" />
+                            Clases en Vivo (Zoom)
+                        </Link>
+                    )}
+                    <Link
+                        href={`/instructor/cursos/${course.id}/builder`}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"
+                    >
+                        <Settings className="h-4 w-4" />
+                        Abrir Course Builder
+                    </Link>
+                </div>
             </div>
 
             {/* Stat Cards */}

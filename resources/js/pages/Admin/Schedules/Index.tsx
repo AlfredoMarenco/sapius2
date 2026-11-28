@@ -12,7 +12,8 @@ import {
     Clock, 
     DollarSign, 
     X, 
-    Save 
+    Save,
+    Video 
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -175,6 +176,11 @@ export default function SchedulesIndex({
                                             <BookOpen className="w-3.5 h-3.5 mr-1" /> Contenido
                                         </Link>
                                     </Button>
+                                    <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs text-indigo-600 border-indigo-200">
+                                        <Link href={`/admin/schedules/${item.id}/zoom-classes`}>
+                                            <Video className="w-3.5 h-3.5 mr-1" /> Zoom
+                                        </Link>
+                                    </Button>
                                     <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs text-blue-600 border-blue-200">
                                         <Link href={`/admin/curso/${item.id}`}>
                                             <Users className="w-3.5 h-3.5 mr-1" /> Alumnos
@@ -269,6 +275,18 @@ export default function SchedulesIndex({
                                                     <Link href={`/admin/registro/contenido?cp_id=${item.id}`}>
                                                         <BookOpen className="w-3.5 h-3.5 xl:mr-1" />
                                                         <span className="hidden xl:inline">Contenido</span>
+                                                    </Link>
+                                                </Button>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 px-2 text-xs rounded-lg text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                                                    title="Gestionar clases en vivo Zoom"
+                                                >
+                                                    <Link href={`/admin/schedules/${item.id}/zoom-classes`}>
+                                                        <Video className="w-3.5 h-3.5 xl:mr-1" />
+                                                        <span className="hidden xl:inline">Zoom</span>
                                                     </Link>
                                                 </Button>
                                                 <Button

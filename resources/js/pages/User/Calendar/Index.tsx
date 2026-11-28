@@ -11,6 +11,8 @@ import {
     Image as ImageIcon,
     ArrowRight,
     X,
+    Video,
+    Radio,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
@@ -79,10 +81,25 @@ interface WeeklyCalendarItem {
     end_date?: string | null;
 }
 
+interface ZoomClassItem {
+    id: number;
+    scheduled_id: number;
+    course_title: string;
+    identifier?: string | null;
+    title: string;
+    scheduled_date_formatted: string;
+    scheduled_time_formatted: string;
+    ends_time_formatted: string;
+    status: string;
+    is_joinable: boolean;
+    room_url: string;
+}
+
 interface CalendarProps {
     events: CalendarEvent[];
     courses?: CourseSummary[];
     weeklyCalendars?: WeeklyCalendarItem[];
+    zoomClasses?: ZoomClassItem[];
 }
 
 const MONTH_NAMES = [
@@ -106,6 +123,7 @@ export default function CalendarIndex({
     events = [],
     courses = [],
     weeklyCalendars = [],
+    zoomClasses = [],
 }: CalendarProps) {
     const { auth } = usePage<{ auth?: Auth }>().props;
     const userEmail = auth?.user?.email || auth?.user?.username || 'Alumno';
@@ -289,6 +307,54 @@ return events;
                         </div>
                     </div>
                 </div>
+
+                {/* Clases en Vivo Zoom */}
+                {zoomClasses.length > 0 && (
+                    <div className="space-y-3">
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            <Video className="h-5 w-5 text-blue-600" />
+                            Clases en Vivo (Zoom)
+                        </h2>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {zoomClasses.map((zc) => (
+                                <Card key={zc.id} className="border-blue-200/80 shadow-xs dark:border-blue-900/50">
+                                    <CardContent className="space-y-3 p-4">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <Badge variant="outline" className="mb-1 border-blue-200 text-[10px] text-blue-700">
+                                                    {zc.course_title}
+                                                </Badge>
+                                                <h3 className="line-clamp-1 text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                                                    {zc.title}
+                                                </h3>
+                                            </div>
+                                            {zc.status === 'live' ? (
+                                                <Badge className="shrink-0 animate-pulse bg-red-600 text-[10px] text-white">
+                                                    <Radio className="mr-1 h-3 w-3" /> EN VIVO
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                                    {zc.status === 'ended' ? 'Finalizada' : 'Programada'}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs text-neutral-500">
+                                            <span>{zc.scheduled_date_formatted}</span>
+                                            <span>
+                                                {zc.scheduled_time_formatted} - {zc.ends_time_formatted}
+                                            </span>
+                                        </div>
+                                        <Button asChild size="sm" className="w-full bg-blue-600 text-xs text-white hover:bg-blue-700">
+                                            <Link href={zc.room_url}>
+                                                <Video className="mr-1.5 h-3.5 w-3.5" /> Entrar a Sala en Vivo
+                                            </Link>
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Resumen de Cursos Inscritos */}
                 {courses.length > 0 && (

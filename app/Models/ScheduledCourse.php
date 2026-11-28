@@ -61,4 +61,9 @@ class ScheduledCourse extends Model
         return $this->belongsToMany(User::class, 'inscripciones', 'curso_programado_id', 'user_id')
             ->withPivot('id', 'aceptado', 'created_at');
     }
+
+    public function zoomClasses()
+    {
+        return $this->hasMany(ZoomClass::class, 'curso_programado_id')->orderBy('scheduled_at', 'asc');
+    }
 }

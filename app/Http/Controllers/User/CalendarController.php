@@ -5,6 +5,7 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\ProgrammingCalendar;
+use App\Models\ZoomClass;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -229,10 +230,35 @@ class CalendarController extends Controller
             //
         }
 
+        $zoomClasses = [];
+        try {
+            $scheduledIds = collect($coursesSummary)->pluck('scheduled_id')->filter()->unique()->values()->all();
+            if (! empty($scheduledIds) && Schema::hasTable('zoom_classes')) {
+                $zoomClasses = ZoomClass::with(['scheduledCourse.course'])
+                    ->whereIn('curso_programado_id', $scheduledIds)
+                    ->where('is_active', true)
+                    ->where('status', '!=', 'cancelled')
+                    ->orderBy('scheduled_at', 'asc')
+                    ->get()
+                    ->map(function (ZoomClass $zc) {
+                        $arr = $zc->toStudentArray();
+                        $arr['course_title'] = $zc->scheduledCourse?->course?->title ?? 'Curso';
+                        $arr['identifier'] = $zc->scheduledCourse?->identificador;
+
+                        return $arr;
+                    })
+                    ->values()
+                    ->toArray();
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
         return Inertia::render('User/Calendar/Index', [
             'events' => $events,
             'courses' => $coursesSummary,
             'weeklyCalendars' => $weeklyCalendars,
+            'zoomClasses' => $zoomClasses,
         ]);
     }
 }
