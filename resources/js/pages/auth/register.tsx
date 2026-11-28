@@ -21,9 +21,13 @@ export default function Register() {
         <>
             <Head title="Registro de Alumno" />
 
-            <div className="mb-8 text-center space-y-1">
-                <h2 className="text-2xl font-black text-brand-navy tracking-tight uppercase">Crear Cuenta</h2>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">Regístrate para acceder a tus cursos y simuladores</p>
+            <div className="mb-7 text-center space-y-1.5">
+                <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-[#101E33] tracking-tight">
+                    Crear cuenta
+                </h2>
+                <p className="text-xs sm:text-sm font-medium text-[#101E33]/75">
+                    Regístrate para acceder a tus cursos y simuladores
+                </p>
             </div>
 
             <Form

@@ -12,7 +12,10 @@ export default function AuthSimpleLayout({
     description,
 }: AuthLayoutProps) {
     return (
-        <div className="min-h-svh w-full flex bg-[#F8FAFC] text-slate-800 font-sans selection:bg-[#FF6B52] selection:text-white">
+        <div
+            style={{ colorScheme: 'light' }}
+            className="min-h-svh w-full flex bg-white text-[#101E33] font-display antialiased selection:bg-[#FF6B52]/20 selection:text-[#101E33]"
+        >
             {/* Lado Izquierdo: Showcase de Marca Sapius 2026 (Visible en pantallas grandes) */}
             <div className="relative hidden lg:flex lg:w-1/2 xl:w-5/12 bg-[#101E33] flex-col justify-between p-12 xl:p-16 text-white overflow-hidden">
                 {/* Patrón de fondo geométrico PlusGrid de la Landing */}
@@ -91,8 +94,14 @@ export default function AuthSimpleLayout({
                 </div>
             </div>
 
-            {/* Lado Derecho: Formulario Limpio y Profesional */}
-            <div className="w-full lg:w-1/2 xl:w-7/12 flex flex-col justify-between p-6 sm:p-12 md:p-16 lg:p-20 relative">
+            {/* Lado Derecho: Formulario con la misma línea visual y degradados de la web */}
+            <div
+                className="w-full lg:w-1/2 xl:w-7/12 flex flex-col justify-between p-6 sm:p-12 md:p-16 lg:p-20 relative overflow-hidden bg-white"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(circle at 85% 15%, rgba(207, 228, 255, 0.7) 0%, transparent 45%), radial-gradient(circle at 15% 85%, rgba(255, 217, 206, 0.7) 0%, transparent 45%)',
+                }}
+            >
                 {/* Botón superior para volver al sitio público */}
                 <div className="flex items-center justify-between w-full max-w-md mx-auto mb-6">
                     <Link
