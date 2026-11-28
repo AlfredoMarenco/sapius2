@@ -42,49 +42,49 @@ export function ProductBookHero({
                 className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,_#FBE3D8_0%,_#FFE9DF_26%,_transparent_56%),radial-gradient(circle_at_84%_58%,_#F7EFEA_0%,_transparent_56%)]"
             />
 
-            {/* Grilla 4x5 navy central superior */}
-            <div className="pointer-events-none absolute top-24 left-[40%] hidden opacity-85 lg:block">
+            {/* Grilla 4x6 navy central superior */}
+            <div className="pointer-events-none absolute top-24 left-[41%] hidden opacity-85 lg:top-26 lg:block">
                 <PlusGridPattern
                     rows={4}
-                    cols={5}
+                    cols={6}
                     color="navy"
-                    gap={28}
-                    size={8}
+                    gap={34}
+                    size={9}
                 />
             </div>
 
             {/* Grilla sutil inferior izquierda */}
-            <div className="pointer-events-none absolute bottom-6 left-4 hidden opacity-25 sm:block">
+            <div className="pointer-events-none absolute bottom-4 left-4 hidden opacity-20 sm:block lg:left-6">
                 <PlusGridPattern
-                    rows={5}
+                    rows={6}
                     cols={4}
                     color="navy"
-                    gap={28}
-                    size={7}
+                    gap={34}
+                    size={8}
                 />
             </div>
 
             {/* Grilla inferior derecha coral */}
-            <div className="pointer-events-none absolute right-4 bottom-6 hidden opacity-85 md:block lg:right-8">
+            <div className="pointer-events-none absolute right-4 bottom-4 hidden opacity-85 md:block lg:right-7">
                 <PlusGridPattern
-                    rows={5}
+                    rows={6}
                     cols={4}
                     color="coral"
-                    gap={28}
-                    size={8}
+                    gap={34}
+                    size={9}
                 />
             </div>
 
             <div className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-10">
                 <div
-                    className={`grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8 ${
-                        flushBottom ? 'items-end' : 'items-center'
+                    className={`grid grid-cols-1 gap-10 lg:grid-cols-12 ${
+                        flushBottom ? 'items-end lg:gap-2' : 'items-center lg:gap-8'
                     }`}
                 >
                     <div
                         className={`lg:col-span-5 ${
                             flushBottom
-                                ? 'pt-4 pb-8 lg:self-center lg:py-14 lg:pl-8 xl:pl-12'
+                                ? 'pt-4 pb-8 lg:self-center lg:py-12 lg:pl-8 xl:pl-12'
                                 : ''
                         }`}
                     >
@@ -92,13 +92,23 @@ export function ProductBookHero({
                             {eyebrow}
                         </p>
 
-                        <h1 className="mt-1 font-display text-5xl leading-[1.0] font-extrabold tracking-tight text-[#101E33] sm:text-6xl lg:text-[4.45rem]">
+                        <h1
+                            className={`mt-0.5 font-display text-5xl font-extrabold tracking-tight text-[#101E33] sm:text-6xl ${
+                                flushBottom
+                                    ? 'leading-[0.98] lg:text-[4.85rem] xl:text-[5.1rem]'
+                                    : 'leading-[1.0] lg:text-[4.45rem]'
+                            }`}
+                        >
                             {titleLine1}
                             <br />
                             {titleLine2}
                         </h1>
 
-                        <p className="mt-4 max-w-[340px] text-base leading-[1.35] font-normal text-[#101E33]/90 sm:text-[20px]">
+                        <p
+                            className={`mt-4 text-base leading-[1.35] font-normal text-[#101E33]/90 sm:text-[20px] ${
+                                flushBottom ? 'max-w-[310px]' : 'max-w-[340px]'
+                            }`}
+                        >
                             {subtitle}
                         </p>
 
