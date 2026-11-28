@@ -22,11 +22,11 @@ export default function GroupsPackages({
                 titleLine2="paquetes"
                 flushBottom
                 customVisual={
-                    <div className="relative flex justify-center self-end lg:justify-end">
+                    <div className="relative flex justify-center self-end lg:justify-start lg:pl-2 xl:pl-6">
                         <img
                             src="/img/brand2026/hero-groups-students.png"
                             alt="Grupo de alumnos Sapius"
-                            className="relative z-10 block max-h-[420px] w-auto object-contain object-bottom sm:max-h-[480px] lg:max-h-[520px]"
+                            className="relative bottom-0 z-10 block max-h-[430px] w-auto object-contain object-bottom sm:max-h-[500px] lg:max-h-[560px]"
                         />
                     </div>
                 }

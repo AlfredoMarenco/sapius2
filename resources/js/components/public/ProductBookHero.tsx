@@ -31,8 +31,10 @@ export function ProductBookHero({
 }: ProductBookHeroProps) {
     return (
         <section
-            className={`relative overflow-hidden bg-white pt-24 sm:pt-28 lg:pt-30 ${
-                flushBottom ? 'pb-0' : 'pb-12 lg:pb-16'
+            className={`relative overflow-hidden bg-white ${
+                flushBottom
+                    ? 'pt-20 pb-0 sm:pt-24 lg:pt-24 lg:pb-0'
+                    : 'pt-24 pb-12 sm:pt-28 lg:pt-30 lg:pb-16'
             }`}
         >
             <div
@@ -81,7 +83,9 @@ export function ProductBookHero({
                 >
                     <div
                         className={`lg:col-span-5 ${
-                            flushBottom ? 'pb-12 lg:pb-16' : ''
+                            flushBottom
+                                ? 'pt-4 pb-8 lg:self-center lg:py-14 lg:pl-8 xl:pl-12'
+                                : ''
                         }`}
                     >
                         <p className="text-lg font-normal text-[#101E33] sm:text-[22px]">
