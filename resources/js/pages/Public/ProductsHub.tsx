@@ -62,6 +62,15 @@ export default function ProductsHub({ scheduledCourses = [] }: ProductsHubProps)
                     titleLine1="Grupos y"
                     titleLine2="paquetes"
                     subtitle="Conoce nuestros programas, cursos y simuladores."
+                    customVisual={
+                        <div className="flex justify-center lg:justify-end">
+                            <img
+                                src="/img/brand2026/hero-student-cursos.png"
+                                alt="Grupo de alumnos Sapius"
+                                className="max-h-[460px] w-auto object-contain drop-shadow-[0_18px_36px_rgba(16,30,51,0.14)]"
+                            />
+                        </div>
+                    }
                     actions={
                         <a
                             href={groupsWhatsappHref}

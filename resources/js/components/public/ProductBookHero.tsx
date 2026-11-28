@@ -10,6 +10,7 @@ export interface ProductBookHeroProps {
     actions: React.ReactNode;
     bookSubtitle?: string;
     bookEdition?: string;
+    customVisual?: React.ReactNode;
 }
 
 /**
@@ -24,6 +25,7 @@ export function ProductBookHero({
     actions,
     bookSubtitle = 'MATERIAL VIRTUAL\nY FÍSICO',
     bookEdition = '2027',
+    customVisual,
 }: ProductBookHeroProps) {
     return (
         <section className="relative overflow-hidden bg-white pt-24 pb-12 sm:pt-28 lg:pt-30 lg:pb-16">
@@ -88,11 +90,13 @@ export function ProductBookHero({
                     </div>
 
                     <div className="lg:col-span-7">
-                        <BookMockup3D
-                            area="guias_simuladores"
-                            subtitle={bookSubtitle}
-                            edition={bookEdition}
-                        />
+                        {customVisual ?? (
+                            <BookMockup3D
+                                area="guias_simuladores"
+                                subtitle={bookSubtitle}
+                                edition={bookEdition}
+                            />
+                        )}
                     </div>
                 </div>
             </div>

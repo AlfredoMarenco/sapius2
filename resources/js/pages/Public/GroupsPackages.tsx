@@ -16,10 +16,19 @@ export default function GroupsPackages({
         <LandingLayout scheduledCourses={scheduledCourses}>
             <Head title="Grupos y paquetes | Sapius" />
 
-            {/* HERO: Grupos y paquetes (Canva Page 9 v297) */}
+            {/* HERO: Grupos y paquetes (Canva Page 9 v332) */}
             <ProductBookHero
                 titleLine1="Grupos y"
                 titleLine2="paquetes"
+                customVisual={
+                    <div className="flex justify-center lg:justify-end">
+                        <img
+                            src="/img/brand2026/hero-student-cursos.png"
+                            alt="Grupo de alumnos Sapius"
+                            className="max-h-[460px] w-auto object-contain drop-shadow-[0_18px_36px_rgba(16,30,51,0.14)]"
+                        />
+                    </div>
+                }
                 actions={
                     <a
                         href={`https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(
