@@ -282,7 +282,7 @@ class MiniTestConfigService
                 ],
                 [
                     'id' => 'group_interest',
-                    'title' => '¿Tienes compañeros de generación que también presentarán el EGEL Plus y estarían interesados en formar un grupo para obtener un precio preferencial?',
+                    'title' => '¿Te interesaría adquirir un descuento por grupo?',
                     'active' => true,
                     'options' => [
                         [

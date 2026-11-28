@@ -335,7 +335,7 @@ export const DEFAULT_MINI_TEST_CONFIG: MiniTestConfig = {
         },
         {
             id: 'group_interest',
-            title: '¿Tienes compañeros de generación que también presentarán el EGEL Plus y estarían interesados en formar un grupo para obtener un precio preferencial?',
+            title: '¿Te interesaría adquirir un descuento por grupo?',
             active: true,
             options: [
                 {
@@ -721,12 +721,12 @@ export function computeDynamicRecommendation(
                 'Atención directa y personalizada con un asesor de Sapius',
                 `Opción individual de referencia: ${baseRecommendation.title}`,
             ],
-            coursePageHref: baseRecommendation.coursePageHref,
+            coursePageHref: '',
             keywords: [],
             purchaseMode: 'whatsapp',
             scheduledCourseId: null,
             whatsappMessage:
-                'Hola Sapius, hice el test de opción ideal y tengo compañeros de generación interesados en formar un grupo para el EGEL Plus. ¿Me pueden decir qué descuento corresponde según cuántas personas seamos?',
+                'Hola Sapius, realicé el test y quiero un descuento de grupo, somos (   ) personas.',
         };
     }
 
@@ -846,7 +846,10 @@ export function MiniTestModal({
             return {
                 href: whatsappHref,
                 isExternal: true,
-                label: 'Hablar con un asesor',
+                label:
+                    recommendation.id === 'grupo_preferencial_whatsapp'
+                        ? 'Solicitar descuento de grupo por WhatsApp'
+                        : 'Hablar con un asesor',
             };
         }
 
