@@ -166,12 +166,20 @@ export default function About({ scheduledCourses }: AboutProps) {
                         </h2>
 
                         <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-8">
-                            {EXPERT_CARDS.map((card) => {
+                            {EXPERT_CARDS.map((card, idx) => {
                                 const Icon = card.icon;
                                 return (
-                                    <div
+                                    <motion.div
                                         key={card.id}
-                                        className="flex items-start gap-4 rounded-[26px] border border-[#FF6B52]/65 bg-white/95 p-6 shadow-[0_14px_32px_-12px_rgba(16,30,51,0.12)]"
+                                        initial={{ opacity: 0, y: 18 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        viewport={{ once: true, margin: '-40px' }}
+                                        transition={{
+                                            duration: 0.38,
+                                            delay: idx * 0.08,
+                                            ease: 'easeOut',
+                                        }}
+                                        className="flex items-start gap-4 rounded-[26px] border border-[#FF6B52]/65 bg-white/95 p-6 shadow-[0_14px_32px_-12px_rgba(16,30,51,0.12)] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#FF6B52] hover:shadow-[0_20px_40px_-12px_rgba(255,107,82,0.18)]"
                                     >
                                         <span className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFD9CE]/45 text-[#FF6B52]">
                                             <Icon
@@ -188,7 +196,7 @@ export default function About({ scheduledCourses }: AboutProps) {
                                                 {card.description}
                                             </p>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 );
                             })}
                         </div>

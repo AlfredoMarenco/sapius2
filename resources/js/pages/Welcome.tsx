@@ -236,7 +236,12 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                 <div className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-10">
                     <div className="grid grid-cols-1 items-end gap-8 lg:grid-cols-12 lg:gap-6">
                         {/* Columna Izquierda: Titular 3 líneas, Subtítulo y 2 CTAs iguales */}
-                        <div className="pb-10 lg:col-span-6 lg:pt-10 lg:pb-16">
+                        <motion.div
+                            initial={{ opacity: 0, y: 18 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.45, ease: 'easeOut' }}
+                            className="pb-10 lg:col-span-6 lg:pt-10 lg:pb-16"
+                        >
                             <h1 className="font-display text-4xl leading-[1.03] font-extrabold tracking-tight text-[#101E33] sm:text-5xl lg:text-[3.95rem]">
                                 Tu próximo logro
                                 <br className="hidden sm:block" /> merece una
@@ -264,10 +269,15 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                                     Ver productos
                                 </Link>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* Columna Derecha: Grilla tenue 4x6 + Isotipo gigante s. + Alumna pegada a bottom-0 */}
-                        <div className="relative flex justify-center lg:col-span-6 lg:justify-end">
+                        <motion.div
+                            initial={{ opacity: 0, y: 22 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
+                            className="relative flex justify-center lg:col-span-6 lg:justify-end"
+                        >
                             {/* Grilla tenue 4x6 detrás de los libros */}
                             <div className="pointer-events-none absolute bottom-12 left-0 hidden opacity-30 sm:block lg:-left-8">
                                 <PlusGridPattern
@@ -295,7 +305,7 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                                 alt="Alumna preparándose con Sapius"
                                 className="relative bottom-0 z-10 block h-auto max-h-[400px] w-auto object-contain object-bottom sm:max-h-[490px] lg:mr-34 lg:max-h-[555px]"
                             />
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             </section>
@@ -328,12 +338,19 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                 <div className="relative z-10 mx-auto max-w-4xl px-5 sm:px-8">
                     <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 sm:gap-16">
                         {/* Bloque EGEL Nutrición */}
-                        <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: '-50px' }}
+                            whileHover={{ y: -4 }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                            className="group flex flex-col items-center"
+                        >
                             <div className="flex items-center gap-4">
                                 {/* Ícono lineal coral manzana + corazón */}
                                 <svg
                                     viewBox="0 0 56 56"
-                                    className="h-18 w-18 shrink-0 stroke-[#FF6B52] sm:h-21 sm:w-21"
+                                    className="h-18 w-18 shrink-0 stroke-[#FF6B52] transition-transform duration-300 group-hover:scale-110 sm:h-21 sm:w-21"
                                     fill="none"
                                     strokeWidth="1.6"
                                     strokeLinecap="round"
@@ -359,15 +376,22 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                             >
                                 Ver más
                             </Link>
-                        </div>
+                        </motion.div>
 
                         {/* Bloque EGEL Medicina */}
-                        <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: '-50px' }}
+                            whileHover={{ y: -4 }}
+                            transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
+                            className="group flex flex-col items-center"
+                        >
                             <div className="flex items-center gap-4">
                                 {/* Ícono lineal coral estetoscopio */}
                                 <svg
                                     viewBox="0 0 56 56"
-                                    className="h-18 w-18 shrink-0 stroke-[#FF6B52] sm:h-21 sm:w-21"
+                                    className="h-18 w-18 shrink-0 stroke-[#FF6B52] transition-transform duration-300 group-hover:scale-110 sm:h-21 sm:w-21"
                                     fill="none"
                                     strokeWidth="1.75"
                                     strokeLinecap="round"
@@ -393,7 +417,7 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                             >
                                 Ver más
                             </Link>
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             </section>
@@ -424,14 +448,14 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                                     duration: 0.35,
                                     delay: idx * 0.05,
                                 }}
-                                className={`flex flex-col items-center text-center ${
+                                className={`group flex flex-col items-center text-center transition-transform duration-300 hover:-translate-y-1.5 ${
                                     idx === 4
                                         ? 'col-span-2 sm:col-span-1'
                                         : ''
                                 }`}
                             >
                                 {/* Squircle 3D oficial de Canva + SVG lineal centrado ópticamente en la masa de color */}
-                                <div className="relative flex h-22 w-22 items-center justify-center sm:h-24 sm:w-24">
+                                <div className="relative flex h-22 w-22 items-center justify-center transition-transform duration-300 group-hover:scale-105 sm:h-24 sm:w-24">
                                     <img
                                         src="/img/brand2026/badge-squircle-peach.png"
                                         alt=""
@@ -530,10 +554,16 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
 
                     {/* Fila inferior: ¿Cómo funciona? + 5 pasos horizontales */}
                     <div className="mt-14 lg:mt-16">
-                        <h3 className="text-center font-display text-3xl font-extrabold tracking-tight text-white sm:text-[2.45rem]">
+                        <motion.h3
+                            initial={{ opacity: 0, y: 14 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: '-50px' }}
+                            transition={{ duration: 0.35 }}
+                            className="text-center font-display text-3xl font-extrabold tracking-tight text-white sm:text-[2.45rem]"
+                        >
                             ¿Cómo{' '}
                             <span className="text-[#FF6B52]">funciona?</span>
-                        </h3>
+                        </motion.h3>
 
                         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
                             {SUMA_STEPS.map((step, idx) => (
@@ -546,9 +576,9 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                                         duration: 0.35,
                                         delay: idx * 0.05,
                                     }}
-                                    className="relative flex flex-col items-center text-center"
+                                    className="group relative flex flex-col items-center text-center transition-transform duration-300 hover:-translate-y-1.5"
                                 >
-                                    <div className="relative flex h-20 w-20 items-center justify-center rounded-[22px] bg-white text-[#101E33] shadow-[0_12px_28px_-8px_rgba(0,0,0,0.4)]">
+                                    <div className="relative flex h-20 w-20 items-center justify-center rounded-[22px] bg-white text-[#101E33] shadow-[0_12px_28px_-8px_rgba(0,0,0,0.4)] transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_16px_32px_-8px_rgba(255,107,82,0.45)]">
                                         {step.icon}
                                     </div>
 
@@ -906,7 +936,13 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                 SECCIÓN 6: TIRA OSCURA MINI-TEST (page1_s4_y3150.png)
                ========================================================= */}
             <section className="bg-[#101E33] py-16 text-center text-white sm:py-20">
-                <div className="mx-auto max-w-4xl px-5 sm:px-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-50px' }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="mx-auto max-w-4xl px-5 sm:px-8"
+                >
                     <h2 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[2.7rem]">
                         ¿No sabes por dónde empezar?
                     </h2>
@@ -919,7 +955,7 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                             Realiza el test
                         </button>
                     </div>
-                </div>
+                </motion.div>
             </section>
 
             {/* =========================================================
@@ -958,7 +994,13 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                     />
                 </div>
 
-                <div className="relative z-10 mx-auto max-w-4xl px-5 text-center sm:px-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-50px' }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="relative z-10 mx-auto max-w-4xl px-5 text-center sm:px-8"
+                >
                     <h2 className="font-display text-3xl font-extrabold tracking-tight text-[#101E33] sm:text-4xl lg:text-[2.85rem]">
                         Empieza hoy{' '}
                         <span className="text-[#FF6B52]">tu ruta</span> de
@@ -973,7 +1015,7 @@ export default function Welcome({ scheduledCourses }: WelcomeProps) {
                             Cursos y paquetes
                         </Link>
                     </div>
-                </div>
+                </motion.div>
             </section>
         </LandingLayout>
     );

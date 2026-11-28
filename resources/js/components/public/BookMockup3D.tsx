@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import React from 'react';
 
 export interface BookMockup3DProps {
@@ -50,7 +51,12 @@ export function BookMockup3D({
     const copy = AREA_COPY[area];
 
     return (
-        <div
+        <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            viewport={{ once: true, margin: '-40px' }}
+            whileHover={{ y: -6, rotate: -0.8 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
             className={`@container relative mx-auto w-full max-w-[560px] select-none ${className}`.trim()}
         >
             {/* Sombra elíptica realista bajo la punta inferior del libro inclinado */}
@@ -114,7 +120,7 @@ export function BookMockup3D({
                     {copy.spineLabel}
                 </div>
             ))}
-        </div>
+        </motion.div>
     );
 }
 

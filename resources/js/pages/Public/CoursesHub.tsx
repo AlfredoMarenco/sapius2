@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { motion } from 'framer-motion';
 import React from 'react';
 import { openMiniTest } from '@/components/public/MiniTestModal';
 import { PlusGridPattern } from '@/components/public/PlusGridPattern';
@@ -60,7 +61,12 @@ export default function CoursesHub({ scheduledCourses = [] }: CoursesHubProps) {
                 <div className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-10">
                     <div className="grid grid-cols-1 items-end gap-10 lg:grid-cols-12 lg:gap-8">
                         {/* Columna izquierda: Titular + CTAs + Mini-test */}
-                        <div className="pb-10 lg:col-span-6 lg:pb-16">
+                        <motion.div
+                            initial={{ opacity: 0, y: 18 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.45, ease: 'easeOut' }}
+                            className="pb-10 lg:col-span-6 lg:pb-16"
+                        >
                             <h1 className="font-display text-4xl leading-[1.02] font-extrabold tracking-tight text-[#101E33] sm:text-6xl lg:text-[4.35rem]">
                                 El curso
                                 <br />
@@ -100,10 +106,15 @@ export default function CoursesHub({ scheduledCourses = [] }: CoursesHubProps) {
                                     Realiza el test
                                 </button>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* Columna derecha: Estudiante grande pegado abajo + Isotipo s. monumental */}
-                        <div className="relative flex justify-center self-end lg:col-span-6 lg:justify-end">
+                        <motion.div
+                            initial={{ opacity: 0, y: 22 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
+                            className="relative flex justify-center self-end lg:col-span-6 lg:justify-end"
+                        >
                             <img
                                 src="/img/brand2026/isotype-s-watermark.png"
                                 alt=""
@@ -116,7 +127,7 @@ export default function CoursesHub({ scheduledCourses = [] }: CoursesHubProps) {
                                 alt="Estudiante Sapius con cuaderno y audífonos"
                                 className="relative z-10 block max-h-[410px] w-auto object-contain object-bottom sm:max-h-[500px] lg:mr-22 lg:max-h-[560px]"
                             />
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             </section>

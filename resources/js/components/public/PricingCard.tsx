@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { motion } from 'framer-motion';
 import React from 'react';
 
 export interface ScheduledCourseCandidate {
@@ -425,7 +426,14 @@ export function PricingCard({
         );
 
     return (
-        <div className={`relative h-full ${className}`.trim()}>
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            whileHover={{ y: -6 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className={`relative h-full ${className}`.trim()}
+        >
             {/* Cinta 3D plegada real sobresaliendo 5px por fuera del borde */}
             {ribbon && (
                 <div
@@ -451,7 +459,7 @@ export function PricingCard({
 
             {/* Tarjeta interior */}
             <div
-                className={`flex h-full flex-col justify-between rounded-[26px] border bg-white p-6 shadow-[0_14px_34px_-14px_rgba(16,30,51,0.15)] transition-all duration-200 hover:shadow-[0_20px_40px_-14px_rgba(16,30,51,0.2)] sm:p-7 ${borderClass}`}
+                className={`flex h-full flex-col justify-between rounded-[26px] border bg-white p-6 shadow-[0_14px_34px_-14px_rgba(16,30,51,0.15)] transition-shadow duration-300 hover:shadow-[0_24px_48px_-14px_rgba(255,107,82,0.22)] sm:p-7 ${borderClass}`}
             >
                 <div>
                     {/* 1. Título centrado en 2 líneas (con margen seguro cuando lleva cinta en esquina) */}
@@ -522,7 +530,7 @@ export function PricingCard({
                     {renderCta()}
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 }
 

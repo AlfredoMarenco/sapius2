@@ -1,4 +1,5 @@
 import { Head } from '@inertiajs/react';
+import { motion } from 'framer-motion';
 import React from 'react';
 import { WHATSAPP_PHONE } from '@/components/public/PricingCard';
 import type { ScheduledCourseCandidate } from '@/components/public/PricingCard';
@@ -49,7 +50,13 @@ export default function GroupsPackages({
                 id="grupos-descuentos"
                 className="bg-white px-5 py-20 text-center lg:py-28"
             >
-                <p className="mx-auto max-w-[780px] text-base leading-[1.7] text-[#101E33]/90 sm:text-[18.5px]">
+                <motion.p
+                    initial={{ opacity: 0, y: 18 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-40px' }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="mx-auto max-w-[780px] text-base leading-[1.7] text-[#101E33]/90 sm:text-[18.5px]"
+                >
                     <strong className="font-extrabold text-[#101E33]">
                         Grupos y descuentos.
                     </strong>{' '}
@@ -64,7 +71,7 @@ export default function GroupsPackages({
                     propia experiencia de los alumnos genere posteriormente
                     recomendación dentro de su universidad y entre las
                     siguientes generaciones.
-                </p>
+                </motion.p>
             </section>
         </LandingLayout>
     );

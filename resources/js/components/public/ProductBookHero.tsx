@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import React from 'react';
 import { BookMockup3D } from '@/components/public/BookMockup3D';
 import { PlusGridPattern } from '@/components/public/PlusGridPattern';
@@ -81,7 +82,11 @@ export function ProductBookHero({
                         flushBottom ? 'items-end' : 'items-center'
                     }`}
                 >
-                    <div
+                    <motion.div
+                        initial={{ opacity: 0, x: -18 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.45, ease: 'easeOut' }}
                         className={`lg:col-span-5 ${
                             flushBottom
                                 ? 'pt-4 pb-10 lg:self-center lg:py-14'
@@ -115,9 +120,13 @@ export function ProductBookHero({
                         <div className="mt-8 flex w-full flex-col gap-3.5 sm:w-[290px]">
                             {actions}
                         </div>
-                    </div>
+                    </motion.div>
 
-                    <div
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
                         className={`lg:col-span-7 ${
                             flushBottom ? 'self-end' : ''
                         }`}
@@ -129,7 +138,7 @@ export function ProductBookHero({
                                 edition={bookEdition}
                             />
                         )}
-                    </div>
+                    </motion.div>
                 </div>
             </div>
         </section>

@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
     BookOpenCheck,
     ChevronDown,
@@ -433,8 +434,16 @@ export function FaqSection({
 
                             {/* Mitad derecha (escritorio): Categorías y preguntas de la tarjeta abierta */}
                             <div className="hidden lg:col-span-6 lg:block">
-                                {!activeGroupId ? (
-                                    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[#FF6B52]/40 bg-[#F6F0EA]/45 p-8 text-center">
+                                <AnimatePresence mode="wait">
+                                    {!activeGroupId ? (
+                                        <motion.div
+                                            key="empty"
+                                            initial={{ opacity: 0, y: 12 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.25 }}
+                                            className="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[#FF6B52]/40 bg-[#F6F0EA]/45 p-8 text-center"
+                                        >
                                         <SapiusIsotype
                                             variant="dark"
                                             className="h-24 opacity-80"
@@ -445,9 +454,16 @@ export function FaqSection({
                                         <p className="mt-1.5 max-w-sm text-sm text-[#101E33]/70">
                                             Haz clic en «Antes de comprar», «Conoce tu preparación» o «Después de comprar» para explorar sus categorías y preguntas.
                                         </p>
-                                    </div>
+                                    </motion.div>
                                 ) : (
-                                    <div className="space-y-6">
+                                    <motion.div
+                                        key={activeGroupId}
+                                        initial={{ opacity: 0, y: 12 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.25 }}
+                                        className="space-y-6"
+                                    >
                                         {PROGRESSIVE_FAQ_GROUPS.filter(
                                             (g) => g.id === activeGroupId,
                                         ).map((group) => (
@@ -510,8 +526,9 @@ export function FaqSection({
                                                 </div>
                                             </div>
                                         ))}
-                                    </div>
+                                    </motion.div>
                                 )}
+                                </AnimatePresence>
                             </div>
                         </div>
                     </div>

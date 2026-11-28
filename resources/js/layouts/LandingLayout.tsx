@@ -136,10 +136,10 @@ export default function LandingLayout({
                                     <Link
                                         key={item.href}
                                         href={item.href}
-                                        className={`text-[15.5px] transition-colors duration-150 ${
+                                        className={`relative text-[15.5px] transition-colors duration-150 after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:bg-[#FF6B52] after:transition-all after:duration-200 ${
                                             active
-                                                ? 'font-extrabold text-[#101E33]'
-                                                : 'font-normal text-[#101E33] hover:text-[#FF6B52]'
+                                                ? 'font-extrabold text-[#101E33] after:w-full'
+                                                : 'font-normal text-[#101E33] after:w-0 hover:text-[#FF6B52] hover:after:w-full'
                                         }`}
                                     >
                                         {item.label}
@@ -249,7 +249,13 @@ export default function LandingLayout({
             <footer className="relative overflow-hidden bg-[#101E33] text-white">
                 <div className="relative z-10 mx-auto max-w-[1280px] px-5 pt-16 pb-14 sm:px-8 lg:px-10 lg:pt-20 lg:pb-16">
                     {/* Bloque superior: CTA izquierda + Navegación derecha */}
-                    <div className="flex flex-col justify-between gap-10 lg:flex-row lg:items-end">
+                    <motion.div
+                        initial={{ opacity: 0, y: 18 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, margin: '-40px' }}
+                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                        className="flex flex-col justify-between gap-10 lg:flex-row lg:items-end"
+                    >
                         <div className="max-w-2xl">
                             <h2 className="font-display text-3xl leading-[1.06] font-extrabold tracking-tight text-white sm:text-4xl lg:text-[3.15rem]">
                                 ¿Tienes dudas sobre
@@ -324,7 +330,7 @@ export default function LandingLayout({
                                 </Link>
                             </li>
                         </ul>
-                    </div>
+                    </motion.div>
 
                     {/* Bloque inferior SIN border-t */}
                     <div className="mt-14 grid grid-cols-1 items-end gap-10 md:grid-cols-3 lg:mt-16">

@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { motion } from 'framer-motion';
 import { ArrowRight, ShoppingBag } from 'lucide-react';
 import React, { useState } from 'react';
 import FaqSection from '@/components/public/FaqSection';
@@ -62,7 +63,13 @@ export default function Faq({ scheduledCourses = [] }: FaqPageProps) {
                 id="temas-informacion"
                 className="bg-[#101E33] py-14 text-center text-white sm:py-16"
             >
-                <div className="mx-auto max-w-4xl px-5 sm:px-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-40px' }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="mx-auto max-w-4xl px-5 sm:px-8"
+                >
                     <h2 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[2.6rem]">
                         ¿Sobre qué tema{' '}
                         <span className="text-[#FF6B52]">
@@ -73,7 +80,7 @@ export default function Faq({ scheduledCourses = [] }: FaqPageProps) {
                         Selecciona una de las siguientes categorías para
                         comenzar.
                     </p>
-                </div>
+                </motion.div>
             </section>
 
             {/* Sección 3: Categorías + Tarjetas compactas + Ilustración libro abierto */}

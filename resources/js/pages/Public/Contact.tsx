@@ -55,7 +55,13 @@ export default function Contact({ scheduledCourses }: ContactProps) {
                     {/* Grilla de 6 tarjetas blancas con borde fino coral */}
                     <div className="mt-14 grid grid-cols-1 gap-7 md:grid-cols-2 lg:grid-cols-3">
                         {/* 1) Horario de atención */}
-                        <div className="flex flex-col justify-between rounded-[22px] border border-[#FF6B52]/75 bg-white p-7 shadow-[0_16px_36px_-14px_rgba(16,30,51,0.15)]">
+                        <motion.div
+                            initial={{ opacity: 0, y: 18 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: '-40px' }}
+                            transition={{ duration: 0.35, ease: 'easeOut' }}
+                            className="flex flex-col justify-between rounded-[22px] border border-[#FF6B52]/75 bg-white p-7 shadow-[0_16px_36px_-14px_rgba(16,30,51,0.15)] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#FF6B52] hover:shadow-[0_22px_44px_-14px_rgba(16,30,51,0.2)]"
+                        >
                             <div>
                                 <div className="flex items-center gap-3.5">
                                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#FF6B52] text-[#FF6B52]">
@@ -88,7 +94,7 @@ export default function Contact({ scheduledCourses }: ContactProps) {
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* 2) Correo */}
                         <div className="flex flex-col justify-between rounded-[22px] border border-[#FF6B52]/75 bg-white p-7 shadow-[0_16px_36px_-14px_rgba(16,30,51,0.15)]">
